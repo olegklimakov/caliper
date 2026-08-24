@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- The history store lives here so a widget, which is sandboxed and can
+         reach nothing else, will be able to read it. Only a build signed with a
+         Developer ID actually gets the container; see HistoryDatabase. -->
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>GCCNH99PN6.caliper</string>
+    </array>
+</dict>
+</plist>

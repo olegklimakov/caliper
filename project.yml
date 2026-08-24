@@ -1,0 +1,75 @@
+name: Caliper
+
+options:
+  bundleIdPrefix: com.olegklimakov
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "15.0"
+  minimumXcodeGenVersion: "2.38.0"
+
+packages:
+  CaliperCore:
+    path: Packages/CaliperCore
+  CaliperHistory:
+    path: Packages/CaliperHistory
+
+settings:
+  base:
+    # Swift 6 language mode implies complete strict concurrency.
+    SWIFT_VERSION: "6.0"
+    ARCHS: arm64
+    ENABLE_HARDENED_RUNTIME: YES
+    ENABLE_APP_SANDBOX: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    # Local builds are ad-hoc signed, which drops hardened runtime; Developer ID
+    # signing lands in Phase 5 and turns it back on.
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+  configs:
+    # Everything else in Debug/Release comes from XcodeGen's presets; dead code
+    # stripping is the one shipped-binary setting they leave off.
+    release:
+      DEAD_CODE_STRIPPING: YES
+
+targets:
+  Caliper:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+      - path: assets/icon/AppIcon.icns
+        buildPhase: resources
+    dependencies:
+      - package: CaliperCore
+        product: CaliperCore
+      - package: CaliperHistory
+        product: CaliperHistory
+    settings:
+      base:
+        PRODUCT_NAME: Caliper
+        PRODUCT_BUNDLE_IDENTIFIER: com.olegklimakov.caliper
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_ENTITLEMENTS: App/Caliper.entitlements
+    info:
+      path: App/Info.plist
+      properties:
+        # Menu bar accessory: no Dock icon, no main window.
+        LSUIElement: true
+        CFBundleDisplayName: Caliper
+        CFBundleIconFile: AppIcon
+        # XcodeGen defaults these to 1.0/1 instead of the version settings.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+
+schemes:
+  Caliper:
+    build:
+      targets:
+        Caliper: all
+    run:
+      config: Debug
+    profile:
+      config: Release
+    archive:
+      config: Release

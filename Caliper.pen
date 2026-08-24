@@ -259,12 +259,12 @@
               "type": "text",
               "id": "fIpFu",
               "name": "Cores label",
-              "fill": "$text-tertiary",
+              "fill": "$text-secondary",
               "content": "CORES",
               "fontFamily": "$font-ui",
-              "fontSize": 9,
+              "fontSize": 11,
               "fontWeight": "600",
-              "letterSpacing": 1.2
+              "letterSpacing": 0.6
             },
             {
               "type": "frame",
@@ -539,12 +539,12 @@
               "type": "text",
               "id": "CDx3t",
               "name": "TP label",
-              "fill": "$text-tertiary",
+              "fill": "$text-secondary",
               "content": "TOP PROCESSES",
               "fontFamily": "$font-ui",
-              "fontSize": 9,
+              "fontSize": 11,
               "fontWeight": "600",
-              "letterSpacing": 1.2
+              "letterSpacing": 0.6
             },
             {
               "type": "frame",
@@ -561,7 +561,7 @@
                   "fill": "$text-primary",
                   "content": "WindowServer",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -623,7 +623,7 @@
                   "fill": "$text-primary",
                   "content": "Google Chrome",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -685,7 +685,7 @@
                   "fill": "$text-primary",
                   "content": "Xcode",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -784,7 +784,7 @@
               "id": "Fptsh",
               "name": "History link",
               "fill": "$accent-cpu",
-              "content": "History →",
+              "content": "History ›",
               "fontFamily": "$font-ui",
               "fontSize": 11,
               "fontWeight": "500"
@@ -993,7 +993,7 @@
                           "fill": "$text-tertiary",
                           "content": "App",
                           "fontFamily": "$font-ui",
-                          "fontSize": 9,
+                          "fontSize": 10,
                           "fontWeight": "normal"
                         },
                         {
@@ -1039,7 +1039,7 @@
                           "fill": "$text-tertiary",
                           "content": "Wired",
                           "fontFamily": "$font-ui",
-                          "fontSize": 9,
+                          "fontSize": 10,
                           "fontWeight": "normal"
                         },
                         {
@@ -1085,7 +1085,7 @@
                           "fill": "$text-tertiary",
                           "content": "Compr.",
                           "fontFamily": "$font-ui",
-                          "fontSize": 9,
+                          "fontSize": 10,
                           "fontWeight": "normal"
                         },
                         {
@@ -1131,7 +1131,7 @@
                           "fill": "$text-tertiary",
                           "content": "Free",
                           "fontFamily": "$font-ui",
-                          "fontSize": 9,
+                          "fontSize": 10,
                           "fontWeight": "normal"
                         },
                         {
@@ -1335,12 +1335,12 @@
               "type": "text",
               "id": "CzZLe",
               "name": "TOP PROCESSES label",
-              "fill": "$text-tertiary",
+              "fill": "$text-secondary",
               "content": "TOP PROCESSES",
               "fontFamily": "$font-ui",
-              "fontSize": 9,
+              "fontSize": 11,
               "fontWeight": "600",
-              "letterSpacing": 1.2
+              "letterSpacing": 0.6
             },
             {
               "type": "frame",
@@ -1357,7 +1357,7 @@
                   "fill": "$text-primary",
                   "content": "Google Chrome",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -1419,7 +1419,7 @@
                   "fill": "$text-primary",
                   "content": "Xcode",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -1481,7 +1481,7 @@
                   "fill": "$text-primary",
                   "content": "Figma",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -1579,8 +1579,8 @@
               "type": "text",
               "id": "pHfat",
               "name": "History link",
-              "fill": "$accent-mem",
-              "content": "History →",
+              "fill": "$accent-cpu",
+              "content": "History ›",
               "fontFamily": "$font-ui",
               "fontSize": 11,
               "fontWeight": "500"
@@ -1929,7 +1929,7 @@
                   "fill": "$text-primary",
                   "content": "68.2 MB/s",
                   "fontFamily": "$font-mono",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 }
               ]
@@ -1966,7 +1966,7 @@
                   "fill": "$text-primary",
                   "content": "24.1 MB/s",
                   "fontFamily": "$font-mono",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 }
               ]
@@ -1993,12 +1993,12 @@
               "type": "text",
               "id": "KzeDI",
               "name": "MOST ACTIVE label",
-              "fill": "$text-tertiary",
+              "fill": "$text-secondary",
               "content": "MOST ACTIVE",
               "fontFamily": "$font-ui",
-              "fontSize": 9,
+              "fontSize": 11,
               "fontWeight": "600",
-              "letterSpacing": 1.2
+              "letterSpacing": 0.6
             },
             {
               "type": "frame",
@@ -2015,7 +2015,7 @@
                   "fill": "$text-primary",
                   "content": "Spotlight",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -2077,7 +2077,7 @@
                   "fill": "$text-primary",
                   "content": "Xcode",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -2139,7 +2139,7 @@
                   "fill": "$text-primary",
                   "content": "Time Machine",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -2237,8 +2237,8 @@
               "type": "text",
               "id": "AsizC",
               "name": "History link",
-              "fill": "$accent-disk",
-              "content": "History →",
+              "fill": "$accent-cpu",
+              "content": "History ›",
               "fontFamily": "$font-ui",
               "fontSize": 11,
               "fontWeight": "500"
@@ -2507,7 +2507,7 @@
                   "fill": "$text-secondary",
                   "content": "Local IP",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -2537,7 +2537,7 @@
                   "fill": "$text-secondary",
                   "content": "Public IP",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -2567,7 +2567,7 @@
                   "fill": "$text-secondary",
                   "content": "Wi-Fi",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -2604,12 +2604,12 @@
               "type": "text",
               "id": "ZLzOM",
               "name": "TOP TALKERS label",
-              "fill": "$text-tertiary",
+              "fill": "$text-secondary",
               "content": "TOP TALKERS",
               "fontFamily": "$font-ui",
-              "fontSize": 9,
+              "fontSize": 11,
               "fontWeight": "600",
-              "letterSpacing": 1.2
+              "letterSpacing": 0.6
             },
             {
               "type": "frame",
@@ -2626,7 +2626,7 @@
                   "fill": "$text-primary",
                   "content": "Safari",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -2688,7 +2688,7 @@
                   "fill": "$text-primary",
                   "content": "Dropbox",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -2750,7 +2750,7 @@
                   "fill": "$text-primary",
                   "content": "Spotify",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -2848,8 +2848,8 @@
               "type": "text",
               "id": "g5xHC",
               "name": "History link",
-              "fill": "$accent-down",
-              "content": "History →",
+              "fill": "$accent-cpu",
+              "content": "History ›",
               "fontFamily": "$font-ui",
               "fontSize": 11,
               "fontWeight": "500"
@@ -3046,12 +3046,12 @@
               "type": "text",
               "id": "iNJM9",
               "name": "TEMPERATURES label",
-              "fill": "$text-tertiary",
+              "fill": "$text-secondary",
               "content": "TEMPERATURES",
               "fontFamily": "$font-ui",
-              "fontSize": 9,
+              "fontSize": 11,
               "fontWeight": "600",
-              "letterSpacing": 1.2
+              "letterSpacing": 0.6
             },
             {
               "type": "frame",
@@ -3068,7 +3068,7 @@
                   "fill": "$text-primary",
                   "content": "CPU P-cluster",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -3130,7 +3130,7 @@
                   "fill": "$text-primary",
                   "content": "CPU E-cluster",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -3192,7 +3192,7 @@
                   "fill": "$text-primary",
                   "content": "GPU",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -3254,7 +3254,7 @@
                   "fill": "$text-primary",
                   "content": "SSD",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -3316,7 +3316,7 @@
                   "fill": "$text-primary",
                   "content": "Battery",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -3385,12 +3385,12 @@
               "type": "text",
               "id": "SJ24n",
               "name": "FANS label",
-              "fill": "$text-tertiary",
+              "fill": "$text-secondary",
               "content": "FANS",
               "fontFamily": "$font-ui",
-              "fontSize": 9,
+              "fontSize": 11,
               "fontWeight": "600",
-              "letterSpacing": 1.2
+              "letterSpacing": 0.6
             },
             {
               "type": "frame",
@@ -3407,7 +3407,7 @@
                   "fill": "$text-primary",
                   "content": "Left fan",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -3469,7 +3469,7 @@
                   "fill": "$text-primary",
                   "content": "Right fan",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -3567,8 +3567,8 @@
               "type": "text",
               "id": "lZJqD",
               "name": "History link",
-              "fill": "$accent-temp",
-              "content": "History →",
+              "fill": "$accent-cpu",
+              "content": "History ›",
               "fontFamily": "$font-ui",
               "fontSize": 11,
               "fontWeight": "500"
@@ -3776,7 +3776,7 @@
       "name": "Design System",
       "clip": true,
       "width": 1080,
-      "fill": "#0F0F11",
+      "fill": "$win-bg",
       "cornerRadius": 20,
       "stroke": "$stroke-sep",
       "strokeWidth": 1,
@@ -5232,7 +5232,7 @@
       "name": "Menu Bar",
       "clip": true,
       "width": 1080,
-      "fill": "#0F0F11",
+      "fill": "$win-bg",
       "cornerRadius": 20,
       "stroke": "$stroke-sep",
       "strokeWidth": 1,
@@ -5296,7 +5296,7 @@
                   "type": "text",
                   "id": "CRIA1",
                   "name": "m File",
-                  "fill": "$text-secondary",
+                  "fill": "$text-primary",
                   "content": "File",
                   "fontFamily": "$font-ui",
                   "fontSize": 13,
@@ -5306,7 +5306,7 @@
                   "type": "text",
                   "id": "GpthE",
                   "name": "m Edit",
-                  "fill": "$text-secondary",
+                  "fill": "$text-primary",
                   "content": "Edit",
                   "fontFamily": "$font-ui",
                   "fontSize": 13,
@@ -5316,7 +5316,7 @@
                   "type": "text",
                   "id": "lfVc8",
                   "name": "m View",
-                  "fill": "$text-secondary",
+                  "fill": "$text-primary",
                   "content": "View",
                   "fontFamily": "$font-ui",
                   "fontSize": 13,
@@ -5326,7 +5326,7 @@
                   "type": "text",
                   "id": "tcQ2y",
                   "name": "m Go",
-                  "fill": "$text-secondary",
+                  "fill": "$text-primary",
                   "content": "Go",
                   "fontFamily": "$font-ui",
                   "fontSize": 13,
@@ -5336,7 +5336,7 @@
                   "type": "text",
                   "id": "c6kt2",
                   "name": "m Window",
-                  "fill": "$text-secondary",
+                  "fill": "$text-primary",
                   "content": "Window",
                   "fontFamily": "$font-ui",
                   "fontSize": 13,
@@ -5605,9 +5605,9 @@
                   "id": "O30yes",
                   "name": "clock",
                   "fill": "$text-primary",
-                  "content": "Wed 12 Aug  17:42",
+                  "content": "Wed 12 Aug 17:42",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 }
               ]
@@ -6350,7 +6350,7 @@
                       "fill": "$text-secondary",
                       "content": "1h",
                       "fontFamily": "$font-ui",
-                      "fontSize": 11
+                      "fontSize": 13
                     }
                   ]
                 },
@@ -6372,7 +6372,7 @@
                       "fill": "$text-primary",
                       "content": "24h",
                       "fontFamily": "$font-ui",
-                      "fontSize": 11,
+                      "fontSize": 13,
                       "fontWeight": "600"
                     }
                   ]
@@ -6395,7 +6395,7 @@
                       "fill": "$text-secondary",
                       "content": "7d",
                       "fontFamily": "$font-ui",
-                      "fontSize": 11
+                      "fontSize": 13
                     }
                   ]
                 },
@@ -6417,7 +6417,7 @@
                       "fill": "$text-secondary",
                       "content": "30d",
                       "fontFamily": "$font-ui",
-                      "fontSize": 11
+                      "fontSize": 13
                     }
                   ]
                 },
@@ -6439,7 +6439,7 @@
                       "fill": "$text-secondary",
                       "content": "1y",
                       "fontFamily": "$font-ui",
-                      "fontSize": 11
+                      "fontSize": 13
                     }
                   ]
                 }
@@ -6751,13 +6751,13 @@
                       "height": 16,
                       "icon": "settings",
                       "library": "lucide",
-                      "fill": "$text-tertiary"
+                      "fill": "$text-secondary"
                     },
                     {
                       "type": "text",
                       "id": "GJ49Q",
                       "name": "n",
-                      "fill": "$text-tertiary",
+                      "fill": "$text-secondary",
                       "content": "Settings",
                       "fontFamily": "$font-ui",
                       "fontSize": 13,
@@ -6791,8 +6791,8 @@
                       "fill": "$text-primary",
                       "content": "CPU — last 24 hours",
                       "fontFamily": "$font-ui",
-                      "fontSize": 18,
-                      "fontWeight": "700"
+                      "fontSize": 17,
+                      "fontWeight": "600"
                     },
                     {
                       "type": "frame",
@@ -6888,7 +6888,7 @@
                       "x": 830,
                       "y": 10,
                       "name": "gl 100",
-                      "fill": "$text-tertiary",
+                      "fill": "$text-secondary",
                       "content": "100%",
                       "fontFamily": "$font-mono",
                       "fontSize": 10,
@@ -6910,7 +6910,7 @@
                       "x": 830,
                       "y": 70,
                       "name": "gl 75",
-                      "fill": "$text-tertiary",
+                      "fill": "$text-secondary",
                       "content": "75%",
                       "fontFamily": "$font-mono",
                       "fontSize": 10,
@@ -6932,7 +6932,7 @@
                       "x": 830,
                       "y": 130,
                       "name": "gl 50",
-                      "fill": "$text-tertiary",
+                      "fill": "$text-secondary",
                       "content": "50%",
                       "fontFamily": "$font-mono",
                       "fontSize": 10,
@@ -6954,7 +6954,7 @@
                       "x": 830,
                       "y": 190,
                       "name": "gl 25",
-                      "fill": "$text-tertiary",
+                      "fill": "$text-secondary",
                       "content": "25%",
                       "fontFamily": "$font-mono",
                       "fontSize": 10,
@@ -7046,7 +7046,7 @@
                           "type": "text",
                           "id": "pj4ux",
                           "name": "t 00:00",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "00:00",
                           "fontFamily": "$font-mono",
                           "fontSize": 10,
@@ -7056,7 +7056,7 @@
                           "type": "text",
                           "id": "Hft0F",
                           "name": "t 06:00",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "06:00",
                           "fontFamily": "$font-mono",
                           "fontSize": 10,
@@ -7066,7 +7066,7 @@
                           "type": "text",
                           "id": "k4Qb4r",
                           "name": "t 12:00",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "12:00",
                           "fontFamily": "$font-mono",
                           "fontSize": 10,
@@ -7076,7 +7076,7 @@
                           "type": "text",
                           "id": "O0daCA",
                           "name": "t 18:00",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "18:00",
                           "fontFamily": "$font-mono",
                           "fontSize": 10,
@@ -7086,7 +7086,7 @@
                           "type": "text",
                           "id": "dxjof",
                           "name": "t now",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "now",
                           "fontFamily": "$font-mono",
                           "fontSize": 10,
@@ -7120,12 +7120,12 @@
                           "type": "text",
                           "id": "h16xY4",
                           "name": "l",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "AVERAGE",
                           "fontFamily": "$font-ui",
-                          "fontSize": 9,
+                          "fontSize": 11,
                           "fontWeight": "600",
-                          "letterSpacing": 1.2
+                          "letterSpacing": 0.6
                         },
                         {
                           "type": "frame",
@@ -7176,12 +7176,12 @@
                           "type": "text",
                           "id": "uYhjZ",
                           "name": "l",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "PEAK",
                           "fontFamily": "$font-ui",
-                          "fontSize": 9,
+                          "fontSize": 11,
                           "fontWeight": "600",
-                          "letterSpacing": 1.2
+                          "letterSpacing": 0.6
                         },
                         {
                           "type": "frame",
@@ -7232,12 +7232,12 @@
                           "type": "text",
                           "id": "YhLFS",
                           "name": "l",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "P-CORES AVG",
                           "fontFamily": "$font-ui",
-                          "fontSize": 9,
+                          "fontSize": 11,
                           "fontWeight": "600",
-                          "letterSpacing": 1.2
+                          "letterSpacing": 0.6
                         },
                         {
                           "type": "frame",
@@ -7288,12 +7288,12 @@
                           "type": "text",
                           "id": "f49ZD2",
                           "name": "l",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "E-CORES AVG",
                           "fontFamily": "$font-ui",
-                          "fontSize": 9,
+                          "fontSize": 11,
                           "fontWeight": "600",
-                          "letterSpacing": 1.2
+                          "letterSpacing": 0.6
                         },
                         {
                           "type": "frame",
@@ -7825,12 +7825,12 @@
               "type": "text",
               "id": "uAxGs",
               "name": "Cores label",
-              "fill": "$text-tertiary",
+              "fill": "$text-secondary",
               "content": "CORES",
               "fontFamily": "$font-ui",
-              "fontSize": 9,
+              "fontSize": 11,
               "fontWeight": "600",
-              "letterSpacing": 1.2
+              "letterSpacing": 0.6
             },
             {
               "type": "frame",
@@ -8105,12 +8105,12 @@
               "type": "text",
               "id": "rcfqQ",
               "name": "TP label",
-              "fill": "$text-tertiary",
+              "fill": "$text-secondary",
               "content": "TOP PROCESSES",
               "fontFamily": "$font-ui",
-              "fontSize": 9,
+              "fontSize": 11,
               "fontWeight": "600",
-              "letterSpacing": 1.2
+              "letterSpacing": 0.6
             },
             {
               "type": "frame",
@@ -8127,7 +8127,7 @@
                   "fill": "$text-primary",
                   "content": "WindowServer",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -8189,7 +8189,7 @@
                   "fill": "$text-primary",
                   "content": "Google Chrome",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -8251,7 +8251,7 @@
                   "fill": "$text-primary",
                   "content": "Xcode",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -8350,7 +8350,7 @@
               "id": "EWJIZ",
               "name": "History link",
               "fill": "$accent-cpu",
-              "content": "History →",
+              "content": "History ›",
               "fontFamily": "$font-ui",
               "fontSize": 11,
               "fontWeight": "500"
@@ -8562,7 +8562,7 @@
                           "fill": "$text-tertiary",
                           "content": "App",
                           "fontFamily": "$font-ui",
-                          "fontSize": 9,
+                          "fontSize": 10,
                           "fontWeight": "normal"
                         },
                         {
@@ -8608,7 +8608,7 @@
                           "fill": "$text-tertiary",
                           "content": "Wired",
                           "fontFamily": "$font-ui",
-                          "fontSize": 9,
+                          "fontSize": 10,
                           "fontWeight": "normal"
                         },
                         {
@@ -8654,7 +8654,7 @@
                           "fill": "$text-tertiary",
                           "content": "Compr.",
                           "fontFamily": "$font-ui",
-                          "fontSize": 9,
+                          "fontSize": 10,
                           "fontWeight": "normal"
                         },
                         {
@@ -8700,7 +8700,7 @@
                           "fill": "$text-tertiary",
                           "content": "Free",
                           "fontFamily": "$font-ui",
-                          "fontSize": 9,
+                          "fontSize": 10,
                           "fontWeight": "normal"
                         },
                         {
@@ -8904,12 +8904,12 @@
               "type": "text",
               "id": "SSgs1",
               "name": "TOP PROCESSES label",
-              "fill": "$text-tertiary",
+              "fill": "$text-secondary",
               "content": "TOP PROCESSES",
               "fontFamily": "$font-ui",
-              "fontSize": 9,
+              "fontSize": 11,
               "fontWeight": "600",
-              "letterSpacing": 1.2
+              "letterSpacing": 0.6
             },
             {
               "type": "frame",
@@ -8926,7 +8926,7 @@
                   "fill": "$text-primary",
                   "content": "Google Chrome",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -8988,7 +8988,7 @@
                   "fill": "$text-primary",
                   "content": "Xcode",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -9050,7 +9050,7 @@
                   "fill": "$text-primary",
                   "content": "Figma",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -9148,8 +9148,8 @@
               "type": "text",
               "id": "nH1hI",
               "name": "History link",
-              "fill": "$accent-mem",
-              "content": "History →",
+              "fill": "$accent-cpu",
+              "content": "History ›",
               "fontFamily": "$font-ui",
               "fontSize": 11,
               "fontWeight": "500"
@@ -9501,7 +9501,7 @@
                   "fill": "$text-primary",
                   "content": "68.2 MB/s",
                   "fontFamily": "$font-mono",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 }
               ]
@@ -9538,7 +9538,7 @@
                   "fill": "$text-primary",
                   "content": "24.1 MB/s",
                   "fontFamily": "$font-mono",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 }
               ]
@@ -9565,12 +9565,12 @@
               "type": "text",
               "id": "gZVdM",
               "name": "MOST ACTIVE label",
-              "fill": "$text-tertiary",
+              "fill": "$text-secondary",
               "content": "MOST ACTIVE",
               "fontFamily": "$font-ui",
-              "fontSize": 9,
+              "fontSize": 11,
               "fontWeight": "600",
-              "letterSpacing": 1.2
+              "letterSpacing": 0.6
             },
             {
               "type": "frame",
@@ -9587,7 +9587,7 @@
                   "fill": "$text-primary",
                   "content": "Spotlight",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -9649,7 +9649,7 @@
                   "fill": "$text-primary",
                   "content": "Xcode",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -9711,7 +9711,7 @@
                   "fill": "$text-primary",
                   "content": "Time Machine",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -9809,8 +9809,8 @@
               "type": "text",
               "id": "PGEUZ",
               "name": "History link",
-              "fill": "$accent-disk",
-              "content": "History →",
+              "fill": "$accent-cpu",
+              "content": "History ›",
               "fontFamily": "$font-ui",
               "fontSize": 11,
               "fontWeight": "500"
@@ -10082,7 +10082,7 @@
                   "fill": "$text-secondary",
                   "content": "Local IP",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -10112,7 +10112,7 @@
                   "fill": "$text-secondary",
                   "content": "Public IP",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -10142,7 +10142,7 @@
                   "fill": "$text-secondary",
                   "content": "Wi-Fi",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -10179,12 +10179,12 @@
               "type": "text",
               "id": "kH760",
               "name": "TOP TALKERS label",
-              "fill": "$text-tertiary",
+              "fill": "$text-secondary",
               "content": "TOP TALKERS",
               "fontFamily": "$font-ui",
-              "fontSize": 9,
+              "fontSize": 11,
               "fontWeight": "600",
-              "letterSpacing": 1.2
+              "letterSpacing": 0.6
             },
             {
               "type": "frame",
@@ -10201,7 +10201,7 @@
                   "fill": "$text-primary",
                   "content": "Safari",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -10263,7 +10263,7 @@
                   "fill": "$text-primary",
                   "content": "Dropbox",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -10325,7 +10325,7 @@
                   "fill": "$text-primary",
                   "content": "Spotify",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -10423,8 +10423,8 @@
               "type": "text",
               "id": "MXTCO",
               "name": "History link",
-              "fill": "$accent-down",
-              "content": "History →",
+              "fill": "$accent-cpu",
+              "content": "History ›",
               "fontFamily": "$font-ui",
               "fontSize": 11,
               "fontWeight": "500"
@@ -10624,12 +10624,12 @@
               "type": "text",
               "id": "m7zkr1",
               "name": "TEMPERATURES label",
-              "fill": "$text-tertiary",
+              "fill": "$text-secondary",
               "content": "TEMPERATURES",
               "fontFamily": "$font-ui",
-              "fontSize": 9,
+              "fontSize": 11,
               "fontWeight": "600",
-              "letterSpacing": 1.2
+              "letterSpacing": 0.6
             },
             {
               "type": "frame",
@@ -10646,7 +10646,7 @@
                   "fill": "$text-primary",
                   "content": "CPU P-cluster",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -10708,7 +10708,7 @@
                   "fill": "$text-primary",
                   "content": "CPU E-cluster",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -10770,7 +10770,7 @@
                   "fill": "$text-primary",
                   "content": "GPU",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -10832,7 +10832,7 @@
                   "fill": "$text-primary",
                   "content": "SSD",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -10894,7 +10894,7 @@
                   "fill": "$text-primary",
                   "content": "Battery",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -10963,12 +10963,12 @@
               "type": "text",
               "id": "GQx4S",
               "name": "FANS label",
-              "fill": "$text-tertiary",
+              "fill": "$text-secondary",
               "content": "FANS",
               "fontFamily": "$font-ui",
-              "fontSize": 9,
+              "fontSize": 11,
               "fontWeight": "600",
-              "letterSpacing": 1.2
+              "letterSpacing": 0.6
             },
             {
               "type": "frame",
@@ -10985,7 +10985,7 @@
                   "fill": "$text-primary",
                   "content": "Left fan",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -11047,7 +11047,7 @@
                   "fill": "$text-primary",
                   "content": "Right fan",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
@@ -11145,8 +11145,8 @@
               "type": "text",
               "id": "qDG7v",
               "name": "History link",
-              "fill": "$accent-temp",
-              "content": "History →",
+              "fill": "$accent-cpu",
+              "content": "History ›",
               "fontFamily": "$font-ui",
               "fontSize": 11,
               "fontWeight": "500"
@@ -11267,7 +11267,7 @@
                       "fill": "$text-secondary",
                       "content": "1h",
                       "fontFamily": "$font-ui",
-                      "fontSize": 11
+                      "fontSize": 13
                     }
                   ]
                 },
@@ -11289,7 +11289,7 @@
                       "fill": "$text-primary",
                       "content": "24h",
                       "fontFamily": "$font-ui",
-                      "fontSize": 11,
+                      "fontSize": 13,
                       "fontWeight": "600"
                     }
                   ]
@@ -11312,7 +11312,7 @@
                       "fill": "$text-secondary",
                       "content": "7d",
                       "fontFamily": "$font-ui",
-                      "fontSize": 11
+                      "fontSize": 13
                     }
                   ]
                 },
@@ -11334,7 +11334,7 @@
                       "fill": "$text-secondary",
                       "content": "30d",
                       "fontFamily": "$font-ui",
-                      "fontSize": 11
+                      "fontSize": 13
                     }
                   ]
                 },
@@ -11356,7 +11356,7 @@
                       "fill": "$text-secondary",
                       "content": "1y",
                       "fontFamily": "$font-ui",
-                      "fontSize": 11
+                      "fontSize": 13
                     }
                   ]
                 }
@@ -11668,13 +11668,13 @@
                       "height": 16,
                       "icon": "settings",
                       "library": "lucide",
-                      "fill": "$text-tertiary"
+                      "fill": "$text-secondary"
                     },
                     {
                       "type": "text",
                       "id": "c8TYb",
                       "name": "n",
-                      "fill": "$text-tertiary",
+                      "fill": "$text-secondary",
                       "content": "Settings",
                       "fontFamily": "$font-ui",
                       "fontSize": 13,
@@ -11708,8 +11708,8 @@
                       "fill": "$text-primary",
                       "content": "CPU — last 24 hours",
                       "fontFamily": "$font-ui",
-                      "fontSize": 18,
-                      "fontWeight": "700"
+                      "fontSize": 17,
+                      "fontWeight": "600"
                     },
                     {
                       "type": "frame",
@@ -11805,7 +11805,7 @@
                       "x": 830,
                       "y": 10,
                       "name": "gl 100",
-                      "fill": "$text-tertiary",
+                      "fill": "$text-secondary",
                       "content": "100%",
                       "fontFamily": "$font-mono",
                       "fontSize": 10,
@@ -11827,7 +11827,7 @@
                       "x": 830,
                       "y": 70,
                       "name": "gl 75",
-                      "fill": "$text-tertiary",
+                      "fill": "$text-secondary",
                       "content": "75%",
                       "fontFamily": "$font-mono",
                       "fontSize": 10,
@@ -11849,7 +11849,7 @@
                       "x": 830,
                       "y": 130,
                       "name": "gl 50",
-                      "fill": "$text-tertiary",
+                      "fill": "$text-secondary",
                       "content": "50%",
                       "fontFamily": "$font-mono",
                       "fontSize": 10,
@@ -11871,7 +11871,7 @@
                       "x": 830,
                       "y": 190,
                       "name": "gl 25",
-                      "fill": "$text-tertiary",
+                      "fill": "$text-secondary",
                       "content": "25%",
                       "fontFamily": "$font-mono",
                       "fontSize": 10,
@@ -11963,7 +11963,7 @@
                           "type": "text",
                           "id": "R6Dwd",
                           "name": "t 00:00",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "00:00",
                           "fontFamily": "$font-mono",
                           "fontSize": 10,
@@ -11973,7 +11973,7 @@
                           "type": "text",
                           "id": "uCDc2",
                           "name": "t 06:00",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "06:00",
                           "fontFamily": "$font-mono",
                           "fontSize": 10,
@@ -11983,7 +11983,7 @@
                           "type": "text",
                           "id": "hwGVK",
                           "name": "t 12:00",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "12:00",
                           "fontFamily": "$font-mono",
                           "fontSize": 10,
@@ -11993,7 +11993,7 @@
                           "type": "text",
                           "id": "ewphv",
                           "name": "t 18:00",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "18:00",
                           "fontFamily": "$font-mono",
                           "fontSize": 10,
@@ -12003,7 +12003,7 @@
                           "type": "text",
                           "id": "O4WK9",
                           "name": "t now",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "now",
                           "fontFamily": "$font-mono",
                           "fontSize": 10,
@@ -12037,12 +12037,12 @@
                           "type": "text",
                           "id": "w9VUE",
                           "name": "l",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "AVERAGE",
                           "fontFamily": "$font-ui",
-                          "fontSize": 9,
+                          "fontSize": 11,
                           "fontWeight": "600",
-                          "letterSpacing": 1.2
+                          "letterSpacing": 0.6
                         },
                         {
                           "type": "frame",
@@ -12093,12 +12093,12 @@
                           "type": "text",
                           "id": "qCHOH",
                           "name": "l",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "PEAK",
                           "fontFamily": "$font-ui",
-                          "fontSize": 9,
+                          "fontSize": 11,
                           "fontWeight": "600",
-                          "letterSpacing": 1.2
+                          "letterSpacing": 0.6
                         },
                         {
                           "type": "frame",
@@ -12149,12 +12149,12 @@
                           "type": "text",
                           "id": "B0b41K",
                           "name": "l",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "P-CORES AVG",
                           "fontFamily": "$font-ui",
-                          "fontSize": 9,
+                          "fontSize": 11,
                           "fontWeight": "600",
-                          "letterSpacing": 1.2
+                          "letterSpacing": 0.6
                         },
                         {
                           "type": "frame",
@@ -12205,12 +12205,12 @@
                           "type": "text",
                           "id": "K8EBSn",
                           "name": "l",
-                          "fill": "$text-tertiary",
+                          "fill": "$text-secondary",
                           "content": "E-CORES AVG",
                           "fontFamily": "$font-ui",
-                          "fontSize": 9,
+                          "fontSize": 11,
                           "fontWeight": "600",
-                          "letterSpacing": 1.2
+                          "letterSpacing": 0.6
                         },
                         {
                           "type": "frame",
@@ -12492,7 +12492,7 @@
       },
       "clip": true,
       "width": 1080,
-      "fill": "#0F0F11",
+      "fill": "$win-bg",
       "cornerRadius": 20,
       "stroke": "$stroke-sep",
       "strokeWidth": 1,
@@ -12556,7 +12556,7 @@
                   "type": "text",
                   "id": "A3lM4k",
                   "name": "m File",
-                  "fill": "$text-secondary",
+                  "fill": "$text-primary",
                   "content": "File",
                   "fontFamily": "$font-ui",
                   "fontSize": 13,
@@ -12566,7 +12566,7 @@
                   "type": "text",
                   "id": "L2ugAh",
                   "name": "m Edit",
-                  "fill": "$text-secondary",
+                  "fill": "$text-primary",
                   "content": "Edit",
                   "fontFamily": "$font-ui",
                   "fontSize": 13,
@@ -12576,7 +12576,7 @@
                   "type": "text",
                   "id": "xZosi",
                   "name": "m View",
-                  "fill": "$text-secondary",
+                  "fill": "$text-primary",
                   "content": "View",
                   "fontFamily": "$font-ui",
                   "fontSize": 13,
@@ -12586,7 +12586,7 @@
                   "type": "text",
                   "id": "rAqZC",
                   "name": "m Go",
-                  "fill": "$text-secondary",
+                  "fill": "$text-primary",
                   "content": "Go",
                   "fontFamily": "$font-ui",
                   "fontSize": 13,
@@ -12596,7 +12596,7 @@
                   "type": "text",
                   "id": "I2bq4",
                   "name": "m Window",
-                  "fill": "$text-secondary",
+                  "fill": "$text-primary",
                   "content": "Window",
                   "fontFamily": "$font-ui",
                   "fontSize": 13,
@@ -12865,9 +12865,9 @@
                   "id": "y82Lz",
                   "name": "clock",
                   "fill": "$text-primary",
-                  "content": "Wed 12 Aug  17:42",
+                  "content": "Wed 12 Aug 17:42",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12,
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 }
               ]
@@ -13566,7 +13566,7 @@
                     "blur": 24
                   },
                   "layout": "vertical",
-                  "padding": 14,
+                  "padding": 16,
                   "children": [
                     {
                       "type": "frame",
@@ -13583,7 +13583,7 @@
                           "fill": "$text-secondary",
                           "content": "CPU",
                           "fontFamily": "$font-ui",
-                          "fontSize": 10,
+                          "fontSize": 11,
                           "fontWeight": "600",
                           "letterSpacing": 1
                         },
@@ -13623,7 +13623,7 @@
                               "y": 0,
                               "name": "bg",
                               "innerRadius": 0.82,
-                              "fill": "$bg-inset",
+                              "fill": "$ring-track",
                               "width": 96,
                               "height": 96
                             },
@@ -13687,7 +13687,7 @@
                   "id": "YPb4R",
                   "name": "cap",
                   "fill": "$text-secondary",
-                  "content": "Small — CPU · refresh 5 min",
+                  "content": "Small — CPU · refresh 15 min",
                   "fontFamily": "$font-ui",
                   "fontSize": 11,
                   "fontWeight": "normal"
@@ -13724,7 +13724,7 @@
                     "blur": 24
                   },
                   "layout": "vertical",
-                  "padding": 14,
+                  "padding": 16,
                   "children": [
                     {
                       "type": "frame",
@@ -13741,7 +13741,7 @@
                           "fill": "$text-secondary",
                           "content": "DISK",
                           "fontFamily": "$font-ui",
-                          "fontSize": 10,
+                          "fontSize": 11,
                           "fontWeight": "600",
                           "letterSpacing": 1
                         },
@@ -13781,7 +13781,7 @@
                               "y": 0,
                               "name": "bg",
                               "innerRadius": 0.82,
-                              "fill": "$bg-inset",
+                              "fill": "$ring-track",
                               "width": 96,
                               "height": 96
                             },
@@ -13882,7 +13882,7 @@
                     "blur": 24
                   },
                   "layout": "vertical",
-                  "padding": 14,
+                  "padding": 16,
                   "children": [
                     {
                       "type": "frame",
@@ -13899,7 +13899,7 @@
                           "fill": "$text-secondary",
                           "content": "SYSTEM",
                           "fontFamily": "$font-ui",
-                          "fontSize": 10,
+                          "fontSize": 11,
                           "fontWeight": "600",
                           "letterSpacing": 1
                         },
@@ -14196,7 +14196,7 @@
                   "id": "Zj8gu",
                   "name": "cap",
                   "fill": "$text-secondary",
-                  "content": "Medium — System glance · refresh 5 min",
+                  "content": "Medium — System glance · refresh 15 min",
                   "fontFamily": "$font-ui",
                   "fontSize": 11,
                   "fontWeight": "normal"
@@ -14233,7 +14233,7 @@
                     "blur": 24
                   },
                   "layout": "vertical",
-                  "padding": 14,
+                  "padding": 16,
                   "children": [
                     {
                       "type": "frame",
@@ -14250,7 +14250,7 @@
                           "fill": "$text-secondary",
                           "content": "NETWORK",
                           "fontFamily": "$font-ui",
-                          "fontSize": 10,
+                          "fontSize": 11,
                           "fontWeight": "600",
                           "letterSpacing": 1
                         },
@@ -14337,12 +14337,12 @@
                           "x": 0,
                           "y": 0,
                           "name": "d",
-                          "geometry": "M0 35.3l7.1 6.1 7.2 6.5 7.1 1.3 7.2 0 7.1-0.7 7.2-6.1 7.1 6.1 7.2-6.8 7.1 3.3 7.2-1.9 7.1-3.7 7.2 1.7 7.1 4.7 7.2 2.9 7.1-3.1 7.2 3.6 7.1-6.5 7.2-2.8 7.1-2.6 7.2 3.6 7.1-3.3 7.2-0.5 7.1 0 7.2 3.6 7.1-6.8 7.2 4.4 7.1-1.8 7.2 0.4 7.1-2.6 7.2 2.5 7.1 1.4 7.2 0.8 7.1-3.2 7.2 4.4 7.1-5 7.2 3 7.1 3.6 7.2 1.9 7.1 1.6 7.2-6.7 7.1 1.9 7.2 0.6 7.1-4.8 7.2 3.1 7.1-5.8 7.2 3.8 7.1-0.3 0 14.9-336 0z",
+                          "geometry": "M0 39.1l7.1 6.9 7 7.4 7.1 1.5 7.1 0 7-0.9 7.1-6.8 7 6.9 7.1-7.8 7.1 3.8 7-2.1 7.1-4.2 7.1 1.8 7 5.4 7.1 3.3 7.1-3.5 7 4.1 7.1-7.4 7-3.2 7.1-2.9 7.1 4 7-3.7 7.1-0.5 7.1 0 7 4 7.1-7.7 7.1 5.1 7-2.1 7.1 0.4 7.1-2.9 7 2.8 7.1 1.6 7 0.9 7.1-3.6 7.1 5 7-5.7 7.1 3.4 7.1 4.1 7 2.1 7.1 1.8 7.1-7.6 7 2.2 7.1 0.6 7-5.3 7.1 3.5 7.1-6.6 7 4.3 7.1-0.3 0 16.8-332 0z",
                           "viewBox": [
                             0,
                             0,
-                            336,
-                            104
+                            332,
+                            116
                           ],
                           "fill": {
                             "type": "gradient",
@@ -14363,8 +14363,8 @@
                               }
                             ]
                           },
-                          "width": 336,
-                          "height": 104
+                          "width": 332,
+                          "height": 116
                         },
                         {
                           "type": "path",
@@ -14372,12 +14372,12 @@
                           "x": 0,
                           "y": 0,
                           "name": "u",
-                          "geometry": "M0 61.4l7.1-3.4 7.2 0.6 7.1 0.7 7.2-1.2 7.1-1.5 7.2-1.7 7.1-0.1 7.2 1.1 7.1-1.1 7.2 1.1 7.1 3.8 7.2-2 7.1-0.1 7.2 1.5 7.1-1 7.2-1.2 7.1-2 7.2 2.4 7.1 1.4 7.2-3.7 7.1 3.6 7.2 2.8 7.1 0.3 7.2-2.5 7.1-1.8 7.2-2.6 7.1 0 7.2 0 7.1 0 7.2 2.6 7.1 1.4 7.2-3.2 7.1-0.8 7.2 0 7.1 0 7.2 4 7.1-2.9 7.2-0.3 7.1-0.8 7.2 0 7.1 1.4 7.2-1.4 7.1 0 7.2 0 7.1 3.5 7.2-3.2 7.1-0.3 0-2.8-336 0z",
+                          "geometry": "M0 68.6l7.1-3.8 7 0.7 7.1 0.8 7.1-1.4 7-1.7 7.1-2 7-0.1 7.1 1.3 7.1-1.3 7 1.3 7.1 4.3 7.1-2.2 7-0.2 7.1 1.8 7.1-1.2 7-1.3 7.1-2.4 7 2.8 7.1 1.5 7.1-4.1 7 4 7.1 3.2 7.1 0.3 7-2.8 7.1-2 7.1-3 7 0 7.1 0 7.1 0 7 3 7.1 1.6 7-3.6 7.1-1 7.1 0 7 0 7.1 4.6 7.1-3.3 7-0.3 7.1-1 7.1 0 7 1.7 7.1-1.7 7 0 7.1 0 7.1 4 7-3.6 7.1-0.4 0-3.1-332 0z",
                           "viewBox": [
                             0,
                             0,
-                            336,
-                            104
+                            332,
+                            116
                           ],
                           "fill": {
                             "type": "gradient",
@@ -14389,26 +14389,26 @@
                             },
                             "colors": [
                               {
-                                "color": "#FF375F66",
+                                "color": "#0A84FF66",
                                 "position": 0
                               },
                               {
-                                "color": "#FF375F08",
+                                "color": "#0A84FF08",
                                 "position": 1
                               }
                             ]
                           },
-                          "width": 336,
-                          "height": 104
+                          "width": 332,
+                          "height": 116
                         },
                         {
                           "type": "rectangle",
                           "id": "Nd3iS",
                           "x": 0,
-                          "y": 51.5,
+                          "y": 57.5,
                           "name": "axis",
                           "fill": "$axis-line",
-                          "width": 336,
+                          "width": 332,
                           "height": 1
                         }
                       ]
@@ -14436,7 +14436,7 @@
           "fill": "$text-secondary",
           "textGrowth": "fixed-width",
           "width": "fill_container",
-          "content": "Widgets read the shared SQLite history (app group), not live sensors — WidgetKit refresh budget ≈ every 5–15 min. Real-time graphs live in the menu bar and floating panels instead.",
+          "content": "Widgets read the shared SQLite history (app group), not live sensors — WidgetKit refresh budget ≈ every 15 min. Real-time graphs live in the menu bar and floating panels instead.",
           "fontFamily": "$font-ui",
           "fontSize": 12,
           "fontWeight": "normal"
@@ -14508,7 +14508,7 @@
                     "blur": 24
                   },
                   "layout": "vertical",
-                  "padding": 14,
+                  "padding": 16,
                   "children": [
                     {
                       "type": "frame",
@@ -14525,7 +14525,7 @@
                           "fill": "$text-secondary",
                           "content": "CPU",
                           "fontFamily": "$font-ui",
-                          "fontSize": 10,
+                          "fontSize": 11,
                           "fontWeight": "600",
                           "letterSpacing": 1
                         },
@@ -14565,7 +14565,7 @@
                               "y": 0,
                               "name": "bg",
                               "innerRadius": 0.82,
-                              "fill": "$bg-inset",
+                              "fill": "$ring-track",
                               "width": 96,
                               "height": 96
                             },
@@ -14629,7 +14629,7 @@
                   "id": "Klgtw",
                   "name": "cap",
                   "fill": "$text-secondary",
-                  "content": "Small — CPU · refresh 5 min",
+                  "content": "Small — CPU · refresh 15 min",
                   "fontFamily": "$font-ui",
                   "fontSize": 11,
                   "fontWeight": "normal"
@@ -14666,7 +14666,7 @@
                     "blur": 24
                   },
                   "layout": "vertical",
-                  "padding": 14,
+                  "padding": 16,
                   "children": [
                     {
                       "type": "frame",
@@ -14683,7 +14683,7 @@
                           "fill": "$text-secondary",
                           "content": "DISK",
                           "fontFamily": "$font-ui",
-                          "fontSize": 10,
+                          "fontSize": 11,
                           "fontWeight": "600",
                           "letterSpacing": 1
                         },
@@ -14723,7 +14723,7 @@
                               "y": 0,
                               "name": "bg",
                               "innerRadius": 0.82,
-                              "fill": "$bg-inset",
+                              "fill": "$ring-track",
                               "width": 96,
                               "height": 96
                             },
@@ -14824,7 +14824,7 @@
                     "blur": 24
                   },
                   "layout": "vertical",
-                  "padding": 14,
+                  "padding": 16,
                   "children": [
                     {
                       "type": "frame",
@@ -14841,7 +14841,7 @@
                           "fill": "$text-secondary",
                           "content": "SYSTEM",
                           "fontFamily": "$font-ui",
-                          "fontSize": 10,
+                          "fontSize": 11,
                           "fontWeight": "600",
                           "letterSpacing": 1
                         },
@@ -15138,7 +15138,7 @@
                   "id": "imH5z",
                   "name": "cap",
                   "fill": "$text-secondary",
-                  "content": "Medium — System glance · refresh 5 min",
+                  "content": "Medium — System glance · refresh 15 min",
                   "fontFamily": "$font-ui",
                   "fontSize": 11,
                   "fontWeight": "normal"
@@ -15175,7 +15175,7 @@
                     "blur": 24
                   },
                   "layout": "vertical",
-                  "padding": 14,
+                  "padding": 16,
                   "children": [
                     {
                       "type": "frame",
@@ -15192,7 +15192,7 @@
                           "fill": "$text-secondary",
                           "content": "NETWORK",
                           "fontFamily": "$font-ui",
-                          "fontSize": 10,
+                          "fontSize": 11,
                           "fontWeight": "600",
                           "letterSpacing": 1
                         },
@@ -15279,12 +15279,12 @@
                           "x": 0,
                           "y": 0,
                           "name": "d",
-                          "geometry": "M0 35.3l7.1 6.1 7.2 6.5 7.1 1.3 7.2 0 7.1-0.7 7.2-6.1 7.1 6.1 7.2-6.8 7.1 3.3 7.2-1.9 7.1-3.7 7.2 1.7 7.1 4.7 7.2 2.9 7.1-3.1 7.2 3.6 7.1-6.5 7.2-2.8 7.1-2.6 7.2 3.6 7.1-3.3 7.2-0.5 7.1 0 7.2 3.6 7.1-6.8 7.2 4.4 7.1-1.8 7.2 0.4 7.1-2.6 7.2 2.5 7.1 1.4 7.2 0.8 7.1-3.2 7.2 4.4 7.1-5 7.2 3 7.1 3.6 7.2 1.9 7.1 1.6 7.2-6.7 7.1 1.9 7.2 0.6 7.1-4.8 7.2 3.1 7.1-5.8 7.2 3.8 7.1-0.3 0 14.9-336 0z",
+                          "geometry": "M0 39.1l7.1 6.9 7 7.4 7.1 1.5 7.1 0 7-0.9 7.1-6.8 7 6.9 7.1-7.8 7.1 3.8 7-2.1 7.1-4.2 7.1 1.8 7 5.4 7.1 3.3 7.1-3.5 7 4.1 7.1-7.4 7-3.2 7.1-2.9 7.1 4 7-3.7 7.1-0.5 7.1 0 7 4 7.1-7.7 7.1 5.1 7-2.1 7.1 0.4 7.1-2.9 7 2.8 7.1 1.6 7 0.9 7.1-3.6 7.1 5 7-5.7 7.1 3.4 7.1 4.1 7 2.1 7.1 1.8 7.1-7.6 7 2.2 7.1 0.6 7-5.3 7.1 3.5 7.1-6.6 7 4.3 7.1-0.3 0 16.8-332 0z",
                           "viewBox": [
                             0,
                             0,
-                            336,
-                            104
+                            332,
+                            116
                           ],
                           "fill": {
                             "type": "gradient",
@@ -15305,8 +15305,8 @@
                               }
                             ]
                           },
-                          "width": 336,
-                          "height": 104
+                          "width": 332,
+                          "height": 116
                         },
                         {
                           "type": "path",
@@ -15314,12 +15314,12 @@
                           "x": 0,
                           "y": 0,
                           "name": "u",
-                          "geometry": "M0 61.4l7.1-3.4 7.2 0.6 7.1 0.7 7.2-1.2 7.1-1.5 7.2-1.7 7.1-0.1 7.2 1.1 7.1-1.1 7.2 1.1 7.1 3.8 7.2-2 7.1-0.1 7.2 1.5 7.1-1 7.2-1.2 7.1-2 7.2 2.4 7.1 1.4 7.2-3.7 7.1 3.6 7.2 2.8 7.1 0.3 7.2-2.5 7.1-1.8 7.2-2.6 7.1 0 7.2 0 7.1 0 7.2 2.6 7.1 1.4 7.2-3.2 7.1-0.8 7.2 0 7.1 0 7.2 4 7.1-2.9 7.2-0.3 7.1-0.8 7.2 0 7.1 1.4 7.2-1.4 7.1 0 7.2 0 7.1 3.5 7.2-3.2 7.1-0.3 0-2.8-336 0z",
+                          "geometry": "M0 68.6l7.1-3.8 7 0.7 7.1 0.8 7.1-1.4 7-1.7 7.1-2 7-0.1 7.1 1.3 7.1-1.3 7 1.3 7.1 4.3 7.1-2.2 7-0.2 7.1 1.8 7.1-1.2 7-1.3 7.1-2.4 7 2.8 7.1 1.5 7.1-4.1 7 4 7.1 3.2 7.1 0.3 7-2.8 7.1-2 7.1-3 7 0 7.1 0 7.1 0 7 3 7.1 1.6 7-3.6 7.1-1 7.1 0 7 0 7.1 4.6 7.1-3.3 7-0.3 7.1-1 7.1 0 7 1.7 7.1-1.7 7 0 7.1 0 7.1 4 7-3.6 7.1-0.4 0-3.1-332 0z",
                           "viewBox": [
                             0,
                             0,
-                            336,
-                            104
+                            332,
+                            116
                           ],
                           "fill": {
                             "type": "gradient",
@@ -15331,26 +15331,26 @@
                             },
                             "colors": [
                               {
-                                "color": "#FF375F66",
+                                "color": "#0A84FF66",
                                 "position": 0
                               },
                               {
-                                "color": "#FF375F08",
+                                "color": "#0A84FF08",
                                 "position": 1
                               }
                             ]
                           },
-                          "width": 336,
-                          "height": 104
+                          "width": 332,
+                          "height": 116
                         },
                         {
                           "type": "rectangle",
                           "id": "P4BYWl",
                           "x": 0,
-                          "y": 51.5,
+                          "y": 57.5,
                           "name": "axis",
                           "fill": "$axis-line",
-                          "width": 336,
+                          "width": 332,
                           "height": 1
                         }
                       ]
@@ -15378,7 +15378,7 @@
           "fill": "$text-secondary",
           "textGrowth": "fixed-width",
           "width": "fill_container",
-          "content": "Widgets read the shared SQLite history (app group), not live sensors — WidgetKit refresh budget ≈ every 5–15 min. Real-time graphs live in the menu bar and floating panels instead.",
+          "content": "Widgets read the shared SQLite history (app group), not live sensors — WidgetKit refresh budget ≈ every 15 min. Real-time graphs live in the menu bar and floating panels instead.",
           "fontFamily": "$font-ui",
           "fontSize": 12,
           "fontWeight": "normal"
@@ -15514,43 +15514,173 @@
     },
     "accent-cpu": {
       "type": "color",
-      "value": "#0A84FF"
+      "value": [
+        {
+          "value": "#0A84FF",
+          "theme": {
+            "mode": "dark"
+          }
+        },
+        {
+          "value": "#007AFF",
+          "theme": {
+            "mode": "light"
+          }
+        }
+      ]
     },
     "accent-cpu-e": {
       "type": "color",
-      "value": "#64D2FF"
+      "value": [
+        {
+          "value": "#64D2FF",
+          "theme": {
+            "mode": "dark"
+          }
+        },
+        {
+          "value": "#32ADE6",
+          "theme": {
+            "mode": "light"
+          }
+        }
+      ]
     },
     "accent-mem": {
       "type": "color",
-      "value": "#BF5AF2"
+      "value": [
+        {
+          "value": "#BF5AF2",
+          "theme": {
+            "mode": "dark"
+          }
+        },
+        {
+          "value": "#AF52DE",
+          "theme": {
+            "mode": "light"
+          }
+        }
+      ]
     },
     "accent-disk": {
       "type": "color",
-      "value": "#FF9F0A"
+      "value": [
+        {
+          "value": "#FF9F0A",
+          "theme": {
+            "mode": "dark"
+          }
+        },
+        {
+          "value": "#E8890C",
+          "theme": {
+            "mode": "light"
+          }
+        }
+      ]
     },
     "accent-down": {
       "type": "color",
-      "value": "#30D158"
+      "value": [
+        {
+          "value": "#32D74B",
+          "theme": {
+            "mode": "dark"
+          }
+        },
+        {
+          "value": "#248A3D",
+          "theme": {
+            "mode": "light"
+          }
+        }
+      ]
     },
     "accent-up": {
       "type": "color",
-      "value": "#FF375F"
+      "value": [
+        {
+          "value": "#0A84FF",
+          "theme": {
+            "mode": "dark"
+          }
+        },
+        {
+          "value": "#007AFF",
+          "theme": {
+            "mode": "light"
+          }
+        }
+      ]
     },
     "accent-temp": {
       "type": "color",
-      "value": "#FF6482"
+      "value": [
+        {
+          "value": "#A0A0A8",
+          "theme": {
+            "mode": "dark"
+          }
+        },
+        {
+          "value": "#6E6E73",
+          "theme": {
+            "mode": "light"
+          }
+        }
+      ]
     },
     "ok": {
       "type": "color",
-      "value": "#32D74B"
+      "value": [
+        {
+          "value": "#32D74B",
+          "theme": {
+            "mode": "dark"
+          }
+        },
+        {
+          "value": "#248A3D",
+          "theme": {
+            "mode": "light"
+          }
+        }
+      ]
     },
     "warn": {
       "type": "color",
-      "value": "#FFD60A"
+      "value": [
+        {
+          "value": "#FFD60A",
+          "theme": {
+            "mode": "dark"
+          }
+        },
+        {
+          "value": "#C97A00",
+          "theme": {
+            "mode": "light"
+          }
+        }
+      ]
     },
     "crit": {
       "type": "color",
-      "value": "#FF453A"
+      "value": [
+        {
+          "value": "#FF453A",
+          "theme": {
+            "mode": "dark"
+          }
+        },
+        {
+          "value": "#D70015",
+          "theme": {
+            "mode": "light"
+          }
+        }
+      ]
     },
     "font-ui": {
       "type": "string",
@@ -15614,13 +15744,13 @@
       "type": "color",
       "value": [
         {
-          "value": "#0D0D0F",
+          "value": "#1E1E22",
           "theme": {
             "mode": "dark"
           }
         },
         {
-          "value": "#E4E4E8",
+          "value": "#F0F0F3",
           "theme": {
             "mode": "light"
           }
@@ -15689,6 +15819,23 @@
         },
         {
           "value": "#F2F2F5",
+          "theme": {
+            "mode": "light"
+          }
+        }
+      ]
+    },
+    "ring-track": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#FFFFFF14",
+          "theme": {
+            "mode": "dark"
+          }
+        },
+        {
+          "value": "#00000014",
           "theme": {
             "mode": "light"
           }

@@ -1,0 +1,12 @@
+.DS_Store
+
+# XcodeGen output — regenerate with `xcodegen generate`
+/Caliper.xcodeproj/
+/App/Info.plist
+
+# Build products
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.swiftpm/

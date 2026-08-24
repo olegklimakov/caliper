@@ -1,0 +1,91 @@
+import Foundation
+
+/// Byte rates, formatted for a place where width is fixed.
+enum RateFormatter {
+    /// Compact form for the menu bar: at most four characters plus a unit, so
+    /// the module never needs to grow. "12,4 M" rather than "12,4 MB/s".
+    static func menuBar(_ bytesPerSecond: Double) -> String {
+        let (value, unit) = scaled(bytesPerSecond)
+        // Below a kilobyte the scale has no prefix, and dropping the unit with
+        // it leaves a bare number that could be anything — "B" is the unit.
+        let symbol = unit.isEmpty ? "B" : unit
+        if value >= 100 || unit == "K" {
+            return "\(Int(value.rounded()))\u{2009}\(symbol)"
+        }
+        return Decimals.string("%.1f\u{2009}\(symbol)", value)
+    }
+
+    /// Full form for panels, where there is room to be explicit.
+    static func panel(_ bytesPerSecond: Double) -> String {
+        let (value, unit) = scaled(bytesPerSecond)
+        let digits = value >= 100 || unit.isEmpty ? 0 : 1
+        return Decimals.string("%.\(digits)f \(unit)B/s", value)
+    }
+
+    /// Powers of 1024, the unit a network stack actually counts in.
+    private static func scaled(_ bytes: Double) -> (value: Double, unit: String) {
+        switch bytes {
+        case ..<1024: (bytes, "")
+        case ..<(1024 * 1024): (bytes / 1024, "K")
+        case ..<(1024 * 1024 * 1024): (bytes / (1024 * 1024), "M")
+        default: (bytes / (1024 * 1024 * 1024), "G")
+        }
+    }
+}
+
+/// Numbers written the way the user's Mac writes them.
+///
+/// `String(format:)` without a locale always produces a full stop, while
+/// `ByteCountFormatter` always follows the region setting — so a panel that
+/// used both put "17.5%" one line above "625,8 MB". Every fractional number
+/// this app prints goes through here or through `ByteCountFormatter`.
+enum Decimals {
+    static func string(_ format: String, _ value: Double) -> String {
+        String(format: format, locale: .current, value)
+    }
+}
+
+/// `ByteCountFormatter` is not `Sendable`, and there is no reason to format
+/// bytes anywhere but on the main actor — formatting is a UI concern.
+@MainActor
+enum ByteFormatter {
+    /// Disk capacities and file sizes, in the decimal units the Finder uses:
+    /// a 1 TB SSD is sold, formatted and reported as 1 TB.
+    private static let fileStyle = make(.file)
+
+    /// Memory, in the binary units a Mac counts it in. `.file` would write a
+    /// 48 GB machine's 51_539_607_552 bytes as "51,54 GB" — a number that
+    /// appears nowhere else on the system.
+    private static let memoryStyle = make(.memory)
+
+    static func capacity(_ bytes: UInt64) -> String {
+        fileStyle.string(fromByteCount: Int64(bytes))
+    }
+
+    static func memory(_ bytes: UInt64) -> String {
+        memoryStyle.string(fromByteCount: Int64(bytes))
+    }
+
+    private static func make(_ style: ByteCountFormatter.CountStyle) -> ByteCountFormatter {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = style
+        formatter.allowedUnits = [.useTB, .useGB, .useMB]
+        // Otherwise an idle swap file reads "Zero KB", which looks like a bug.
+        formatter.allowsNonnumericFormatting = false
+        return formatter
+    }
+}
+
+enum PercentFormatter {
+    /// Fractions arrive as 0…1 everywhere in the core; the UI is the only place
+    /// that turns them into percentages.
+    static func string(_ fraction: Double, decimals: Int = 0) -> String {
+        Decimals.string("%.\(decimals)f%%", fraction * 100)
+    }
+}
+
+enum TemperatureFormatter {
+    static func string(_ celsius: Double) -> String {
+        "\(Int(celsius.rounded()))°"
+    }
+}
