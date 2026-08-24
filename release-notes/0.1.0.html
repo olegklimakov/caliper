@@ -1,0 +1,50 @@
+<style>
+  /* Sparkle renders these notes inside the update window, which follows the
+     system appearance — so the text has to name a colour that survives both.
+     Canvas/CanvasText are the system pair; without them the default black
+     lands on a dark panel. */
+  :root { color-scheme: light dark; }
+  body {
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, sans-serif;
+    color: CanvasText;
+    background: Canvas;
+    margin: 0;
+  }
+  h3 { font-size: 13px; margin: 16px 0 6px; }
+  ul { margin: 0; padding-left: 18px; }
+  li { margin-bottom: 4px; }
+  p { margin: 0 0 10px; }
+  code { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; }
+  a { color: LinkText; }
+</style>
+
+<p>The first release of Caliper — a native macOS system monitor that lives in
+the menu bar, keeps a real history of what the machine has been doing, and is
+built not to become the load it measures.</p>
+
+<h3>In this build</h3>
+<ul>
+  <li><b>Menu bar</b> — CPU, memory, network, disk and temperature, each drawn
+    at a fixed width so nothing shoves its neighbours around. Every module is
+    configured on its own: the picture is its live graph, the symbol that names
+    it, or nothing, and the value switches on and off beside it. The modules
+    can also share a single item, in an order you set by dragging.</li>
+  <li><b>Panels</b> — one behind each module. CPU with its performance and
+    efficiency clusters, per-core bars and the heaviest processes; memory
+    pressure and composition; disk throughput, free space and drive health;
+    network rates with the interface and address behind them; every sensor and
+    fan the machine will report.</li>
+  <li><b>History</b> — recorded locally to SQLite from the moment the app
+    starts, rolled up 10 s → 1 min → 10 min → 1 h, and charted over an hour, a
+    day, a week, a month or a year. Nothing leaves the Mac.</li>
+  <li><b>Cost</b> — under 1 % of one core and under 50 MB of physical footprint
+    in menu-bar-only use, measured by a harness rather than hoped for.</li>
+  <li><b>Updates</b> — Caliper now checks for its own, quietly: a scheduled
+    check that finds something marks the menu bar rather than interrupting you,
+    and every update is verified against the developer signature before it is
+    applied.</li>
+</ul>
+
+<h3>Requirements</h3>
+<p>macOS 15 or later, Apple Silicon. Sensors are read on a best-effort basis:
+what a particular Mac will not report is hidden rather than guessed at.</p>

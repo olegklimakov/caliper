@@ -124,9 +124,13 @@ final class UpdaterService: NSObject, SPUStandardUserDriverDelegate {
         _ update: SUAppcastItem,
         andInImmediateFocus immediateFocus: Bool
     ) -> Bool {
-        // Only when Sparkle would already be in front of the user — otherwise
-        // the badge below is the whole notification.
-        immediateFocus
+        // Always ours, and `immediateFocus` is deliberately ignored. It reads
+        // like "the user is looking at the app", and it is not: Sparkle sets it
+        // when it proposes to take utmost focus, which it does when the app was
+        // launched recently or the machine has been idle. Returning it put a
+        // window over the screen at every login — the one moment a menu bar
+        // monitor is least entitled to one.
+        false
     }
 
     nonisolated func standardUserDriverWillHandleShowingUpdate(
