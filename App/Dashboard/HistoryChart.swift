@@ -287,37 +287,28 @@ private struct ChartCursorKeys: ViewModifier {
     let cursor: Binding<Date?>
     let slice: HistorySlice
 
-    @FocusState private var focused: Bool
-    /// The two accessibility modes a focus indicator has to answer to: one asks
-    /// for it louder, the other asks for it not to move.
-    @Environment(\.colorSchemeContrast) private var contrast
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     func body(content: Content) -> some View {
         content
+            // Before `focusable`, never after: the ring reads `\.isFocused`,
+            // and only a view *inside* the focusable one is told that.
+            .overlay { ChartFocusRing() }
+            // A click focuses this on its own — a `focusable` view is what the
+            // click lands in — so scrubbing once with the pointer leaves the
+            // arrows working from there. Which matters because Tab reaches a
+            // `focusable` view only when Full Keyboard Access is on, and it is
+            // off by default: arrows that needed a trip to System Settings
+            // first would be the accessibility note again in a new form.
+            // Taking the window's initial focus off the sidebar instead was
+            // tried and is worse — a split view's sidebar is where macOS puts
+            // it, and arrow keys through a list of metrics is the behaviour
+            // that would have been stolen.
             .focusable()
-            .focused($focused)
             // The system ring is drawn around whatever is focusable, and what
             // is focusable here is the whole picture — five stacked charts, or
             // a pane-sized one. At that size the ring stops reading as "the
             // arrow keys go here" and starts reading as an alert, so it is
-            // replaced by a hairline in the same accent below.
+            // replaced by `ChartFocusRing`'s hairline in the same accent.
             .focusEffectDisabled()
-            .overlay { focusRing }
-            // A click takes focus as well as placing the cursor, so scrubbing
-            // once with the pointer leaves the arrows working from there.
-            //
-            // This is why: Tab reaches a `focusable` view only when Full
-            // Keyboard Access is on, and it is off by default, so arrows that
-            // needed a trip to System Settings first would be the accessibility
-            // note again in a new form. Taking the window's initial focus off
-            // the sidebar instead was tried and is worse — a split view's
-            // sidebar is where macOS puts it, and arrow keys through a list of
-            // metrics is the behaviour that would have been stolen.
-            //
-            // `simultaneousGesture`, because the chart's own drag has already
-            // claimed the click and a plain `onTapGesture` would never fire.
-            .simultaneousGesture(TapGesture().onEnded { focused = true })
             .onKeyPress(.leftArrow) { step(-1) }
             .onKeyPress(.rightArrow) { step(1) }
             // The same way out a drag has: leaving the plot dismisses the
@@ -329,15 +320,44 @@ private struct ChartCursorKeys: ViewModifier {
             }
     }
 
-    /// Says where the arrow keys will land without shouting it. Outside the
-    /// plot by a few points so it never crowds the axis labels, and faded in so
-    /// that clicking into a chart does not blink a box into existence.
-    ///
-    /// Quiet is a default, not a rule: with Increase Contrast on, a hairline at
-    /// 45 % is exactly the indicator that setting exists to reject, so the ring
-    /// goes back to full strength and full weight. Reduce Motion drops the
-    /// fade — the ring still appears, it just stops travelling to get there.
-    private var focusRing: some View {
+    /// Ignored rather than handled when the slice holds no whole bucket: there
+    /// is nothing to move to, and swallowing the key would only make the
+    /// window feel stuck.
+    private func step(_ buckets: Int) -> KeyPress.Result {
+        guard let next = slice.bucket(from: cursor.wrappedValue, steppedBy: buckets) else {
+            return .ignored
+        }
+        cursor.wrappedValue = next
+        return .handled
+    }
+}
+
+/// Says where the arrow keys will land without shouting it. Outside the plot by
+/// a few points so it never crowds the axis labels, and faded in so that
+/// clicking into a chart does not blink a box into existence.
+///
+/// Quiet is a default, not a rule: with Increase Contrast on, a hairline at
+/// 45 % is exactly the indicator that setting exists to reject, so the ring
+/// goes back to full strength and full weight. Reduce Motion drops the fade —
+/// the ring still appears, it just stops travelling to get there.
+///
+/// A view of its own so that it sits *inside* the focusable chart and can read
+/// `\.isFocused`, which is the enclosing focusable view's own answer rather
+/// than a flag something else has to remember to set.
+///
+/// A `@FocusState` bound with `.focused` was that flag, and it is worse than
+/// useless: with that modifier applied SwiftUI reports the chart as unfocused
+/// both through the binding *and* through the environment, while going on
+/// drawing a focus effect around the very same chart. The ring gated on it
+/// never once appeared, in either pane.
+private struct ChartFocusRing: View {
+    @Environment(\.isFocused) private var focused
+    /// The two accessibility modes a focus indicator has to answer to: one asks
+    /// for it louder, the other asks for it not to move.
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
         let isEmphasised = contrast == .increased
         return RoundedRectangle(cornerRadius: PanelMetrics.cardRadius, style: .continuous)
             .strokeBorder(
@@ -348,17 +368,6 @@ private struct ChartCursorKeys: ViewModifier {
             .opacity(focused ? 1 : 0)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: focused)
             .allowsHitTesting(false)
-    }
-
-    /// Ignored rather than handled when the slice holds no whole bucket: there
-    /// is nothing to move to, and swallowing the key would only make the
-    /// window feel stuck.
-    private func step(_ buckets: Int) -> KeyPress.Result {
-        guard let next = slice.bucket(from: cursor.wrappedValue, steppedBy: buckets) else {
-            return .ignored
-        }
-        cursor.wrappedValue = next
-        return .handled
     }
 }
 
