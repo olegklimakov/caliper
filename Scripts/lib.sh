@@ -6,18 +6,23 @@
 
 # Path to the release app, unless one was given.
 #
-# Absolute either way. The pid lookup below compares against `ps -o comm=`,
-# which always answers with a full path, so a relative one given on the command
-# line matches nothing and the harness reports "app did not start" over an app
-# that started perfectly well.
+# Canonical either way, which is more than merely absolute. The pid lookup below
+# compares against `ps -o comm=`, and that answers with a path resolved all the
+# way down — no `..`, no symlinks. Anything less matches nothing and the harness
+# reports "app did not start" over an app that started perfectly well: first a
+# relative path, then `build/../dist/Caliper.app`, which is absolute the moment
+# `$PWD` is prepended and still not what `ps` will say.
 caliper_app_path() {
     local given="${1:-}"
     if [[ -n "$given" ]]; then
-        if [[ "$given" == /* ]]; then
-            echo "$given"
-        else
-            echo "$PWD/$given"
-        fi
+        # `pwd -P` on the directory, because the bundle itself need not exist
+        # yet and `realpath` is not on a stock macOS.
+        local directory
+        directory=$(cd "$(dirname "$given")" 2>/dev/null && pwd -P) || {
+            echo "no such directory: $(dirname "$given")" >&2
+            return 1
+        }
+        echo "$directory/$(basename "$given")"
         return
     fi
     local products
