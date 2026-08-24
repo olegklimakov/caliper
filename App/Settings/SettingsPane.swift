@@ -201,27 +201,26 @@ struct SettingsPane: View {
     private var updates: some View {
         @Bindable var updater = updater
         return Section("Updates") {
-                Toggle("Check automatically", isOn: $updater.automaticallyChecksForUpdates)
-                Toggle("Download in the background", isOn: $updater.automaticallyDownloadsUpdates)
-                    .disabled(!updater.automaticallyChecksForUpdates)
-                Text(
-                    "A downloaded update installs itself the next time Caliper quits. "
-                        + "Every update is checked against the developer signature before it is applied."
-                )
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            Toggle("Check automatically", isOn: $updater.automaticallyChecksForUpdates)
+            Toggle("Download in the background", isOn: $updater.automaticallyDownloadsUpdates)
+                .disabled(!updater.automaticallyChecksForUpdates)
+            Text(
+                "A downloaded update installs itself the next time Caliper quits. Every update is checked against the developer signature before it is applied."
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
 
-                LabeledContent("Last checked") {
-                    Text(lastChecked)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                }
-                LabeledContent("Version") {
-                    Text(UpdaterService.version)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
+            LabeledContent("Last checked") {
+                Text(lastChecked)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            LabeledContent("Version") {
+                Text(UpdaterService.version)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
             Button("Check Now") { updater.checkForUpdates() }
                 .disabled(!updater.canCheckForUpdates)
         }

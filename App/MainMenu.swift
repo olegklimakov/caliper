@@ -35,6 +35,11 @@ enum MainMenu {
             action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
             keyEquivalent: ""
         )
+        menu.addItem(
+            withTitle: "Check for Updates…",
+            action: #selector(AppDelegate.checkForUpdates(_:)),
+            keyEquivalent: ""
+        )
         menu.addItem(.separator())
         // Targetless like the edit items: the responder chain ends at the app
         // delegate, which is the one object that can reach the window.

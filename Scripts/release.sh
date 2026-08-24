@@ -63,12 +63,35 @@ NOTES_MD="$ROOT/release-notes/$VERSION.md"
 
 step() { printf "\n==> %s\n" "$1"; }
 
+# The bundles Sparkle ships inside its framework, innermost first — which is the
+# order they must be signed in, since signing an outer bundle seals the hashes
+# of everything inside it. Spelled out once: two copies in two orders is two
+# answers to "what has to be signed".
+nested_bundles() {
+    local sparkle="$1"
+    find "$sparkle/Versions/B/XPCServices" -maxdepth 1 -name "*.xpc" 2>/dev/null || true
+    echo "$sparkle/Versions/B/Updater.app"
+    echo "$sparkle/Versions/B/Autoupdate"
+    echo "$sparkle/Versions/B"
+}
+
+# Sparkle's layout is Sparkle's to change. If it ever does, every path above
+# stops existing, both loops below run zero times, and the checks report success
+# having examined nothing — so the count is asserted rather than assumed.
+NESTED_EXPECTED=5
+
 # Every check below costs seconds; every one of them skipped costs a build and a
 # round trip to Apple to be told the same thing.
 step "checking prerequisites"
 
-security find-identity -v -p codesigning | grep -q "$TEAM_ID" ||
-    { echo "no Developer ID certificate for team $TEAM_ID" >&2; exit 1; }
+# Read into a variable rather than piped to `grep -q`, which exits on its first
+# match and leaves `security` writing into a closed pipe — a failure `pipefail`
+# would report as this check failing.
+identities=$(security find-identity -v -p codesigning)
+case $identities in
+*"$TEAM_ID"*) ;;
+*) echo "no Developer ID certificate for team $TEAM_ID" >&2; exit 1 ;;
+esac
 xcrun notarytool history --keychain-profile "$KEYCHAIN_PROFILE" >/dev/null 2>&1 ||
     { echo "no stored credentials — see the header of this script" >&2; exit 1; }
 
@@ -109,7 +132,15 @@ if [ "$KEYCHAIN_KEY" != "$BUNDLED_KEY" ]; then
 fi
 
 step "generating project"
+command -v xcodegen >/dev/null ||
+    { echo "xcodegen not installed (brew install xcodegen)" >&2; exit 1; }
 xcodegen generate
+
+# Below the cheap guards and above the build: quick, and a failure here is worth
+# hearing about before a notarization round trip.
+step "running the tests"
+(cd Packages/CaliperCore && swift test)
+(cd Packages/CaliperHistory && swift test)
 
 step "checking the version against what is already published"
 rm -rf "$DIST"
@@ -131,7 +162,11 @@ if [ -f "$FEED/appcast.xml" ]; then
     PUBLISHED=$(xmllint --format "$FEED/appcast.xml" |
         sed -n 's|.*<sparkle:version>\([0-9][0-9]*\)</sparkle:version>.*|\1|p' |
         sort -n | tail -1)
-    if [ -n "$PUBLISHED" ] && [ "$BUILD_NUMBER" -le "$PUBLISHED" ]; then
+    # An appcast that parsed to nothing is a changed format, not an empty feed,
+    # and a guard that reports success over zero rows is not a guard.
+    [ -n "$PUBLISHED" ] ||
+        { echo "read no <sparkle:version> out of the published appcast" >&2; exit 1; }
+    if [ "$BUILD_NUMBER" -le "$PUBLISHED" ]; then
         echo "CURRENT_PROJECT_VERSION ($BUILD_NUMBER) is not above the published build ($PUBLISHED)." >&2
         echo "Sparkle compares that number — bump it in project.yml." >&2
         exit 1
@@ -183,16 +218,19 @@ SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
 # entitlements of its own, and re-signing without them leaves an updater that
 # cannot install anything.
 step "re-signing Sparkle's nested bundles"
+NESTED=$(nested_bundles "$SPARKLE")
+NESTED_COUNT=$(grep -c . <<<"$NESTED" || true)
+[ "$NESTED_COUNT" -eq "$NESTED_EXPECTED" ] || {
+    echo "expected $NESTED_EXPECTED bundles inside Sparkle.framework, found $NESTED_COUNT:" >&2
+    echo "$NESTED" >&2
+    echo "Sparkle's layout has changed — the signing below would miss what it misses." >&2
+    exit 1
+}
 while IFS= read -r nested; do
-    [ -e "$nested" ] || continue
+    [ -e "$nested" ] || { echo "no such bundle: $nested" >&2; exit 1; }
     codesign --force --sign "$IDENTITY" --timestamp --options=runtime \
         --preserve-metadata=entitlements "$nested"
-done <<EOF
-$(find "$SPARKLE/Versions/B/XPCServices" -maxdepth 1 -name "*.xpc" 2>/dev/null)
-$SPARKLE/Versions/B/Updater.app
-$SPARKLE/Versions/B/Autoupdate
-$SPARKLE/Versions/B
-EOF
+done <<<"$NESTED"
 codesign --force --sign "$IDENTITY" --timestamp --options=runtime \
     --entitlements App/Caliper.entitlements "$APP"
 
@@ -203,8 +241,9 @@ codesign --verify --deep --strict --verbose=2 "$APP"
 # failure here. Read into a variable rather than piped to `grep -q`, which exits
 # on its first match and leaves codesign writing into a closed pipe — a failure
 # `set -o pipefail` would report as the check itself failing.
+CHECKED=0
 while IFS= read -r nested; do
-    [ -e "$nested" ] || continue
+    [ -e "$nested" ] || { echo "no such bundle: $nested" >&2; exit 1; }
     description=$(codesign -dv --verbose=4 "$nested" 2>&1)
     case $description in
     *"flags="*"runtime"*) ;;
@@ -214,13 +253,26 @@ while IFS= read -r nested; do
     *"Authority=$IDENTITY"*) ;;
     *) echo "not signed with the release identity: $nested" >&2; exit 1 ;;
     esac
-done <<EOF
-$APP
-$SPARKLE/Versions/B
-$SPARKLE/Versions/B/Updater.app
-$SPARKLE/Versions/B/Autoupdate
-$(find "$SPARKLE/Versions/B/XPCServices" -maxdepth 1 -name "*.xpc" 2>/dev/null)
-EOF
+    CHECKED=$((CHECKED + 1))
+done <<<"$APP
+$NESTED"
+echo "    $CHECKED bundles carry the release identity and the hardened runtime"
+[ "$CHECKED" -eq "$((NESTED_EXPECTED + 1))" ] ||
+    { echo "checked $CHECKED bundles, expected $((NESTED_EXPECTED + 1))" >&2; exit 1; }
+
+# The key the *shipped bundle* carries, which is the only one that matters. The
+# check at the top read project.yml so a mismatch fails in seconds rather than
+# after a build; this one reads what XcodeGen actually wrote, and catches the
+# plist wiring silently dropping the key — the same silent-and-unfixable failure
+# by a different route.
+SHIPPED_KEY=$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$APP/Contents/Info.plist" 2>/dev/null) ||
+    { echo "the built app carries no SUPublicEDKey — it could verify no update" >&2; exit 1; }
+[ "$SHIPPED_KEY" = "$KEYCHAIN_KEY" ] || {
+    echo "the built app's SUPublicEDKey is not the key this machine signs with:" >&2
+    echo "  in the bundle: $SHIPPED_KEY" >&2
+    echo "  in the Keychain: $KEYCHAIN_KEY" >&2
+    exit 1
+}
 
 # The app is notarized and stapled first, then packaged. A ticket is issued
 # against the exact bytes that were sent, so stapling only the disk image leaves
@@ -240,6 +292,7 @@ step "packaging"
 # and opens offline. Into the feed directory, which holds nothing else.
 ditto -c -k --keepParent "$APP" "$ZIP"
 hdiutil create -volname "Caliper" -srcfolder "$APP" -ov -format UDZO "$DMG"
+codesign --force --sign "$IDENTITY" --timestamp "$DMG"
 
 step "notarizing the disk image"
 xcrun notarytool submit "$DMG" --keychain-profile "$KEYCHAIN_PROFILE" --wait

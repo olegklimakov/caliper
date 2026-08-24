@@ -173,13 +173,12 @@ final class StatusItemController {
 
             guard lastIdentity[module] != identity else { continue }
             lastIdentity[module] = identity
-            let (image, width) = badged(
+            draw(
                 indicator.makeImage(state, style: style),
                 width: indicator.width,
-                if: module == parts.enabled.first
+                into: item,
+                badged: module == parts.enabled.first
             )
-            item.length = width
-            item.button?.image = image
         }
 
         guard silent, let first = parts.enabled.first, let item = items[first] else { return }
@@ -220,29 +219,37 @@ final class StatusItemController {
         guard lastCombinedIdentity != identity else { return }
         lastCombinedIdentity = identity
 
-        let (image, width) = badged(
+        draw(
             CombinedStrip.image(of: drawn, state: state, style: style),
             width: CombinedStrip.width(of: drawn),
-            if: true
+            into: item,
+            badged: true
         )
-        item.length = width
-        item.button?.image = image
     }
 
-    /// One dot for the whole strip, on the item that carries it — the first in
-    /// the separate arrangement, the only one in the combined. Four items
-    /// wearing four dots would read as four updates.
+    /// Puts a drawing into an item at the width it was drawn at, wearing the
+    /// update dot if this is the item that carries it.
     ///
-    /// Image and width together, because the dot takes room of its own and an
-    /// item drawn wider than it was sized for is an item with its dot cropped
-    /// off.
-    private func badged(
+    /// One call rather than an image and a length assigned separately: the dot
+    /// takes room of its own, and an item sized for the drawing it had before
+    /// the dot is an item with the dot cropped off.
+    ///
+    /// `badged` says only whether this item is the one *allowed* to wear it —
+    /// the first in the separate arrangement, the only one in the combined.
+    /// Four items wearing four dots would read as four updates.
+    private func draw(
         _ image: NSImage,
         width: CGFloat,
-        if isTheOne: Bool
-    ) -> (NSImage, CGFloat) {
-        guard isUpdateAvailable, isTheOne else { return (image, width) }
-        return (MenuBarBadge.over(image, style: style), width + MenuBarBadge.width)
+        into item: NSStatusItem,
+        badged: Bool
+    ) {
+        if isUpdateAvailable, badged {
+            item.length = width + MenuBarBadge.width
+            item.button?.image = MenuBarBadge.over(image, style: style)
+        } else {
+            item.length = width
+            item.button?.image = image
+        }
     }
 
     /// The one thing a drawn image cannot carry. Label and tooltip are the same
@@ -254,13 +261,12 @@ final class StatusItemController {
     }
 
     private func drawPlaceholder(into item: NSStatusItem) {
-        let (image, width) = badged(
+        draw(
             MenuBarPlaceholder.image(style: style),
             width: MenuBarMetrics.minimumWidth,
-            if: true
+            into: item,
+            badged: true
         )
-        item.length = width
-        item.button?.image = image
         speak("Caliper, no readings yet", from: item)
     }
 

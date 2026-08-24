@@ -80,10 +80,12 @@ final class UpdaterService: NSObject, SPUStandardUserDriverDelegate {
         // `canCheckForUpdates` flips false while a check runs and back when it
         // ends, which also makes it the moment the last-check date is new.
         canCheckObservation = updater.observe(\.canCheckForUpdates, options: [.new]) {
-            [weak self] updater, change in
+            [weak self] _, change in
             guard let canCheck = change.newValue else { return }
-            // KVO fires outside any actor: hop before touching @MainActor state
-            // instead of assuming the thread.
+            // KVO fires outside any actor, so the hop carries the new value and
+            // nothing else. Not the updater the observation was handed: it is
+            // not Sendable, and reading it again on the other side costs one
+            // property access to keep the boundary honest.
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 canCheckForUpdates = canCheck
