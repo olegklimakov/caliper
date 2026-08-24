@@ -12,6 +12,13 @@ packages:
     path: Packages/CaliperCore
   CaliperHistory:
     path: Packages/CaliperHistory
+  # Pinned exactly, not `from:` — the .xcodeproj (and with it Package.resolved)
+  # is generated and gitignored, so a range would let every clone resolve a
+  # different Sparkle, and Scripts/sparkle_tools.sh hands out whichever tools
+  # that clone happened to fetch.
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.9.6
 
 settings:
   base:
@@ -44,6 +51,7 @@ targets:
         product: CaliperCore
       - package: CaliperHistory
         product: CaliperHistory
+      - package: Sparkle
     settings:
       base:
         PRODUCT_NAME: Caliper
@@ -61,6 +69,24 @@ targets:
         # XcodeGen defaults these to 1.0/1 instead of the version settings.
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # The appcast Sparkle polls. GitHub redirects /releases/latest/download/
+        # to the newest release's asset, so the URL never changes — but a
+        # release marked "pre-release" is skipped by /latest. The feed lives in
+        # the public repository rather than this one, so an installed copy keeps
+        # updating whatever happens to the source.
+        SUFeedURL: https://github.com/olegklimakov/caliper/releases/latest/download/appcast.xml
+        # Public half of the EdDSA key pair that signs updates; the private half
+        # lives in the release manager's login Keychain, created once with
+        # `"$(Scripts/sparkle_tools.sh)/generate_keys"` (-p prints this value
+        # again). Replacing it strands every installed copy, since they only
+        # accept updates signed by the key they shipped with.
+        #
+        # One key for every app this account ships, which is what Sparkle
+        # advises: the tool stores a single key per Keychain and says so. The
+        # cost is a shared blast radius; the benefit is one secret to keep
+        # rather than one per app, and a secret nobody can find is as lost as
+        # one nobody kept.
+        SUPublicEDKey: BPrTisY3ZaEybRKiAlQbOkUR5zUiu39dA4VM7eGf6bQ=
 
 schemes:
   Caliper:

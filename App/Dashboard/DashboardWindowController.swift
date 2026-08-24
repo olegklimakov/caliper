@@ -36,6 +36,11 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
     private let preferences: Preferences
     /// What the settings room may do to the recorded history.
     private let historyActions: HistoryActions?
+    /// Whether the app shows a Dock tile and a menu bar. Shared with the
+    /// updater, which puts up windows of its own.
+    private let activation: ActivationPolicy
+    /// Sparkle, for the settings room's Updates section.
+    private let updater: UpdaterService
     /// Reported so the sampler can run at dashboard rates while the window is
     /// on screen, and drop back when it is not.
     private let onVisibilityChange: (Bool) -> Void
@@ -47,12 +52,16 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
         history: HistoryReader?,
         historyActions: HistoryActions?,
         preferences: Preferences,
+        activation: ActivationPolicy,
+        updater: UpdaterService,
         onVisibilityChange: @escaping (Bool) -> Void
     ) {
         self.metrics = metrics
         self.history = history
         self.historyActions = historyActions
         self.preferences = preferences
+        self.activation = activation
+        self.updater = updater
         self.onVisibilityChange = onVisibilityChange
     }
 
@@ -64,19 +73,10 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
         self.window = window
 
         // The Dock icon and the menu bar across the top of the screen belong to
-        // this window, not to the app: a monitor that lives in the status bar
-        // has no business holding a Dock slot while its only window is closed,
-        // and a window shown by an accessory app has no visible Quit, no Window
-        // menu and no discoverable ⌘W, because an accessory app's main menu is
-        // never drawn.
-        //
-        // Before `activate`, not after: the switch itself reorders the app, and
-        // a window brought forward first lands behind whatever was in front.
-        NSApp.setActivationPolicy(.regular)
-        // A menu bar app is not the active app when someone picks from its
-        // menu, and a window ordered front by an inactive app opens behind
-        // whatever they were looking at.
-        NSApp.activate(ignoringOtherApps: true)
+        // the windows that are showing, not to the app; ActivationPolicy holds
+        // the reasoning and the fact that this window is not the only one that
+        // can ask.
+        activation.hold(.dashboard)
         window.makeKeyAndOrderFront(nil)
         onVisibilityChange(true)
     }
@@ -95,6 +95,7 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
                 history: history,
                 preferences: preferences,
                 historyActions: historyActions,
+                updater: updater,
                 navigation: navigation
             )
         )
@@ -127,19 +128,7 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         onVisibilityChange(false)
-        // After this delegate call returns, not inside it: dropping back to
-        // accessory while AppKit is still closing the window leaves the app
-        // frontmost with nothing on screen, and the Dock icon outlives the
-        // window by a beat.
-        //
-        // Re-checked rather than assumed: closing and reopening in the same
-        // breath — the status bar menu is one click away from doing exactly
-        // that — would otherwise land this after `show` and strip the Dock icon
-        // and the menu bar off a window that is on screen.
-        Task { @MainActor [weak self] in
-            guard self?.window?.isVisible != true else { return }
-            NSApp.setActivationPolicy(.accessory)
-        }
+        activation.release(.dashboard)
     }
 
     /// Closing is not the only way a window stops being looked at.

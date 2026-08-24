@@ -35,6 +35,10 @@ final class StatusItemController {
     private var indicators: [MenuBarModule: any MenuBarIndicator] = [:]
     private var parts = MenuBarParts()
     private var combines = false
+    /// Whether the strip is wearing the update dot. A scheduled check that
+    /// finds something says so here rather than by opening a window; see
+    /// `UpdaterService.supportsGentleScheduledUpdateReminders`.
+    private var isUpdateAvailable = false
 
     /// Called when a module's button is clicked, with the button to anchor a
     /// popover to. Set by the app delegate, which owns the panels.
@@ -46,6 +50,9 @@ final class StatusItemController {
 
     /// Called when the menu's Settings item is picked.
     var onOpenSettings: (() -> Void)?
+
+    /// Called when the menu's Check for Updates item is picked.
+    var onCheckForUpdates: (() -> Void)?
 
     /// Shares one metrics store with the panels: they show the same numbers,
     /// and two stores would guarantee they disagree by a tick.
@@ -60,6 +67,16 @@ final class StatusItemController {
     func setLayout(_ parts: MenuBarParts, combined: Bool) {
         guard parts != self.parts || combined != self.combines else { return }
         apply(parts, combined: combined)
+    }
+
+    /// The update dot, on or off. Redraws through `forgetDrawings` because the
+    /// badge is part of the image, and the identity that decides whether to
+    /// redraw knows only about the reading.
+    func setUpdateAvailable(_ available: Bool) {
+        guard available != isUpdateAvailable else { return }
+        isUpdateAvailable = available
+        forgetDrawings()
+        refresh()
     }
 
     func setColoured(_ coloured: Bool) {
@@ -156,8 +173,13 @@ final class StatusItemController {
 
             guard lastIdentity[module] != identity else { continue }
             lastIdentity[module] = identity
-            item.length = indicator.width
-            item.button?.image = indicator.makeImage(state, style: style)
+            let (image, width) = badged(
+                indicator.makeImage(state, style: style),
+                width: indicator.width,
+                if: module == parts.enabled.first
+            )
+            item.length = width
+            item.button?.image = image
         }
 
         guard silent, let first = parts.enabled.first, let item = items[first] else { return }
@@ -198,8 +220,29 @@ final class StatusItemController {
         guard lastCombinedIdentity != identity else { return }
         lastCombinedIdentity = identity
 
-        item.length = CombinedStrip.width(of: drawn)
-        item.button?.image = CombinedStrip.image(of: drawn, state: state, style: style)
+        let (image, width) = badged(
+            CombinedStrip.image(of: drawn, state: state, style: style),
+            width: CombinedStrip.width(of: drawn),
+            if: true
+        )
+        item.length = width
+        item.button?.image = image
+    }
+
+    /// One dot for the whole strip, on the item that carries it — the first in
+    /// the separate arrangement, the only one in the combined. Four items
+    /// wearing four dots would read as four updates.
+    ///
+    /// Image and width together, because the dot takes room of its own and an
+    /// item drawn wider than it was sized for is an item with its dot cropped
+    /// off.
+    private func badged(
+        _ image: NSImage,
+        width: CGFloat,
+        if isTheOne: Bool
+    ) -> (NSImage, CGFloat) {
+        guard isUpdateAvailable, isTheOne else { return (image, width) }
+        return (MenuBarBadge.over(image, style: style), width + MenuBarBadge.width)
     }
 
     /// The one thing a drawn image cannot carry. Label and tooltip are the same
@@ -211,8 +254,13 @@ final class StatusItemController {
     }
 
     private func drawPlaceholder(into item: NSStatusItem) {
-        item.length = MenuBarMetrics.minimumWidth
-        item.button?.image = MenuBarPlaceholder.image(style: style)
+        let (image, width) = badged(
+            MenuBarPlaceholder.image(style: style),
+            width: MenuBarMetrics.minimumWidth,
+            if: true
+        )
+        item.length = width
+        item.button?.image = image
         speak("Caliper, no readings yet", from: item)
     }
 
@@ -276,6 +324,15 @@ final class StatusItemController {
             action: #selector(openSettings),
             keyEquivalent: ","
         ).target = self
+        // Named for what it will do rather than what it is: with the dot
+        // showing, the answer is already known and the item is the way to see
+        // it. This menu is the only one an accessory app draws, so it is also
+        // the only place the dot can be acted on.
+        menu.addItem(
+            withTitle: isUpdateAvailable ? "Update Available…" : "Check for Updates…",
+            action: #selector(checkForUpdates),
+            keyEquivalent: ""
+        ).target = self
         menu.addItem(.separator())
         menu.addItem(
             withTitle: "Quit Caliper",
@@ -303,6 +360,10 @@ final class StatusItemController {
     /// opens its own windows.
     @objc private func openSettings() {
         onOpenSettings?()
+    }
+
+    @objc private func checkForUpdates() {
+        onCheckForUpdates?()
     }
 
     private static let combinedIdentifier = "combined"

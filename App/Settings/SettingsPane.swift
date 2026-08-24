@@ -30,6 +30,7 @@ struct SettingsPane: View {
     /// What the menu bar previews draw. The same store the strip itself reads,
     /// so the row shows the icon that is up there rather than a mock-up of it.
     let metrics: LiveMetrics
+    let updater: UpdaterService
     @State private var launchesAtLogin: Bool
     @State private var loginError: String?
     @State private var confirming: Deletion?
@@ -64,10 +65,16 @@ struct SettingsPane: View {
         }
     }
 
-    init(preferences: Preferences, history: HistoryActions?, metrics: LiveMetrics) {
+    init(
+        preferences: Preferences,
+        history: HistoryActions?,
+        metrics: LiveMetrics,
+        updater: UpdaterService
+    ) {
         self.preferences = preferences
         self.history = history
         self.metrics = metrics
+        self.updater = updater
         _launchesAtLogin = State(initialValue: preferences.launchesAtLogin)
     }
 
@@ -183,8 +190,46 @@ struct SettingsPane: View {
                         .foregroundStyle(Color(Palette.critical))
                 }
             }
+
+            updates
         }
         .formStyle(.grouped)
+    }
+
+    // MARK: - Updates
+
+    private var updates: some View {
+        @Bindable var updater = updater
+        return Section("Updates") {
+                Toggle("Check automatically", isOn: $updater.automaticallyChecksForUpdates)
+                Toggle("Download in the background", isOn: $updater.automaticallyDownloadsUpdates)
+                    .disabled(!updater.automaticallyChecksForUpdates)
+                Text(
+                    "A downloaded update installs itself the next time Caliper quits. "
+                        + "Every update is checked against the developer signature before it is applied."
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+                LabeledContent("Last checked") {
+                    Text(lastChecked)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+                LabeledContent("Version") {
+                    Text(UpdaterService.version)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            Button("Check Now") { updater.checkForUpdates() }
+                .disabled(!updater.canCheckForUpdates)
+        }
+    }
+
+    private var lastChecked: String {
+        guard let date = updater.lastUpdateCheckDate else { return "Never" }
+        return date.formatted(date: .abbreviated, time: .shortened)
     }
 
     // MARK: - Menu bar

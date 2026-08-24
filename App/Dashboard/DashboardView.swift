@@ -14,6 +14,7 @@ struct DashboardView: View {
     /// needs what the preferences already decided.
     let preferences: Preferences
     let historyActions: HistoryActions?
+    let updater: UpdaterService
     /// Which room is showing. Owned by the window controller, so the status bar
     /// menu can open the window straight onto the settings.
     @Bindable var navigation: DashboardNavigation
@@ -59,7 +60,12 @@ struct DashboardView: View {
             case .module(let module):
                 DashboardPane(metrics: metrics, history: history, module: module)
             case .settings:
-                SettingsPane(preferences: preferences, history: historyActions, metrics: metrics)
+                SettingsPane(
+                    preferences: preferences,
+                    history: historyActions,
+                    metrics: metrics,
+                    updater: updater
+                )
             }
         }
         .navigationTitle("Caliper")

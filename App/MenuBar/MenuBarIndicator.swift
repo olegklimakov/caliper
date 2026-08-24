@@ -386,6 +386,45 @@ enum MenuBarPlaceholder {
     private static let symbol = "gauge.with.dots.needle.bottom.50percent"
 }
 
+/// The dot the strip wears while an update is waiting to be looked at.
+///
+/// In its own space at the trailing edge, not laid over the drawing. The first
+/// attempt put it in the top corner on the theory that no module draws there,
+/// and the temperature module's degree sign proved otherwise — a notice that
+/// eats a digit is worse than no notice, because the strip is read.
+///
+/// The item does get wider while it is showing, which is the one jitter the
+/// fixed widths allow: it happens when an update appears and again when it is
+/// dismissed, not twice a second.
+@MainActor
+enum MenuBarBadge {
+    /// What an item claims on top of its drawing while the dot is up.
+    static let width: CGFloat = diameter + gap
+
+    static func over(_ image: NSImage, style: IndicatorStyle) -> NSImage {
+        let size = CGSize(width: image.size.width + width, height: image.size.height)
+        let badged = NSImage(size: size, flipped: false) { bounds in
+            image.draw(in: CGRect(origin: .zero, size: image.size))
+            let dot = CGRect(
+                x: bounds.maxX - diameter,
+                y: bounds.midY - diameter / 2,
+                width: diameter,
+                height: diameter
+            )
+            style.accent(.controlAccentColor).setFill()
+            NSBezierPath(ovalIn: dot).fill()
+            return true
+        }
+        // Template rendering follows the image it extends: a badge that opted
+        // out would be the one coloured thing in a monochrome strip.
+        badged.isTemplate = image.isTemplate
+        return badged
+    }
+
+    private static let diameter: CGFloat = 5
+    private static let gap: CGFloat = 3
+}
+
 /// The one image the modules share when they share a status item.
 ///
 /// Here rather than in the status bar controller because the preview harness

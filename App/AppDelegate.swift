@@ -26,6 +26,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panels: PanelController?
     private var dashboard: DashboardWindowController?
     private var appNap: AppNapAssertion?
+    /// One owner of the Dock tile and the menu bar: the history window and the
+    /// updater both put windows up, and either closing must not undress the
+    /// other.
+    private let activation = ActivationPolicy()
+    private var updater: UpdaterService?
     private var updates: Task<Void, Never>?
     private var isDashboardVisible = false
     private var isPanelOpen = false
@@ -61,11 +66,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         statusItemController.setColoured(preferences.colouredIndicators)
 
+        // After the status item, because starting the updater can find an
+        // update straight away and the dot it asks for needs somewhere to land;
+        // before the window, because the settings room draws its switches.
+        let updater = UpdaterService(activation: activation)
+        updater.onUnseenUpdateChange = { [weak statusItemController] hasUpdate in
+            statusItemController?.setUpdateAvailable(hasUpdate)
+        }
+        statusItemController.onCheckForUpdates = { [weak updater] in
+            updater?.checkForUpdates()
+        }
+        self.updater = updater
+
         let dashboard = DashboardWindowController(
             metrics: metrics,
             history: history,
             historyActions: historyActions,
-            preferences: preferences
+            preferences: preferences,
+            activation: activation,
+            updater: updater
         ) { [weak self] isVisible in
             self?.dashboardVisibilityChanged(isVisible)
         }
@@ -131,6 +150,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// controller, and the menu is installed before that controller exists.
     @objc func openSettings(_ sender: Any?) {
         dashboard?.show(.settings)
+    }
+
+    /// The app menu's Check for Updates item, arriving down the responder chain
+    /// the way Settings does.
+    @objc func checkForUpdates(_ sender: Any?) {
+        updater?.checkForUpdates()
     }
 
     /// A popover is a window. Without this, closing one — which is what

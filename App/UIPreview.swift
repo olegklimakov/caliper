@@ -130,6 +130,20 @@ enum UIPreview {
                             style: style
                         )
                         write(combined, to: url.appendingPathComponent("combined-\(suffix)-\(appearance).png"))
+                        // Wearing the update dot. Drawn over a busy strip on
+                        // purpose: the corner it claims is the one a module
+                        // never draws into, and this is where that gets
+                        // checked.
+                        write(
+                            MenuBarBadge.over(combined, style: style),
+                            to: url.appendingPathComponent("combined-badged-\(suffix)-\(appearance).png")
+                        )
+                        // And over the narrowest thing the strip can be, where
+                        // there is least room for it.
+                        write(
+                            MenuBarBadge.over(MenuBarPlaceholder.image(style: style), style: style),
+                            to: url.appendingPathComponent("placeholder-badged-\(suffix)-\(appearance).png")
+                        )
                     }
                 }
             }
