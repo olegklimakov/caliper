@@ -5,10 +5,19 @@
 # measurement are two chances to measure it differently.
 
 # Path to the release app, unless one was given.
+#
+# Absolute either way. The pid lookup below compares against `ps -o comm=`,
+# which always answers with a full path, so a relative one given on the command
+# line matches nothing and the harness reports "app did not start" over an app
+# that started perfectly well.
 caliper_app_path() {
     local given="${1:-}"
     if [[ -n "$given" ]]; then
-        echo "$given"
+        if [[ "$given" == /* ]]; then
+            echo "$given"
+        else
+            echo "$PWD/$given"
+        fi
         return
     fi
     local products
