@@ -152,7 +152,13 @@ final class StatusItemController {
         // Walked in the strip's own order, so the item that stands in for a
         // silent strip is its first one rather than whichever the dictionary
         // happened to hand over first.
-        var silent = true
+        //
+        // The first module that *draws*, not the first that is enabled: with
+        // Sensors dragged to the front of a Mac that reports none, the leading
+        // item is hidden, and a dot given to it would be a dot given to
+        // nothing. Which is what "first" meant here before, so a found update
+        // announced itself nowhere at all.
+        var firstDrawn: MenuBarModule?
         for module in parts.enabled {
             guard let item = items[module], let indicator = indicators[module] else { continue }
 
@@ -163,7 +169,7 @@ final class StatusItemController {
                 lastIdentity[module] = nil
                 continue
             }
-            silent = false
+            if firstDrawn == nil { firstDrawn = module }
             // Ahead of the identity check, not inside it: the label carries the
             // reading whether or not the picture drew it, and a module showing
             // only its symbol has an identity that never moves — which would
@@ -177,11 +183,13 @@ final class StatusItemController {
                 indicator.makeImage(state, style: style),
                 width: indicator.width,
                 into: item,
-                badged: module == parts.enabled.first
+                badged: module == firstDrawn
             )
         }
 
-        guard silent, let first = parts.enabled.first, let item = items[first] else { return }
+        guard firstDrawn == nil, let first = parts.enabled.first, let item = items[first] else {
+            return
+        }
         let identity = AnyHashable(Self.placeholderIdentity)
         guard lastIdentity[first] != identity else { return }
         lastIdentity[first] = identity
