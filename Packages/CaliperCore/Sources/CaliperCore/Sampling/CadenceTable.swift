@@ -22,50 +22,50 @@ public enum MetricKind: String, Sendable, CaseIterable, Codable {
 /// The coordinator runs a single one-second timer; everything slower is a
 /// divisor of that tick rather than a timer of its own, so the app wakes the
 /// CPU once a second at most.
+///
+/// Three rates per metric, picked by `MetricDemand`. *Foreground* is what a
+/// metric costs while something on screen is drawing it. *Background* is what
+/// it costs while it is merely being recorded — slow enough not to matter,
+/// often enough that the history has something to fold. *Hidden* is what it
+/// costs with the display asleep.
 public enum CadenceTable {
-    public static func interval(for kind: MetricKind, at level: ActivityLevel) -> Int {
-        switch kind {
-        case .cpu, .memory, .network, .diskActivity:
-            // Live values back the menu bar indicators, so they run at the base
-            // rate whenever anything is on screen.
-            level == .hidden ? 5 : 1
-        case .volumes, .connection:
-            switch level {
-            case .hidden: 60
-            case .menuBarOnly: 30
-            case .panelOpen, .dashboardOpen: 10
-            }
-        case .processes:
-            // The most expensive sampler: a full pid sweep with a syscall each.
-            switch level {
-            case .hidden: 30
-            case .menuBarOnly: 10
-            case .panelOpen, .dashboardOpen: 3
-            }
-        case .sensors:
-            // Measured on an M5 Pro: a full sweep costs 29 ms, and 25 of those
-            // are the fourteen SoC die sensors at 1.8 ms each. That is the most
-            // expensive read in the app, and the half-hour footprint run showed
-            // it was a third of a budget the whole app has to fit inside. All
-            // the menu bar shows is a badge, and a die climbs about 0.4 °C a
-            // second under full load, so thirty seconds loses nothing anyone
-            // can see. With a panel open, where the number is being read, the
-            // cost is worth paying.
-            switch level {
-            case .hidden: 60
-            case .menuBarOnly: 30
-            case .panelOpen, .dashboardOpen: 2
-            }
-        case .driveHealth:
-            // Wear is measured in whole percent of a drive's lifetime; ten
-            // minutes is already far more often than it can change.
-            600
-        case .selfMetrics:
-            level == .hidden ? 30 : 10
-        }
+    public static func interval(for kind: MetricKind, demand: MetricDemand) -> Int {
+        let rates = rates(for: kind)
+        guard demand.isVisible else { return rates.hidden }
+        return demand.metrics.contains(kind) ? rates.foreground : rates.background
     }
 
-    public static func isDue(_ kind: MetricKind, tick: UInt64, at level: ActivityLevel) -> Bool {
-        tick % UInt64(interval(for: kind, at: level)) == 0
+    public static func isDue(_ kind: MetricKind, tick: UInt64, demand: MetricDemand) -> Bool {
+        tick % UInt64(interval(for: kind, demand: demand)) == 0
+    }
+
+    /// All three rates for one metric, on one line, next to the reason they are
+    /// what they are.
+    ///
+    /// One switch rather than three, so that a metric's whole story is read and
+    /// edited in one place — and so a rate cannot be changed in one column and
+    /// forgotten in the others.
+    private static func rates(for kind: MetricKind) -> (foreground: Int, background: Int, hidden: Int) {
+        switch kind {
+        // The cheapest four, all under 0.15 ms a sweep, and the ones the
+        // ten-second history buckets fold min/avg/max out of. Slowing them off
+        // screen would cost the history its shape and save nothing worth
+        // measuring, so background matches foreground.
+        case .cpu, .memory, .network, .diskActivity: (1, 1, 5)
+        case .volumes, .connection: (10, 30, 60)
+        // A full pid sweep, one syscall per process.
+        case .processes: (3, 10, 30)
+        // Measured on an M5 Pro: a full sweep costs 29 ms, and 25 of those are
+        // the fourteen SoC die sensors at 1.8 ms each — the most expensive read
+        // in the app by an order of magnitude, and worth two seconds only where
+        // the number is being watched move. A die climbs about 0.4 °C a second
+        // under full load, so thirty seconds loses nothing the menu bar's badge
+        // can show.
+        case .sensors: (2, 30, 60)
+        // Wear is measured in whole percent of a drive's lifetime; ten minutes
+        // is already far more often than it can change, on screen or off.
+        case .driveHealth: (600, 600, 600)
+        case .selfMetrics: (10, 30, 30)
+        }
     }
 }

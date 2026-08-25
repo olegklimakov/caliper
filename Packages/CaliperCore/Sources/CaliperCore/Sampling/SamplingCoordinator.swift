@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Drives every sampler from a single timer and publishes composed snapshots.
 ///
@@ -14,7 +15,16 @@ public actor SamplingCoordinator {
     private let host: HostInfo
     private let queue = DispatchQueue(label: "com.olegklimakov.caliper.sampling", qos: .utility)
 
-    private var activityLevel: ActivityLevel
+    /// What the app says is on screen.
+    ///
+    /// A lock rather than actor state, so the app can set it on the main thread
+    /// the moment a panel opens and be done. Hopping onto the actor took a
+    /// `Task` per change, and two of those — a popover closing as a window
+    /// opens — are two independent jobs the runtime is free to run in either
+    /// order. Losing that race latches the *higher* demand for the life of the
+    /// process, which is the one failure this whole mechanism exists to avoid.
+    private let demand: Mutex<MetricDemand>
+
     private var tickCount: UInt64 = 0
     private var lastTick: ContinuousClock.Instant?
     private var timer: DispatchSourceTimer?
@@ -49,9 +59,9 @@ public actor SamplingCoordinator {
     /// Base tick of the whole app. Everything slower is a multiple of this.
     public static let baseInterval: Duration = .seconds(1)
 
-    public init(host: HostInfo = .current(), activityLevel: ActivityLevel = .menuBarOnly) {
+    public init(host: HostInfo = .current(), demand: MetricDemand = .menuBar) {
         self.host = host
-        self.activityLevel = activityLevel
+        self.demand = Mutex(demand)
     }
 
     // MARK: - Lifecycle
@@ -82,8 +92,10 @@ public actor SamplingCoordinator {
         subscribers.removeAll()
     }
 
-    public func setActivityLevel(_ level: ActivityLevel) {
-        activityLevel = level
+    /// Callable from anywhere, and from the main thread without awaiting: the
+    /// next tick reads whatever is here when it runs.
+    public nonisolated func setDemand(_ demand: MetricDemand) {
+        self.demand.withLock { $0 = demand }
     }
 
     // MARK: - Output
@@ -230,7 +242,7 @@ public actor SamplingCoordinator {
     }
 
     func isDue(_ kind: MetricKind) -> Bool {
-        CadenceTable.isDue(kind, tick: tickCount, at: activityLevel)
+        CadenceTable.isDue(kind, tick: tickCount, demand: demand.withLock { $0 })
     }
 
     /// A metric that has never produced a value is sampled at the first

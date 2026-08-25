@@ -22,9 +22,30 @@ final class PanelController: NSObject, NSPopoverDelegate {
         case combined
     }
 
-    /// Reports open and closed, so the app can raise the sampling rate while
-    /// someone is looking at a panel.
-    var onOpenChange: ((Bool) -> Void)?
+    /// What a popover draws, and so what the sampler owes it at full rate.
+    ///
+    /// Not on `Opened`, because the combined answer needs the preferences: the
+    /// window lists the modules the user has switched on and no others, so a
+    /// strip without Sensors must not be billed for the sweep behind a room it
+    /// cannot open.
+    private func metrics(of panel: Opened) -> Set<MetricKind> {
+        switch panel {
+        case .module(let module):
+            module.panelMetrics
+        // Every enabled module's summary at once, and any of their rooms one
+        // click away — a click this side never hears about, so the window is
+        // charged for every room it can reach. The union of the same map rather
+        // than "all kinds", so a metric no room draws stays unbilled.
+        case .combined:
+            preferences.menuBar.enabled.reduce(into: Set<MetricKind>()) {
+                $0.formUnion($1.panelMetrics)
+            }
+        }
+    }
+
+    /// Reports what the open panel draws, so the app can raise the sampling
+    /// rate for those metrics and no others. `nil` when nothing is open.
+    var onOpenChange: ((Set<MetricKind>?) -> Void)?
 
     /// Called when a panel's History affordance is used. The window is the
     /// app's to open, not the panel's.
@@ -88,7 +109,7 @@ final class PanelController: NSObject, NSPopoverDelegate {
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         self.popover = popover
         opened = panel
-        onOpenChange?(true)
+        onOpenChange?(metrics(of: panel))
     }
 
     @ViewBuilder
@@ -130,6 +151,6 @@ final class PanelController: NSObject, NSPopoverDelegate {
         popover?.contentViewController = nil
         popover = nil
         opened = nil
-        onOpenChange?(false)
+        onOpenChange?(nil)
     }
 }

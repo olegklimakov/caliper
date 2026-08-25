@@ -14,7 +14,7 @@ enum SelfTestCommand {
     private static let deadline = Duration.seconds(10)
 
     static func run() async -> Never {
-        let coordinator = SamplingCoordinator(activityLevel: .dashboardOpen)
+        let coordinator = SamplingCoordinator(demand: .everything)
         // Subscribe before starting, or the first tick can land before anyone
         // is listening and the reading is taken over the wrong interval.
         let snapshots = await coordinator.snapshots()

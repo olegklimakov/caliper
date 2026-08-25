@@ -1,4 +1,5 @@
 import AppKit
+import CaliperCore
 import CaliperHistory
 import Observation
 import SwiftUI
@@ -29,6 +30,26 @@ final class DashboardNavigation {
 /// a query and a refresh clock that should survive being closed and reopened.
 @MainActor
 final class DashboardWindowController: NSObject, NSWindowDelegate {
+    /// What this window draws from the live snapshot, as opposed to from the
+    /// recorded history.
+    ///
+    /// Much less than the window's size suggests: every chart and every stat
+    /// card in both panes is read out of the history store. What is live is the
+    /// column of summary numbers down the sidebar, and the settings room, whose
+    /// menu bar previews are the real indicators rendered from the real
+    /// snapshot — every module's, whether or not it is in the strip.
+    ///
+    /// Listed here for the same reason `MenuBarModule.panelMetrics` is listed
+    /// beside `PanelFactory` — it is the bill this window sends the sampler,
+    /// and a stale entry is either a frozen number or CPU spent on a metric
+    /// nobody is reading. Complete rather than pruned to the kinds whose rate
+    /// would actually change: what a surface draws is a fact about the surface,
+    /// and a list that also encodes the cadence table's current numbers would
+    /// have to be revisited every time those move.
+    static let drawnMetrics: Set<MetricKind> = [
+        .cpu, .memory, .network, .diskActivity, .volumes, .sensors,
+    ]
+
     let navigation = DashboardNavigation()
 
     private let metrics: LiveMetrics
@@ -137,8 +158,13 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
     /// would hold the sampler at dashboard rates for the rest of the session.
     /// Occlusion covers all of those, including another app's window laid over
     /// this one.
+    /// `isVisible` as well as the occlusion bit, because these arrive
+    /// asynchronously and one can land *after* `windowWillClose` — reporting a
+    /// window that is already gone as visible, and holding the sampler at
+    /// window rates with nothing on screen for the rest of the session. The
+    /// closed window's own answer to `isVisible` is the tie-breaker.
     func windowDidChangeOcclusionState(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
-        onVisibilityChange(window.occlusionState.contains(.visible))
+        onVisibilityChange(window.isVisible && window.occlusionState.contains(.visible))
     }
 }

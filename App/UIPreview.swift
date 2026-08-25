@@ -14,7 +14,7 @@ enum UIPreview {
     static let flag = "--preview-ui"
 
     static func run(writingTo directory: String) async -> Never {
-        let coordinator = SamplingCoordinator(activityLevel: .dashboardOpen)
+        let coordinator = SamplingCoordinator(demand: .everything)
         let snapshots = await coordinator.snapshots()
         await coordinator.start()
 

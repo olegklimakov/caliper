@@ -33,7 +33,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var updater: UpdaterService?
     private var updates: Task<Void, Never>?
     private var isDashboardVisible = false
-    private var isPanelOpen = false
+    /// What the open panel is drawing, and `nil` when none is. One optional
+    /// rather than a flag beside a set: two of those can disagree, and the one
+    /// that would be believed is the one deciding what the machine pays.
+    private var openPanelMetrics: Set<MetricKind>?
 
     override init() {
         if let store = try? HistoryStore() {
@@ -91,10 +94,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.dashboard = dashboard
 
         let panels = PanelController(metrics: metrics, preferences: preferences)
-        panels.onOpenChange = { [weak self, weak statusItemController] isOpen in
-            self?.isPanelOpen = isOpen
-            statusItemController?.setLive(isOpen)
-            self?.updateActivityLevel()
+        panels.onOpenChange = { [weak self] drawn in
+            self?.openPanelMetrics = drawn
+            self?.updateDemand()
         }
         statusItemController.onSelect = { [weak panels] module, button in
             panels?.toggle(module, from: button)
@@ -237,7 +239,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func dashboardVisibilityChanged(_ isVisible: Bool) {
         isDashboardVisible = isVisible
-        updateActivityLevel()
+        updateDemand()
     }
 
     // MARK: - Activity
@@ -246,18 +248,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// One place decides the sampling rate, from everything that can be looking
     /// at the data at once.
-    private func updateActivityLevel() {
-        let level: ActivityLevel =
-            if !areScreensAwake {
-                .hidden
-            } else if isDashboardVisible {
-                .dashboardOpen
-            } else if isPanelOpen {
-                .panelOpen
-            } else {
-                .menuBarOnly
-            }
-        Task { await coordinator.setActivityLevel(level) }
+    ///
+    /// The menu bar strip contributes nothing: its four live modules run at the
+    /// base rate whatever happens, and its temperature badge reads the slow
+    /// sweep without ever looking stale. Only something the user has opened
+    /// raises a metric — and only the metrics that surface actually draws,
+    /// which is what keeps a CPU panel from paying for the sensors.
+    ///
+    /// Set rather than awaited: `setDemand` takes a lock the next tick reads,
+    /// so this cannot leave a change queued behind another one.
+    private func updateDemand() {
+        // The union, not whichever is uppermost: nothing closes a popover when
+        // the window is showing, so a panel opened over the dashboard is a
+        // second surface drawing, and taking only the window's list would drop
+        // that panel's process rows to the background rate while they are being
+        // read.
+        var drawn = openPanelMetrics ?? []
+        if isDashboardVisible {
+            drawn.formUnion(DashboardWindowController.drawnMetrics)
+        }
+        coordinator.setDemand(MetricDemand(isVisible: areScreensAwake, metrics: drawn))
     }
 
     private func observeWorkspace() {
@@ -287,14 +297,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // time. With the screens off there is nothing to throttle us away from.
         appNap = AppNapAssertion(reason: "Sampling system metrics for the menu bar")
         areScreensAwake = true
-        updateActivityLevel()
+        updateDemand()
     }
 
     @objc private func becomeHidden() {
         appNap = nil
         panels?.close()
         areScreensAwake = false
-        updateActivityLevel()
+        updateDemand()
     }
 }
 

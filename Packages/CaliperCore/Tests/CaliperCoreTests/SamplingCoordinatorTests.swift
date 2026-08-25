@@ -25,14 +25,30 @@ import Testing
     #expect(a?.timestamp == b?.timestamp)
 }
 
-@Test func cadenceFollowsTheCurrentActivityLevel() async {
-    let coordinator = SamplingCoordinator(activityLevel: .panelOpen)
+@Test func cadenceFollowsWhatIsBeingDrawn() async {
+    let coordinator = SamplingCoordinator(
+        demand: MetricDemand(isVisible: true, metrics: [.processes])
+    )
 
     await coordinator.tick()
     await coordinator.tick()
     await coordinator.tick()
     #expect(await coordinator.isDue(.processes))  // third tick, interval 3
 
-    await coordinator.setActivityLevel(.hidden)
+    coordinator.setDemand(.hidden)
     #expect(await coordinator.isDue(.processes) == false)  // interval 30
+}
+
+/// The demand is read at the tick, not carried onto the actor by a task of its
+/// own — so a change made while a tick is in flight lands whole, and two
+/// changes in quick succession cannot be applied in the order they were not
+/// made in.
+@Test func demandTakesEffectWithoutAwaiting() async {
+    let coordinator = SamplingCoordinator(demand: .hidden)
+
+    coordinator.setDemand(.everything)
+
+    await coordinator.tick()
+    await coordinator.tick()
+    #expect(await coordinator.isDue(.sensors))  // second tick, interval 2
 }
