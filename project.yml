@@ -70,8 +70,8 @@ targets:
       base:
         PRODUCT_NAME: Caliper
         PRODUCT_BUNDLE_IDENTIFIER: com.olegklimakov.caliper
-        MARKETING_VERSION: "0.1.1"
-        CURRENT_PROJECT_VERSION: "2"
+        MARKETING_VERSION: "0.1.2"
+        CURRENT_PROJECT_VERSION: "3"
         CODE_SIGN_ENTITLEMENTS: App/Caliper.entitlements
     info:
       path: App/Info.plist

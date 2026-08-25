@@ -1,0 +1,52 @@
+<style>
+  /* Sparkle renders these notes inside the update window, which follows the
+     system appearance — so the text has to name a colour that survives both.
+     Canvas/CanvasText are the system pair; without them the default black
+     lands on a dark panel. */
+  :root { color-scheme: light dark; }
+  body {
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, sans-serif;
+    color: CanvasText;
+    background: Canvas;
+    margin: 0;
+  }
+  h3 { font-size: 13px; margin: 16px 0 6px; }
+  ul { margin: 0; padding-left: 18px; }
+  li { margin-bottom: 4px; }
+  p { margin: 0 0 10px; }
+  code { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; }
+  a { color: LinkText; }
+</style>
+
+<p>Caliper's history charts were drawing things nobody measured. This fixes
+that, which is the whole of the release.</p>
+
+<h3>What changed</h3>
+<ul>
+  <li><b>A gap in the record now looks like a gap.</b> A bucket is written only
+    when the Mac is awake to be measured, so a night's sleep leaves a hole — and
+    the chart used to join the two edges of it with a straight line and fill the
+    min/max band underneath. On this machine that turned sixteen hours of
+    nothing into a smooth ramp on the disk and network plots. The line now
+    breaks where the record breaks, and a stretch of one lone bucket is marked
+    with a point rather than vanishing.</li>
+  <li><b>The one-hour view shows its top processes again.</b> It had been asking
+    the process log for the half-minute the cursor was standing in, which is
+    usually still being written; it now takes the newest half-minute that was,
+    and says which one it is showing. With recording switched off it goes back
+    to showing nothing, which is the point of the switch.</li>
+  <li><b>A chart stays inside its card.</b> The temperature panel's shading was
+    drawn past the bottom of its card and over the readings underneath — it was
+    filling from zero, and that chart's scale starts near body
+    temperature.</li>
+</ul>
+
+<h3>About the numbers</h3>
+<p>"Under 1 % of one core" is the steady state — menu bar up, nothing open. A
+panel costs more while it is open, around 2 %, because it samples and draws what
+it shows. Both figures are shares of <i>one</i> core, the unit Activity
+Monitor's %CPU column uses, not of the whole machine.</p>
+
+<h3>Requirements</h3>
+<p>macOS 15 or later, Apple Silicon. Sensors are read on a best-effort basis:
+what a particular Mac will not report is hidden rather than guessed at.</p>
