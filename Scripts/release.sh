@@ -131,6 +131,11 @@ if [ "$KEYCHAIN_KEY" != "$BUNDLED_KEY" ]; then
     exit 1
 fi
 
+command -v create-dmg >/dev/null ||
+    { echo "create-dmg not installed (brew install create-dmg)" >&2; exit 1; }
+[ -f "$ROOT/assets/dmg/background.tiff" ] ||
+    { echo "no disk image backdrop — run Scripts/make_dmg_background.sh" >&2; exit 1; }
+
 step "generating project"
 command -v xcodegen >/dev/null ||
     { echo "xcodegen not installed (brew install xcodegen)" >&2; exit 1; }
@@ -292,7 +297,33 @@ step "packaging"
 # Zipped from the stapled app, so the copy Sparkle installs carries its ticket
 # and opens offline. Into the feed directory, which holds nothing else.
 ditto -c -k --keepParent "$APP" "$ZIP"
-hdiutil create -volname "Caliper" -srcfolder "$APP" -ov -format UDZO "$DMG"
+
+# The disk image is the first thing anyone sees of this app, and `hdiutil` on
+# its own hands them a bare bundle in a bare folder — with no /Applications to
+# drop it on, which is what every set of installation instructions ever written
+# tells people to do. `create-dmg` sets the window's size, its backdrop, where
+# the two icons sit and the alias itself; assets/dmg/background.tiff is drawn
+# by Scripts/make_dmg_background.swift, which holds the same coordinates.
+#
+# From a folder holding nothing but the app: the export directory also has
+# Xcode's plists and logs in it, and every one of them would arrive in the
+# window beside the icon.
+STAGE="$BUILD_DIR/dmg"
+rm -rf "$STAGE" "$DMG"
+mkdir -p "$STAGE"
+cp -R "$APP" "$STAGE/"
+create-dmg \
+    --volname "Caliper" \
+    --volicon "$ROOT/assets/icon/AppIcon.icns" \
+    --background "$ROOT/assets/dmg/background.tiff" \
+    --window-pos 200 120 \
+    --window-size 660 420 \
+    --icon-size 128 \
+    --icon "Caliper.app" 165 188 \
+    --app-drop-link 495 188 \
+    --hide-extension "Caliper.app" \
+    --no-internet-enable \
+    "$DMG" "$STAGE"
 codesign --force --sign "$IDENTITY" --timestamp "$DMG"
 
 step "notarizing the disk image"
