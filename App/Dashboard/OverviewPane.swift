@@ -293,7 +293,7 @@ struct OverviewPane: View {
             .frame(width: 112, alignment: .leading)
 
             HistoryChart(
-                samples: slice[presentation.series],
+                runs: slice.runs(presentation.series),
                 colour: presentation.colour,
                 range: presentation.range,
                 startsAtZero: presentation.startsAtZero,

@@ -172,6 +172,42 @@ public struct HistorySlice: Sendable, Equatable {
         rows[series] ?? []
     }
 
+    /// The same buckets, split into unbroken runs.
+    ///
+    /// A stored row exists only for a bucket that was actually recorded, so two
+    /// neighbouring elements of the array can be hours apart — a sleeping Mac
+    /// writes nothing. Handed to a chart as one series, that reads as a
+    /// straight line across the hole, and the min/max band fills the space
+    /// under it: a smooth sixteen-hour ramp that nothing ever measured. On a
+    /// monitor whose whole claim is a real record of what the machine did,
+    /// inventing the quiet hours is the worst thing the picture can do.
+    ///
+    /// The split lives here because this is the only type holding both halves
+    /// of the rule — the rows, and the tier that says how far apart two
+    /// consecutive buckets are entitled to be.
+    public func runs(_ series: MetricSeries) -> [[HistorySample]] {
+        let samples = self[series]
+        guard !samples.isEmpty else { return [] }
+
+        // Strictly greater than one bucket: buckets are aligned to the tier's
+        // width, so neighbours in an unbroken stretch are exactly one width
+        // apart and only a missing bucket can push them further.
+        let width = TimeInterval(tier.seconds)
+        var runs: [[HistorySample]] = []
+        var current: [HistorySample] = [samples[0]]
+        for sample in samples.dropFirst() {
+            if let previous = current.last,
+                sample.timestamp.timeIntervalSince(previous.timestamp) > width
+            {
+                runs.append(current)
+                current = []
+            }
+            current.append(sample)
+        }
+        runs.append(current)
+        return runs
+    }
+
     public var isEmpty: Bool {
         rows.values.allSatisfy(\.isEmpty)
     }

@@ -6,14 +6,23 @@ import SwiftUI
 ///
 /// Time on the x-axis, not sample index: the app is not always running, and
 /// plotting stored buckets side by side would draw a night the Mac spent asleep
-/// as a continuous line. Swift Charts leaves a gap where there is no data, which
-/// is the honest picture.
+/// at the same width as a busy minute.
+///
+/// A real time axis is only half of it, though, and this comment used to claim
+/// the other half for free — that Swift Charts "leaves a gap where there is no
+/// data". It does not. Sparse rows are not absent data to it, they are points
+/// that happen to be far apart, and it joins them: a Mac asleep from midnight
+/// to four in the afternoon came back as a smooth sixteen-hour ramp with the
+/// min/max band filled in underneath. So the breaking is done here, by handing
+/// each unbroken stretch to the chart as a series of its own.
 ///
 /// The band between each bucket's minimum and maximum is drawn behind the
 /// average, because that is the whole reason those columns are stored: an hour
 /// that averaged 20 % but touched 100 % is not the same hour as a flat 20 %.
 struct HistoryChart: View {
-    let samples: [HistorySample]
+    /// Stored buckets in unbroken stretches — `HistorySlice.runs(_:)` splits
+    /// them where the record does.
+    let runs: [[HistorySample]]
     let colour: Color
     var range: ClosedRange<Double>?
     /// Whether zero belongs on the axis. A rate of nothing is meaningful, so
@@ -48,20 +57,27 @@ struct HistoryChart: View {
 
     var body: some View {
         Chart {
-            ForEach(samples, id: \.timestamp) { sample in
-                AreaMark(
-                    x: .value("Time", sample.timestamp),
-                    yStart: .value("Low", sample.aggregate.minimum),
-                    yEnd: .value("High", sample.aggregate.maximum)
-                )
-                .foregroundStyle(colour.opacity(0.18))
+            // `series:` is what keeps one run from being joined to the next.
+            // It groups only — the colour is still set outright, so no legend
+            // and no palette follow from it.
+            ForEach(Array(runs.enumerated()), id: \.offset) { index, run in
+                ForEach(run, id: \.timestamp) { sample in
+                    AreaMark(
+                        x: .value("Time", sample.timestamp),
+                        yStart: .value("Low", sample.aggregate.minimum),
+                        yEnd: .value("High", sample.aggregate.maximum),
+                        series: .value("Run", index)
+                    )
+                    .foregroundStyle(colour.opacity(0.18))
 
-                LineMark(
-                    x: .value("Time", sample.timestamp),
-                    y: .value("Average", sample.aggregate.average)
-                )
-                .foregroundStyle(colour)
-                .lineStyle(StrokeStyle(lineWidth: 1.5))
+                    LineMark(
+                        x: .value("Time", sample.timestamp),
+                        y: .value("Average", sample.aggregate.average),
+                        series: .value("Run", index)
+                    )
+                    .foregroundStyle(colour)
+                    .lineStyle(StrokeStyle(lineWidth: 1.5))
+                }
             }
 
             if let cursor {
@@ -144,6 +160,13 @@ struct HistoryChart: View {
         report(proxy.value(atX: x, as: Date.self))
     }
 
+    /// Every bucket in the slice, the runs run together.
+    ///
+    /// What the scale and the axis are asking about is the whole span, not how
+    /// it happens to be broken up — where the record stops matters to the line
+    /// and to nothing else.
+    private var samples: [HistorySample] { runs.flatMap { $0 } }
+
     /// The band decides the scale here, because the band is what is drawn.
     private var defaultDomain: ClosedRange<Double> {
         chartDomain(
@@ -192,7 +215,8 @@ private struct TimeDomain: ViewModifier {
 /// gridlines, no labels, no min–max band and no cursor: four more flags to say
 /// "draw almost none of this" is the larger change, not the smaller one.
 struct MiniChart: View {
-    let samples: [HistorySample]
+    /// Broken where the record is, for the reason `HistoryChart` explains.
+    let runs: [[HistorySample]]
     let colour: Color
     var range: ClosedRange<Double>?
     var startsAtZero = true
@@ -200,32 +224,38 @@ struct MiniChart: View {
     var body: some View {
         let domain = range ?? defaultDomain
 
-        Chart(samples, id: \.timestamp) { sample in
-            AreaMark(
+        Chart {
+            ForEach(Array(runs.enumerated()), id: \.offset) { index, run in
+                ForEach(run, id: \.timestamp) { sample in
+                    AreaMark(
                 x: .value("Time", sample.timestamp),
                 // Anchored to the foot of the scale, not left to fill to zero.
                 // A temperature chart's domain starts around 36 °C, and an area
                 // that reaches for zero is drawn well below the plot — it spills
                 // out of the card and over whatever is under it.
-                yStart: .value("Floor", domain.lowerBound),
-                yEnd: .value("Average", sample.aggregate.average)
-            )
+                        yStart: .value("Floor", domain.lowerBound),
+                        yEnd: .value("Average", sample.aggregate.average),
+                        series: .value("Run", index)
+                    )
             // A gradient rather than a flat wash: at this height a solid fill
             // reads as a block of colour with a line on top of it.
-            .foregroundStyle(
-                .linearGradient(
-                    colors: [colour.opacity(0.35), colour.opacity(0.02)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
+                    .foregroundStyle(
+                        .linearGradient(
+                            colors: [colour.opacity(0.35), colour.opacity(0.02)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
 
-            LineMark(
-                x: .value("Time", sample.timestamp),
-                y: .value("Average", sample.aggregate.average)
-            )
-            .foregroundStyle(colour)
-            .lineStyle(StrokeStyle(lineWidth: 1.5))
+                    LineMark(
+                        x: .value("Time", sample.timestamp),
+                        y: .value("Average", sample.aggregate.average),
+                        series: .value("Run", index)
+                    )
+                    .foregroundStyle(colour)
+                    .lineStyle(StrokeStyle(lineWidth: 1.5))
+                }
+            }
         }
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
@@ -237,7 +267,7 @@ struct MiniChart: View {
     /// draw, a domain sized to the maxima would flatten the line into the
     /// bottom third of a chart this short.
     private var defaultDomain: ClosedRange<Double> {
-        let averages = samples.map(\.aggregate.average)
+        let averages = runs.flatMap { $0 }.map(\.aggregate.average)
         return chartDomain(lowest: averages.min(), highest: averages.max(), startsAtZero: startsAtZero)
     }
 }

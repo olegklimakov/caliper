@@ -229,3 +229,57 @@ private func sixBuckets(from start: Date, recorded: [Int] = []) -> HistorySlice 
         #expect(slice.sample(.cpu, at: intoTheGap) == nil)
     }
 }
+
+/// A slice holds only the buckets that were recorded, so two neighbouring rows
+/// can be hours apart. Handed to a chart as one series that reads as a straight
+/// line across the hole — which is a picture of data nobody measured.
+private func slice(
+    tier: HistoryTier,
+    offsets: [Int],
+    series: MetricSeries = .cpu
+) -> HistorySlice {
+    let start = Date(timeIntervalSince1970: 1_700_000_000)
+    let samples = offsets.map { offset in
+        HistorySample(
+            series: series,
+            timestamp: start.addingTimeInterval(Double(offset * tier.seconds)),
+            aggregate: Aggregate(Double(offset))
+        )
+    }
+    return HistorySlice(
+        tier: tier,
+        start: start,
+        end: start.addingTimeInterval(Double((offsets.last ?? 0) * tier.seconds)),
+        rows: [series: samples]
+    )
+}
+
+@Test func anUnbrokenStretchIsOneRun() {
+    let runs = slice(tier: .tenMinutes, offsets: [0, 1, 2, 3]).runs(.cpu)
+
+    #expect(runs.count == 1)
+    #expect(runs[0].count == 4)
+}
+
+@Test func aMissingBucketBreaksTheRun() {
+    // 0, 1, then nothing until 100 — the shape of a Mac that slept.
+    let runs = slice(tier: .tenMinutes, offsets: [0, 1, 100, 101]).runs(.cpu)
+
+    #expect(runs.count == 2)
+    #expect(runs.map(\.count) == [2, 2])
+}
+
+/// Every bucket kept, in order, however the runs fall: the scale and the axis
+/// are asking about the whole span.
+@Test func breakingKeepsEveryBucket() {
+    let offsets = [0, 1, 2, 50, 90, 91]
+    let runs = slice(tier: .hour, offsets: offsets).runs(.cpu)
+
+    #expect(runs.count == 3)
+    #expect(runs.flatMap { $0 }.count == offsets.count)
+}
+
+@Test func aSeriesWithNothingRecordedHasNoRuns() {
+    #expect(slice(tier: .minute, offsets: []).runs(.cpu).isEmpty)
+    #expect(slice(tier: .minute, offsets: [0, 1]).runs(.memory).isEmpty)
+}

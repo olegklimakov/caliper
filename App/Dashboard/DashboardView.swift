@@ -293,7 +293,7 @@ struct DashboardPane: View {
         // stat cards, where it used to say so.
         if case .loaded(let slice) = active?.state, !slice[presentation.series].isEmpty {
             HistoryChart(
-                samples: slice[presentation.series],
+                runs: slice.runs(presentation.series),
                 colour: presentation.colour,
                 range: presentation.range,
                 startsAtZero: presentation.startsAtZero,
@@ -493,12 +493,15 @@ private struct MiniChartCard: View {
             }
 
             MiniChart(
-                samples: samples,
+                runs: slice?.runs(presentation.series) ?? [],
                 colour: presentation.colour,
                 range: presentation.range,
                 startsAtZero: presentation.startsAtZero
             )
             .frame(height: 64)
+            // For the reason ChartCard clips: an area mark is drawn past the
+            // frame it was given, and this card has rows under it.
+            .clipped()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
