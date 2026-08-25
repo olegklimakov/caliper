@@ -50,7 +50,7 @@ public struct HistoryReader: Sendable {
         now: Date = Date()
     ) async throws -> ProcessBucket? {
         guard let tier = ProcessTier.holding(moment, retention: retention.seconds, now: now) else { return nil }
-        return try await store.consumers(at: moment, tier: tier)
+        return try await store.consumers(at: moment, tier: tier, now: now)
     }
 
     /// Removes every stored process row and every interned name.

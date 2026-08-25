@@ -78,6 +78,20 @@ struct HistoryChart: View {
                     .foregroundStyle(colour)
                     .lineStyle(StrokeStyle(lineWidth: 1.5))
                 }
+
+                // A stretch of one bucket has no length, and a line with no
+                // length draws nothing at all. Breaking the series stopped the
+                // chart inventing the quiet hours; without this it would hide
+                // the lone buckets either side of them instead, which is the
+                // same failure wearing the other coat.
+                if run.count == 1, let only = run.first {
+                    PointMark(
+                        x: .value("Time", only.timestamp),
+                        y: .value("Average", only.aggregate.average)
+                    )
+                    .foregroundStyle(colour)
+                    .symbolSize(12)
+                }
             }
 
             if let cursor {
@@ -227,18 +241,19 @@ struct MiniChart: View {
         Chart {
             ForEach(Array(runs.enumerated()), id: \.offset) { index, run in
                 ForEach(run, id: \.timestamp) { sample in
+                    // Anchored to the foot of the scale, not left to fill to
+                    // zero. A temperature chart's domain starts around 36 °C,
+                    // and an area reaching for zero is drawn well below the
+                    // plot — it spills out of the card and over whatever is
+                    // under it.
                     AreaMark(
-                x: .value("Time", sample.timestamp),
-                // Anchored to the foot of the scale, not left to fill to zero.
-                // A temperature chart's domain starts around 36 °C, and an area
-                // that reaches for zero is drawn well below the plot — it spills
-                // out of the card and over whatever is under it.
+                        x: .value("Time", sample.timestamp),
                         yStart: .value("Floor", domain.lowerBound),
                         yEnd: .value("Average", sample.aggregate.average),
                         series: .value("Run", index)
                     )
-            // A gradient rather than a flat wash: at this height a solid fill
-            // reads as a block of colour with a line on top of it.
+                    // A gradient rather than a flat wash: at this height a
+                    // solid fill reads as a block of colour with a line on it.
                     .foregroundStyle(
                         .linearGradient(
                             colors: [colour.opacity(0.35), colour.opacity(0.02)],
@@ -254,6 +269,16 @@ struct MiniChart: View {
                     )
                     .foregroundStyle(colour)
                     .lineStyle(StrokeStyle(lineWidth: 1.5))
+                }
+
+                // As above: one bucket on its own still has to be visible.
+                if run.count == 1, let only = run.first {
+                    PointMark(
+                        x: .value("Time", only.timestamp),
+                        y: .value("Average", only.aggregate.average)
+                    )
+                    .foregroundStyle(colour)
+                    .symbolSize(10)
                 }
             }
         }

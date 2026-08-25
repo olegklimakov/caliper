@@ -499,9 +499,6 @@ private struct MiniChartCard: View {
                 startsAtZero: presentation.startsAtZero
             )
             .frame(height: 64)
-            // For the reason ChartCard clips: an area mark is drawn past the
-            // frame it was given, and this card has rows under it.
-            .clipped()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)

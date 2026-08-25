@@ -137,9 +137,9 @@ public struct HistoryStore: Sendable {
     /// One bucket, never a span. A day of the finest tier is around sixty
     /// thousand rows and the readout shows at most twenty of them, so the
     /// cursor asks for the row it is standing on rather than the whole range.
-    func consumers(at moment: Date, tier: ProcessTier) async throws -> ProcessBucket {
+    func consumers(at moment: Date, tier: ProcessTier, now: Date = Date()) async throws -> ProcessBucket {
         try await queue.read { db in
-            try Self.fetchConsumers(at: moment, tier: tier, in: db)
+            try Self.fetchConsumers(at: moment, tier: tier, now: now, in: db)
         }
     }
 
@@ -154,16 +154,26 @@ public struct HistoryStore: Sendable {
     /// for this bucket" on the one-hour view, on a Mac that had been recording
     /// without a break all day.
     ///
-    /// One flush interval. Together with the bucket still filling, that is the
-    /// furthest the writer can be behind; past it, the answer would be about a
-    /// different moment than the one asked about, and no answer is the honest
-    /// one.
-    private static let consumerWriteLag: TimeInterval = 60
-
-    static func fetchConsumers(at moment: Date, tier: ProcessTier, in db: Database) throws -> ProcessBucket {
+    /// One flush interval — asked of the writer rather than restated, so the
+    /// two cannot drift apart. Together with the bucket still filling, that is
+    /// the furthest the writer can be behind; past it, the answer would be
+    /// about a different moment than the one asked about, and no answer is the
+    /// honest one.
+    static func fetchConsumers(
+        at moment: Date,
+        tier: ProcessTier,
+        now: Date,
+        in db: Database
+    ) throws -> ProcessBucket {
         let asked = tier.bucketStart(of: moment)
-        // The newest bucket at or before the one asked for, within reach.
-        let earliest = asked.addingTimeInterval(-(Double(tier.seconds) + consumerWriteLag))
+        // Only at the write head. A bucket old enough to have been written and
+        // still empty is a bucket with nothing in it — the Mac was asleep — and
+        // answering that with the readings from ninety seconds earlier would
+        // put a list of processes beside a metric row reading "—". Reaching
+        // back is for the one bucket the writer has not caught up with yet.
+        let reach = Double(tier.seconds) + ProcessTier.flushInterval
+        let atWriteHead = now.timeIntervalSince(asked) <= reach
+        let earliest = atWriteHead ? asked.addingTimeInterval(-reach) : asked
         // Read as the integer it is stored as. Timestamps go into these tables
         // as seconds since the epoch, and letting the driver decide what an
         // integer means when a `Date` is asked for is a guess this does not

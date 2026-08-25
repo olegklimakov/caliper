@@ -12,6 +12,18 @@ public enum ProcessTier: String, Sendable, CaseIterable, Codable {
     case thirtySeconds
     case minute
 
+    /// How long the recorder holds finished buckets before writing them.
+    ///
+    /// One transaction a minute rather than one a tick — a write per sweep is a
+    /// disk wakeup per sweep, which is the cost this app promises not to have.
+    ///
+    /// Here rather than inside the recorder because it is not only the writer's
+    /// business: a reader asking for the bucket a cursor is standing in has to
+    /// know how far behind the writer is allowed to be, or it reports an empty
+    /// bucket for a moment that was recorded perfectly well. Two copies of this
+    /// number are two answers, and the reader's would drift silently.
+    public static let flushInterval: TimeInterval = 60
+
     public var seconds: Int {
         switch self {
         case .thirtySeconds: 30

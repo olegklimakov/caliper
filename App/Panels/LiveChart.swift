@@ -27,6 +27,8 @@ struct LiveChart: View {
     var axisLabel: ((Double) -> String)?
 
     var body: some View {
+        let domain = range ?? 0...max(upperBound, 1)
+
         Chart {
             ForEach(series) { line in
                 ForEach(Array(line.values.enumerated()), id: \.offset) { index, value in
@@ -34,7 +36,18 @@ struct LiveChart: View {
                         // A gradient rather than a flat wash: a solid block of
                         // colour under the line reads as a filled bar chart and
                         // buries the line that carries the information.
-                        AreaMark(x: .value("Sample", index), y: .value("Value", value))
+                        //
+                        // Anchored to the foot of the scale, not left to fill to
+                        // zero. A temperature chart's domain starts around 33 °C
+                        // and zero is nowhere near it, so the area was drawn far
+                        // below the plot — eighteen points below the card, over
+                        // the rows underneath. Clipping hid that; this is why it
+                        // was happening.
+                        AreaMark(
+                            x: .value("Sample", index),
+                            yStart: .value("Floor", domain.lowerBound),
+                            yEnd: .value("Value", value)
+                        )
                             .foregroundStyle(
                                 .linearGradient(
                                     colors: [line.colour.opacity(0.28), line.colour.opacity(0.02)],
@@ -72,7 +85,7 @@ struct LiveChart: View {
                 }
             }
         }
-        .chartYScale(domain: range ?? 0...max(upperBound, 1))
+        .chartYScale(domain: domain)
         .chartLegend(.hidden)
     }
 

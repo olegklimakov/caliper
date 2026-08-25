@@ -193,18 +193,13 @@ public struct HistorySlice: Sendable, Equatable {
         // width, so neighbours in an unbroken stretch are exactly one width
         // apart and only a missing bucket can push them further.
         let width = TimeInterval(tier.seconds)
-        var runs: [[HistorySample]] = []
-        var current: [HistorySample] = [samples[0]]
-        for sample in samples.dropFirst() {
-            if let previous = current.last,
-                sample.timestamp.timeIntervalSince(previous.timestamp) > width
-            {
-                runs.append(current)
-                current = []
+        var runs: [[HistorySample]] = [[samples[0]]]
+        for (previous, sample) in zip(samples, samples.dropFirst()) {
+            if sample.timestamp.timeIntervalSince(previous.timestamp) > width {
+                runs.append([])
             }
-            current.append(sample)
+            runs[runs.count - 1].append(sample)
         }
-        runs.append(current)
         return runs
     }
 

@@ -522,10 +522,12 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
             tier: .thirtySeconds
         )
 
-        // The next bucket along, which the writer has not reached.
+        // The next bucket along, which the writer has not reached — and it is
+        // the bucket the clock is standing in, which is what makes it reachable.
         let bucket = try await store.consumers(
             at: bucketStart.addingTimeInterval(35),
-            tier: .thirtySeconds
+            tier: .thirtySeconds,
+            now: bucketStart.addingTimeInterval(35)
         )
 
         #expect(bucket.consumers.map(\.name) == ["Xcode"])
@@ -549,9 +551,63 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
 
         let long = try await store.consumers(
             at: bucketStart.addingTimeInterval(600),
-            tier: .thirtySeconds
+            tier: .thirtySeconds,
+            now: bucketStart.addingTimeInterval(600)
         )
 
         #expect(long.isEmpty)
+    }
+}
+
+/// One bucket plus one flush interval, exactly: the furthest the writer can be
+/// behind, and therefore the furthest an answer may come from.
+@Test func theReachIsOneBucketAndOneFlush() async throws {
+    try await withStore { store in
+        try store.write(
+            processes: [
+                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, count: 1)
+            ],
+            tier: .thirtySeconds
+        )
+        let reach = Double(ProcessTier.thirtySeconds.seconds) + ProcessTier.flushInterval
+
+        let atLimit = try await store.consumers(
+            at: bucketStart.addingTimeInterval(reach),
+            tier: .thirtySeconds,
+            now: bucketStart.addingTimeInterval(reach)
+        )
+        let pastLimit = try await store.consumers(
+            at: bucketStart.addingTimeInterval(reach + Double(ProcessTier.thirtySeconds.seconds)),
+            tier: .thirtySeconds,
+            now: bucketStart.addingTimeInterval(reach + Double(ProcessTier.thirtySeconds.seconds))
+        )
+
+        #expect(atLimit.consumers.count == 1)
+        #expect(pastLimit.isEmpty)
+    }
+}
+
+/// Reaching back is for the bucket the writer has not caught up with, and for
+/// no other. An empty bucket in the middle of a night the Mac spent asleep is
+/// empty, and answering it with readings from a minute earlier would put a list
+/// of processes beside a metric row that reads "—".
+@Test func anOldEmptyBucketIsNotAnsweredByAnEarlierOne() async throws {
+    try await withStore { store in
+        try store.write(
+            processes: [
+                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, count: 1)
+            ],
+            tier: .thirtySeconds
+        )
+
+        // The bucket right after the written one — reachable at the head, but
+        // this is hours later.
+        let bucket = try await store.consumers(
+            at: bucketStart.addingTimeInterval(35),
+            tier: .thirtySeconds,
+            now: bucketStart.addingTimeInterval(6 * 3600)
+        )
+
+        #expect(bucket.isEmpty)
     }
 }

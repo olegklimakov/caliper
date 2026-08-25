@@ -180,12 +180,6 @@ struct ChartCard<Content: View>: View {
         content
             .frame(height: PanelMetrics.chartHeight)
             .frame(maxWidth: .infinity)
-            // Charts draw outside the frame they were given. An `AreaMark`'s
-            // gradient runs past the bottom of the plot and kept going: measured
-            // on the sensors panel, the fill was still visible eighteen points
-            // below the card it is supposed to sit inside, fading out over the
-            // rows beneath it. It reads as a rendering fault, because it is one.
-            .clipped()
             .padding(6)
             .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: PanelMetrics.cardRadius))
     }

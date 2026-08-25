@@ -15,8 +15,9 @@ import Synchronization
 public final class ProcessHistoryRecorder: Sendable {
     private let store: HistoryStore
     private let tier = ProcessTier.thirtySeconds
-    /// One transaction a minute: two buckets' worth.
-    private let flushInterval: TimeInterval = 60
+    /// One transaction a minute: two buckets' worth. Shared with the read
+    /// side, which has to know the same number — see `ProcessTier.flushInterval`.
+    private let flushInterval = ProcessTier.flushInterval
     private let writeQueue = DispatchQueue(
         label: "com.olegklimakov.caliper.processHistory",
         qos: .utility

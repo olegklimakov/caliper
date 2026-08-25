@@ -279,6 +279,21 @@ private func slice(
     #expect(runs.flatMap { $0 }.count == offsets.count)
 }
 
+/// The edge the rule turns on: one bucket missing is a break, and none missing
+/// is not.
+@Test func exactlyOneMissingBucketIsAlreadyABreak() {
+    #expect(slice(tier: .tenMinutes, offsets: [0, 1]).runs(.cpu).count == 1)
+    #expect(slice(tier: .tenMinutes, offsets: [0, 2]).runs(.cpu).count == 2)
+}
+
+/// A stretch of one bucket is a run of its own, and the chart has to be told so
+/// — a line through a single point draws nothing.
+@Test func aLoneBucketIsItsOwnRun() {
+    let runs = slice(tier: .hour, offsets: [0, 50, 51]).runs(.cpu)
+
+    #expect(runs.map(\.count) == [1, 2])
+}
+
 @Test func aSeriesWithNothingRecordedHasNoRuns() {
     #expect(slice(tier: .minute, offsets: []).runs(.cpu).isEmpty)
     #expect(slice(tier: .minute, offsets: [0, 1]).runs(.memory).isEmpty)
