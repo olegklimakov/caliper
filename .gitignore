@@ -1,5 +1,8 @@
 .DS_Store
 
+# Local agent state: machine-specific settings, worktrees, scratch
+.claude/
+
 # XcodeGen output — regenerate with `xcodegen generate`
 /Caliper.xcodeproj/
 /App/Info.plist

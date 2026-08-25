@@ -94,12 +94,6 @@ targets:
         # `"$(Scripts/sparkle_tools.sh)/generate_keys"` (-p prints this value
         # again). Replacing it strands every installed copy, since they only
         # accept updates signed by the key they shipped with.
-        #
-        # One key for every app this account ships, which is what Sparkle
-        # advises: the tool stores a single key per Keychain and says so. The
-        # cost is a shared blast radius; the benefit is one secret to keep
-        # rather than one per app, and a secret nobody can find is as lost as
-        # one nobody kept.
         SUPublicEDKey: BPrTisY3ZaEybRKiAlQbOkUR5zUiu39dA4VM7eGf6bQ=
 
 schemes:
