@@ -37,8 +37,11 @@ built not to become the load it measures.</p>
   <li><b>History</b> — recorded locally to SQLite from the moment the app
     starts, rolled up 10 s → 1 min → 10 min → 1 h, and charted over an hour, a
     day, a week, a month or a year. Nothing leaves the Mac.</li>
-  <li><b>Cost</b> — under 1 % of one core and under 50 MB of physical footprint
-    in menu-bar-only use, measured by a harness rather than hoped for.</li>
+  <li><b>Cost</b> — under 1 % of one core and under 50 MB while it is just the
+    menu bar, measured by a harness rather than hoped for. An open panel costs
+    more, because a panel samples and draws what it shows: about 2 % of one
+    core on an M5 Pro, and back down when it closes. Sensors are the expensive
+    reading, so only the panel that shows temperatures pays for them.</li>
   <li><b>Updates</b> — Caliper now checks for its own, quietly: a scheduled
     check that finds something marks the menu bar rather than interrupting you,
     and every update is verified against the developer signature before it is
