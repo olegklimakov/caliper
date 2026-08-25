@@ -31,9 +31,9 @@ dragging.
 Behind each one is a panel with the detail.
 
 <p align="center">
-  <img src="docs/panel-cpu.png" alt="CPU panel: total load, performance and efficiency clusters, per-core bars and the heaviest processes" width="260">
-  <img src="docs/panel-network.png" alt="Network panel: download and upload rates, the interface and its address" width="260">
-  <img src="docs/panel-sensors.png" alt="Sensors panel: temperature history, per-group readings and fan speeds" width="260">
+  <img src="docs/panel-cpu.png" alt="CPU panel: total load, performance and efficiency clusters, per-core bars and the heaviest processes" width="250">
+  <img src="docs/panel-memory.png" alt="Memory panel: pressure, the composition bar, swap and cached, and the heaviest consumers" width="250">
+  <img src="docs/panel-sensors.png" alt="Sensors panel: temperature history, per-group readings and fan speeds" width="250">
 </p>
 
 ## A real history, kept locally
@@ -44,7 +44,7 @@ records to SQLite from the moment it starts, rolls the samples up 10 s → 1 min
 heaviest processes of each bucket, so "what was going on at 3am" has an answer.
 
 <p align="center">
-  <img src="docs/dashboard.png" alt="The history window: an hour of CPU, memory, network, disk and temperature, charted together" width="900">
+  <img src="docs/dashboard.png" alt="The history window: an hour of CPU, memory, network, disk and temperature charted together, with the heaviest consumers of the selected bucket underneath" width="900">
 </p>
 
 Nothing leaves the Mac. There is no account, no telemetry and no network call
