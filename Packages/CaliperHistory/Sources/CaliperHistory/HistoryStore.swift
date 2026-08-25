@@ -137,9 +137,14 @@ public struct HistoryStore: Sendable {
     /// One bucket, never a span. A day of the finest tier is around sixty
     /// thousand rows and the readout shows at most twenty of them, so the
     /// cursor asks for the row it is standing on rather than the whole range.
-    func consumers(at moment: Date, tier: ProcessTier, now: Date = Date()) async throws -> ProcessBucket {
+    func consumers(
+        at moment: Date,
+        tier: ProcessTier,
+        now: Date = Date(),
+        isRecording: Bool = true
+    ) async throws -> ProcessBucket {
         try await queue.read { db in
-            try Self.fetchConsumers(at: moment, tier: tier, now: now, in: db)
+            try Self.fetchConsumers(at: moment, tier: tier, now: now, isRecording: isRecording, in: db)
         }
     }
 
@@ -163,17 +168,27 @@ public struct HistoryStore: Sendable {
         at moment: Date,
         tier: ProcessTier,
         now: Date,
+        isRecording: Bool,
         in db: Database
     ) throws -> ProcessBucket {
         let asked = tier.bucketStart(of: moment)
-        // Only at the write head. A bucket old enough to have been written and
-        // still empty is a bucket with nothing in it — the Mac was asleep — and
-        // answering that with the readings from ninety seconds earlier would
-        // put a list of processes beside a metric row reading "—". Reaching
-        // back is for the one bucket the writer has not caught up with yet.
+        // Reaching back is for one case only: the bucket the writer has not
+        // caught up with yet.
+        //
+        // A bucket old enough to have been written and still empty is a bucket
+        // with nothing in it — the Mac was asleep — and answering it with the
+        // readings from ninety seconds earlier would put a list of processes
+        // beside a metric row reading "—".
+        //
+        // And an empty bucket while nothing is recording is not lag either. The
+        // recorder throws its open bucket away the moment the setting goes off,
+        // on the grounds that a half-written one is not something the user
+        // agreed to keep; carrying the previous minute's list forward past that
+        // switch would put back what the switch was for. So the reader is told
+        // whether anyone is writing rather than inferring it from an absence.
         let reach = Double(tier.seconds) + ProcessTier.flushInterval
-        let atWriteHead = now.timeIntervalSince(asked) <= reach
-        let earliest = atWriteHead ? asked.addingTimeInterval(-reach) : asked
+        let mayBeLagging = isRecording && now.timeIntervalSince(asked) <= reach
+        let earliest = mayBeLagging ? asked.addingTimeInterval(-reach) : asked
         // Read as the integer it is stored as. Timestamps go into these tables
         // as seconds since the epoch, and letting the driver decide what an
         // integer means when a `Date` is asked for is a guess this does not

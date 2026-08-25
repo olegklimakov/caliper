@@ -101,10 +101,11 @@ final class DashboardHistory {
     /// thousands. The one in flight is cancelled when the cursor moves on, so a
     /// drag leaves at most one query outstanding.
     ///
-    /// The retention comes with the call rather than being held from when the
-    /// loader was made: it is a setting, and a window left open across a change
-    /// to it would keep asking the old question.
-    func inspect(_ moment: Date?, retention: ProcessRetention) {
+    /// The retention and whether anything is being recorded come with the call
+    /// rather than being held from when the loader was made: they are settings,
+    /// and a window left open across a change to either would keep asking the
+    /// old question.
+    func inspect(_ moment: Date?, retention: ProcessRetention, isRecording: Bool) {
         inspection?.cancel()
         // A preloaded loader has nothing to read from and its bucket is already
         // right — the same reason `load` leaves one alone. Clearing it here is
@@ -115,7 +116,7 @@ final class DashboardHistory {
             return
         }
         inspection = Task { [weak self] in
-            let bucket = try? await reader.consumers(at: moment, retention: retention)
+            let bucket = try? await reader.consumers(at: moment, retention: retention, isRecording: isRecording)
             guard let self, !Task.isCancelled else { return }
             consumers = bucket
         }

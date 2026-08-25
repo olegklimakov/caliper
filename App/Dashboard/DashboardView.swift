@@ -55,7 +55,8 @@ struct DashboardView: View {
                 OverviewPane(
                     metrics: metrics,
                     history: history,
-                    processRetention: preferences.processRetention
+                    processRetention: preferences.processRetention,
+                    recordsProcesses: preferences.recordsProcessHistory
                 )
             case .module(let module):
                 DashboardPane(metrics: metrics, history: history, module: module)

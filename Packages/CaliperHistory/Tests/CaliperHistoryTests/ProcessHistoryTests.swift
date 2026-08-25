@@ -611,3 +611,29 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
         #expect(bucket.isEmpty)
     }
 }
+
+/// Reaching back is a statement about the writer being behind, and there is no
+/// writer to be behind when the setting is off. The recorder throws its open
+/// bucket away the moment that happens — carrying the previous minute's list
+/// forward past the switch would put back exactly what the switch was for.
+@Test func nothingIsCarriedForwardWhileRecordingIsOff() async throws {
+    try await withStore { store in
+        try store.write(
+            processes: [
+                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, count: 1)
+            ],
+            tier: .thirtySeconds
+        )
+        let moment = bucketStart.addingTimeInterval(35)
+
+        let recording = try await store.consumers(
+            at: moment, tier: .thirtySeconds, now: moment, isRecording: true
+        )
+        let stopped = try await store.consumers(
+            at: moment, tier: .thirtySeconds, now: moment, isRecording: false
+        )
+
+        #expect(recording.consumers.count == 1)
+        #expect(stopped.isEmpty)
+    }
+}

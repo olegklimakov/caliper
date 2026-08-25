@@ -28,6 +28,10 @@ struct OverviewPane: View {
     private struct Lookup: Equatable {
         let moment: Date?
         let retention: ProcessRetention
+        /// Whether anything is writing process rows. A missing bucket means
+        /// something different when nobody is recording, and the answer has to
+        /// be asked again when the switch moves.
+        let isRecording: Bool
     }
 
     /// How many of the bucket's processes the pane has room for. The rest are
@@ -38,11 +42,19 @@ struct OverviewPane: View {
     /// How long the process history is kept, so the readout knows which moments
     /// are still stored.
     private let processRetention: ProcessRetention
+    /// Whether the process history is being written at all.
+    private let recordsProcesses: Bool
 
-    init(metrics: LiveMetrics, history: HistoryReader?, processRetention: ProcessRetention) {
+    init(
+        metrics: LiveMetrics,
+        history: HistoryReader?,
+        processRetention: ProcessRetention,
+        recordsProcesses: Bool
+    ) {
         self.metrics = metrics
         self.history = history
         self.processRetention = processRetention
+        self.recordsProcesses = recordsProcesses
         self.preloaded = nil
     }
 
@@ -51,6 +63,7 @@ struct OverviewPane: View {
         self.history = nil
         // Never used: the preview's bucket is handed in already read.
         self.processRetention = .week
+        self.recordsProcesses = true
         self.preloaded = preloaded
         _cursor = State(initialValue: cursor)
     }
@@ -83,8 +96,18 @@ struct OverviewPane: View {
         }
         // `cursor` is already snapped to a bucket, so a drag across hundreds of
         // pixels inside one asks the store once.
-        .task(id: Lookup(moment: inspectedMoment, retention: processRetention)) {
-            loader?.inspect(inspectedMoment, retention: processRetention)
+        .task(
+            id: Lookup(
+                moment: inspectedMoment,
+                retention: processRetention,
+                isRecording: recordsProcesses
+            )
+        ) {
+            loader?.inspect(
+                inspectedMoment,
+                retention: processRetention,
+                isRecording: recordsProcesses
+            )
         }
         // Not in the task above, which also runs on first appear and would
         // throw away a cursor the preview harness had just set. A bucket of one
