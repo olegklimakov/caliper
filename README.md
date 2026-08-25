@@ -44,7 +44,7 @@ records to SQLite from the moment it starts, rolls the samples up 10 s → 1 min
 heaviest processes of each bucket, so "what was going on at 3am" has an answer.
 
 <p align="center">
-  <img src="docs/dashboard.png" alt="The history window: 24 hours of CPU, memory, network, disk and temperature, with the top consumers underneath" width="900">
+  <img src="docs/dashboard.png" alt="The history window: an hour of CPU, memory, network, disk and temperature, charted together" width="900">
 </p>
 
 Nothing leaves the Mac. There is no account, no telemetry and no network call
