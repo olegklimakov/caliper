@@ -1,0 +1,54 @@
+<style>
+  /* Sparkle renders these notes inside the update window, which follows the
+     system appearance — so the text has to name a colour that survives both.
+     Canvas/CanvasText are the system pair; without them the default black
+     lands on a dark panel. */
+  :root { color-scheme: light dark; }
+  body {
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, sans-serif;
+    color: CanvasText;
+    background: Canvas;
+    margin: 0;
+  }
+  h3 { font-size: 13px; margin: 16px 0 6px; }
+  ul { margin: 0; padding-left: 18px; }
+  li { margin-bottom: 4px; }
+  p { margin: 0 0 10px; }
+  code { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; }
+  a { color: LinkText; }
+</style>
+
+<p>A performance release. Caliper cost the most in the one state you were most
+likely to be looking at it — a panel open, which is the only way to read its own
+figure. That is fixed, and the claim it makes about itself is now specific about
+which state it describes.</p>
+
+<h3>What changed</h3>
+<ul>
+  <li><b>A panel only samples what it shows.</b> Cadence used to be decided by
+    <i>how much</i> of the app was open, so opening any panel pulled the
+    temperature sweep from one reading every thirty seconds to one every two —
+    including on the four panels that draw no temperature at all. That sweep is
+    the most expensive reading Caliper takes, by an order of magnitude. Each
+    surface now asks for the metrics it actually draws and nothing else.</li>
+  <li><b>The menu bar stopped repeating itself.</b> The strip was handing the
+    window server a new label, tooltip and width on every refresh whether or not
+    any of them had changed, and a module with nothing to show — a Mac that
+    reports no sensors — was being re-hidden twice a second for the life of the
+    session.</li>
+  <li><b>On this Mac</b>, with the default strip: 0.68 % of one core with the
+    menu bar alone, down from 0.78 %, and 2.1 % with the CPU panel open, down
+    from 3.2 %. Closing a panel now returns to where it started instead of
+    settling at twice it.</li>
+</ul>
+
+<h3>About that number</h3>
+<p>"Under 1 %" is the steady state — menu bar up, nothing open — and it was
+never a claim about anything else. Since the only way to see Caliper's own
+reading is to open a panel, the expensive state is the one everybody meets, so
+the figures above name which is which. They are shares of <i>one</i> core, the
+unit Activity Monitor's %CPU column uses, not of the whole machine.</p>
+
+<h3>Requirements</h3>
+<p>macOS 15 or later, Apple Silicon. Sensors are read on a best-effort basis:
+what a particular Mac will not report is hidden rather than guessed at.</p>
