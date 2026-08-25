@@ -25,13 +25,27 @@ settings:
     # Swift 6 language mode implies complete strict concurrency.
     SWIFT_VERSION: "6.0"
     ARCHS: arm64
-    ENABLE_HARDENED_RUNTIME: YES
     ENABLE_APP_SANDBOX: NO
     ENABLE_USER_SCRIPT_SANDBOXING: YES
-    # Local builds are ad-hoc signed, which drops hardened runtime; Developer ID
-    # signing lands in Phase 5 and turns it back on.
+    # Local builds are ad-hoc signed, so anyone can clone this and build it
+    # without a certificate.
     CODE_SIGN_STYLE: Manual
     CODE_SIGN_IDENTITY: "-"
+    # And therefore *not* hardened, which is the half of that sentence this
+    # file used to claim and not do. Hardened runtime turns on library
+    # validation, and library validation refuses a framework that is not signed
+    # by the app's team — which the embedded Sparkle never is: it arrives from
+    # the package artifact ad-hoc signed by the Sparkle project, and only
+    # Scripts/release.sh re-signs it. The result was a Release build that dyld
+    # killed at launch, intermittently enough to read as a crash:
+    #
+    #   Library not loaded: @rpath/Sparkle.framework/Versions/B/Sparkle
+    #   ... mapping process and mapped file (non-platform) have different Team IDs
+    #
+    # The archive turns it back on, where the whole bundle carries one Developer
+    # ID and notarization requires it. Set there rather than here so that the
+    # build everyone runs is the build that works.
+    ENABLE_HARDENED_RUNTIME: NO
   configs:
     # Everything else in Debug/Release comes from XcodeGen's presets; dead code
     # stripping is the one shipped-binary setting they leave off.
