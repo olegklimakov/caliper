@@ -143,8 +143,40 @@ public struct HistoryStore: Sendable {
         }
     }
 
+    /// How far back a moment may reach for the bucket that answers it.
+    ///
+    /// The bucket a moment falls inside is usually not on disk yet. The process
+    /// recorder closes one only when a later sweep arrives, and writes on a
+    /// flush a minute apart; the metric tiers are far quicker, the ten-second
+    /// table being seconds behind the clock. So a cursor resting on the newest
+    /// metric bucket asks the process table for a bucket that is still in
+    /// memory — and gets nothing. That was the whole of "No processes recorded
+    /// for this bucket" on the one-hour view, on a Mac that had been recording
+    /// without a break all day.
+    ///
+    /// One flush interval. Together with the bucket still filling, that is the
+    /// furthest the writer can be behind; past it, the answer would be about a
+    /// different moment than the one asked about, and no answer is the honest
+    /// one.
+    private static let consumerWriteLag: TimeInterval = 60
+
     static func fetchConsumers(at moment: Date, tier: ProcessTier, in db: Database) throws -> ProcessBucket {
-        let start = tier.bucketStart(of: moment)
+        let asked = tier.bucketStart(of: moment)
+        // The newest bucket at or before the one asked for, within reach.
+        let earliest = asked.addingTimeInterval(-(Double(tier.seconds) + consumerWriteLag))
+        // Read as the integer it is stored as. Timestamps go into these tables
+        // as seconds since the epoch, and letting the driver decide what an
+        // integer means when a `Date` is asked for is a guess this does not
+        // need to make.
+        let found = try Int.fetchOne(
+            db,
+            sql: """
+                SELECT MAX(timestamp) FROM \(tier.tableName)
+                WHERE timestamp <= ? AND timestamp >= ?
+                """,
+            arguments: [Int(asked.timeIntervalSince1970), Int(earliest.timeIntervalSince1970)]
+        )
+        let start = found.map { Date(timeIntervalSince1970: TimeInterval($0)) } ?? asked
         let rows = try Row.fetchAll(
             db,
             sql: """

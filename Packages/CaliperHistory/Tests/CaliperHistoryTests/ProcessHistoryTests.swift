@@ -506,3 +506,52 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
         #expect(names.count == ProcessTier.topCount)
     }
 }
+
+/// The bucket a cursor is standing in is usually still in memory: the recorder
+/// closes one only when a later sweep arrives, and writes on a flush a minute
+/// apart, while the ten-second metric tier is seconds behind the clock. So the
+/// overview's cursor, resting on the newest metric bucket, asks for a process
+/// bucket nobody has written — which is how a Mac that had been recording all
+/// day reported "no processes recorded" for the last hour.
+@Test func aBucketNotWrittenYetIsAnsweredByTheOneBeforeIt() async throws {
+    try await withStore { store in
+        try store.write(
+            processes: [
+                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, count: 1)
+            ],
+            tier: .thirtySeconds
+        )
+
+        // The next bucket along, which the writer has not reached.
+        let bucket = try await store.consumers(
+            at: bucketStart.addingTimeInterval(35),
+            tier: .thirtySeconds
+        )
+
+        #expect(bucket.consumers.map(\.name) == ["Xcode"])
+        // Labelled with the bucket that answered, not the one that was asked
+        // for: the readout says which span it is showing.
+        #expect(bucket.start == bucketStart)
+    }
+}
+
+/// Only as far back as the writer can be behind. Past that the rows describe a
+/// different moment than the one asked about, and an empty answer is the
+/// truthful one — a Mac asleep for an hour did not have Xcode running in it.
+@Test func reachingBackStopsAtTheWritersLag() async throws {
+    try await withStore { store in
+        try store.write(
+            processes: [
+                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, count: 1)
+            ],
+            tier: .thirtySeconds
+        )
+
+        let long = try await store.consumers(
+            at: bucketStart.addingTimeInterval(600),
+            tier: .thirtySeconds
+        )
+
+        #expect(long.isEmpty)
+    }
+}
