@@ -3,6 +3,12 @@
 # Local agent state: machine-specific settings, worktrees, scratch
 .claude/
 
+# Planning documents. They live in the private `caliper-notes` repository —
+# see CLAUDE.md. Ignored rather than merely deleted so that a working copy of
+# them sitting here never turns into a second, drifting original.
+/tasks/
+/docs/PRD.md
+
 # XcodeGen output — regenerate with `xcodegen generate`
 /Caliper.xcodeproj/
 /App/Info.plist
