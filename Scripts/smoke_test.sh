@@ -1,12 +1,14 @@
 #!/bin/bash
 #
-# Proves a built app actually runs: it produces a snapshot quickly, hides the
-# sensors cleanly when the private interfaces are refused, puts something in the
-# menu bar, and exits when asked.
+# Proves a built app actually runs: it carries the notices it owes, produces a
+# snapshot quickly, hides the sensors cleanly when the private interfaces are
+# refused, puts something in the menu bar, and exits when asked.
 #
-# The four things it checks are the four ways this app has broken during
-# development — a status item that never appeared, a sampler that never produced
-# a reading, degradation that silently regressed, and a quit that hung.
+# Four of the five are the ways this app has broken during development — a
+# status item that never appeared, a sampler that never produced a reading,
+# degradation that silently regressed, and a quit that hung. The fifth is the
+# one that could not break loudly: a bundle without its NOTICE looks perfectly
+# well from the outside.
 #
 # Usage: Scripts/smoke_test.sh [path/to/Caliper.app]
 
@@ -31,14 +33,14 @@ fail() {
 
 [[ -x "$BINARY" ]] || fail "no executable at $BINARY"
 
-# 0. The notice the bundled libraries' licence requires is in the bundle. It is
-#    checked here because nothing else would notice its absence: the settings
-#    sheet falls back to a short summary rather than an empty pane, so a build
-#    that dropped the resource would look fine and ship without the notice.
+# 1. The notice the bundled libraries' licences require is in the bundle. Its
+#    absence is silent everywhere else: the settings sheet falls back to a
+#    pointer rather than an empty pane, so a build that dropped the resource
+#    looks fine and ships without what it owes.
 [[ -f "$APP/Contents/Resources/NOTICE" ]] || fail "bundle carries no NOTICE"
 echo "ok: third-party notice bundled"
 
-# 1. A snapshot, quickly, with the metrics that matter in it.
+# 2. A snapshot, quickly, with the metrics that matter in it.
 START=$(date +%s)
 SNAPSHOT=$("$BINARY" --selftest) || fail "--selftest exited non-zero"
 ELAPSED=$(($(date +%s) - START))
@@ -51,7 +53,7 @@ for KEY in host cpu memory network; do
 done
 echo "ok: snapshot in ${ELAPSED}s with cpu, memory and network"
 
-# 2. Degradation: with the private sensor interfaces refused, the app must run
+# 3. Degradation: with the private sensor interfaces refused, the app must run
 #    with the feature hidden rather than reporting zeros.
 DEGRADED=$(CALIPER_DISABLE_SENSORS=1 "$BINARY" --selftest) || fail "degraded run exited non-zero"
 if echo "$DEGRADED" | plutil -extract sensors json -o - -- - >/dev/null 2>&1; then
@@ -61,7 +63,7 @@ echo "$DEGRADED" | plutil -extract cpu json -o - -- - >/dev/null 2>&1 ||
     fail "degraded run lost cpu"
 echo "ok: sensors hidden cleanly when refused"
 
-# 3. It launches and appears in the menu bar.
+# 4. It launches and appears in the menu bar.
 pkill -x Caliper 2>/dev/null || true
 open "$APP"
 sleep 4
@@ -79,7 +81,7 @@ else
     echo "warn: cannot count menu bar items — grant Accessibility permission to check this" >&2
 fi
 
-# 4. Opening a second panel must not take the app with it.
+# 5. Opening a second panel must not take the app with it.
 #
 #    A popover is a window, and AppKit quits an app whose last window closes —
 #    so opening panel two, which closes panel one, used to end the process with
@@ -110,7 +112,7 @@ else
     echo "warn: Kuroko not found — the panel and dashboard checks verified nothing" >&2
 fi
 
-# 5. It quits when asked.
+# 6. It quits when asked.
 caliper_stop "$BINARY"
 sleep 2
 [[ -z "$(caliper_pid "$BINARY")" ]] || fail "app still running after quit"

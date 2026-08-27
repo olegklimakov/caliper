@@ -197,18 +197,15 @@ struct SettingsPane: View {
         }
         .formStyle(.grouped)
         .sheet(isPresented: $showingAcknowledgements) {
-            AcknowledgementsSheet { showingAcknowledgements = false }
+            AcknowledgementsSheet()
         }
     }
 
     // MARK: - About
 
-    /// Where the third-party notices are reachable from.
-    ///
-    /// Not decoration: GRDB is linked into the binary and Sparkle ships beside
-    /// it, both under a licence whose one condition is that its notice reaches
-    /// whoever holds the copy. A file in the repository does not reach the
-    /// person who downloaded a disk image; this does.
+    /// Where the third-party notices are reachable from — the only route to
+    /// them for someone who downloaded a disk image rather than the source.
+    /// `NOTICE` says what is owed to whom.
     private var about: some View {
         Section("About") {
             Text(
