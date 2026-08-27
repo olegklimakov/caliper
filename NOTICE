@@ -1,0 +1,58 @@
+Caliper
+Copyright (c) 2026 Oleg Klimakov
+
+Caliper is distributed under the MIT licence; see LICENSE. This file names the
+third-party work it is built on. Each component keeps its own copyright and its
+own licence, and nothing here narrows what those licences grant you.
+
+
+================================================================================
+Bundled in the application
+================================================================================
+
+GRDB.swift 7.11.1
+    https://github.com/groue/GRDB.swift
+    Copyright (C) 2015-2025 Gwendal Roué
+    MIT licence — https://github.com/groue/GRDB.swift/blob/master/LICENSE
+
+    The SQLite layer under the history store: the tiered tables, the rollups
+    and the retention sweep all run through it.
+
+Sparkle 2.9.6
+    https://github.com/sparkle-project/Sparkle
+    Copyright (c) 2006-2013 Andy Matuschak, and the further holders named in
+    the project's own LICENSE
+    MIT licence — https://github.com/sparkle-project/Sparkle/blob/2.x/LICENSE
+
+    The self-update mechanism, embedded as a framework. Sparkle carries
+    components of its own under their separate terms — bsdiff 4.3 and
+    SUSignatureVerifier.m under a BSD 2-clause licence, sais-lite under MIT,
+    and a portable Ed25519 implementation under a zlib-style licence. All four
+    texts are in the LICENSE linked above.
+
+
+================================================================================
+Derived from other projects
+================================================================================
+
+Stats
+    https://github.com/exelban/stats
+    Copyright (c) 2019 Serhiy Mytrovtsiy
+    MIT licence — https://github.com/exelban/stats/blob/master/LICENSE
+
+    As of this writing Caliper contains no code from Stats. It is an
+    independent implementation, and Stats is read as a reference — chiefly for
+    the SMC and IOHID sensor keys that every Apple SoC generation renames,
+    which their Modules/Sensors/values.swift has been accumulating since 2020,
+    and for the failure modes their changelog has already paid for.
+
+    Where that changes it is recorded here rather than left implicit. Any file
+    carrying material from Stats keeps their copyright header above ours and
+    says what was modified, and gains an entry under this heading naming the
+    file and what was taken from it.
+
+    This is not paperwork. The MIT licence grants everything it grants on one
+    condition — that the notice travels with the copy — so keeping it is the
+    price of the permission, not a courtesy on top of it. And a monitor that
+    competes with Stats while standing on their work is the last project that
+    should be quiet about doing so.
