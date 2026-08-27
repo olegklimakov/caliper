@@ -2,11 +2,9 @@ import Charts
 import CaliperCore
 import SwiftUI
 
-/// A time series drawn with Swift Charts, one line per series.
-///
-/// Sample index rather than timestamp on the x-axis: these buffers are evenly
-/// spaced by construction, and an index axis cannot drift when a tick is
-/// dropped.
+/// A time series drawn with Swift Charts, one line per series. Sample index
+/// rather than timestamp on the x-axis: these buffers are evenly spaced by
+/// construction, and an index axis cannot drift when a tick is dropped.
 struct LiveChart: View {
     struct Series: Identifiable {
         let id: String
@@ -19,8 +17,7 @@ struct LiveChart: View {
     /// `nil` scales to the data, which is what rates need.
     var range: ClosedRange<Double>?
     var filled = false
-    /// Panels are too small for axis furniture; the dashboard has room for it,
-    /// and a chart you are meant to read values off needs a scale.
+    /// Panels are too small for axis furniture; the dashboard has room.
     var showsAxes = false
     /// Formats the y-axis labels — percentages, bytes per second or degrees,
     /// depending on what is being charted.
@@ -33,16 +30,11 @@ struct LiveChart: View {
             ForEach(series) { line in
                 ForEach(Array(line.values.enumerated()), id: \.offset) { index, value in
                     if filled {
-                        // A gradient rather than a flat wash: a solid block of
-                        // colour under the line reads as a filled bar chart and
-                        // buries the line that carries the information.
-                        //
-                        // Anchored to the foot of the scale, not left to fill to
-                        // zero. A temperature chart's domain starts around 33 °C
-                        // and zero is nowhere near it, so the area was drawn far
-                        // below the plot — eighteen points below the card, over
-                        // the rows underneath. Clipping hid that; this is why it
-                        // was happening.
+                        // A gradient, because a solid block under the line
+                        // reads as a filled bar chart. Anchored to the foot of
+                        // the scale, not zero: a temperature domain starts around
+                        // 33 °C, and an area reaching for zero is drawn below the
+                        // card, over the rows underneath.
                         AreaMark(
                             x: .value("Sample", index),
                             yStart: .value("Floor", domain.lowerBound),
@@ -56,9 +48,9 @@ struct LiveChart: View {
                                 )
                             )
                     }
-                    // Without an explicit series, Swift Charts treats every
-                    // point as one line and joins the end of one series to the
-                    // start of the next — a diagonal across the whole chart.
+                    // Without an explicit series Swift Charts joins the end of
+                    // one to the start of the next — a diagonal across the
+                    // chart.
                     LineMark(
                         x: .value("Sample", index),
                         y: .value("Value", value),

@@ -4,14 +4,13 @@ import Synchronization
 
 /// Folds process sweeps into thirty-second buckets and writes them in batches.
 ///
-/// The expensive half of "what was running then" is already paid for: the
-/// coordinator sweeps every pid — a syscall each — and keeps the top ten by
-/// CPU, footprint and disk, then throws the result away a second later.
-/// Recording it is rows in a file, not new sampling work.
+/// The expensive half is already paid for: the coordinator sweeps every pid and
+/// throws the result away a second later, so recording it is rows in a file, not
+/// new sampling work.
 ///
-/// The same shape as `HistoryRecorder`, and for the same reasons: a lock rather
-/// than an actor so the flush at termination is synchronous, and one
-/// transaction a minute rather than one a tick.
+/// The same shape as `HistoryRecorder` and for the same reasons: a lock rather
+/// than an actor so the flush at termination is synchronous, and one transaction
+/// a minute.
 public final class ProcessHistoryRecorder: Sendable {
     private let store: HistoryStore
     private let tier = ProcessTier.thirtySeconds
@@ -29,10 +28,10 @@ public final class ProcessHistoryRecorder: Sendable {
         var isEnabled: Bool
         var open: [String: Accumulator] = [:]
         var openBucket: Date?
-        /// The sweep last folded in. A snapshot carries the newest process
-        /// sample rather than one taken on its own tick, so the same sweep
-        /// arrives again every second — up to thirty times when the app is
-        /// hidden — and folding it each time would weight it thirtyfold.
+        /// A snapshot carries the newest process sample rather than one taken
+        /// on its own tick, so the same sweep arrives every second — up to
+        /// thirty times when hidden — and folding it each time weights it
+        /// thirtyfold.
         var lastSweep: Date?
         var pending: [ProcessRow] = []
         var lastFlush = Date()
@@ -54,16 +53,13 @@ public final class ProcessHistoryRecorder: Sendable {
         }
     }
 
-    /// Throws away everything held in memory without writing it.
-    ///
     /// What the delete button needs: emptying the tables while the recorder
-    /// still holds a bucket and up to a minute of pending rows would put part
-    /// of the record straight back moments later.
+    /// holds a bucket and a minute of pending rows puts part of the record
+    /// straight back.
     public func discardPending() {
         state.withLock { Self.discard(&$0) }
-        // And wait for whatever is already on its way to the store: a batch
-        // handed to this queue a moment ago would otherwise land *after* the
-        // delete.
+        // And wait for what is already on its way: a batch handed to this
+        // queue a moment ago would land *after* the delete.
         writeQueue.sync {}
     }
 
@@ -74,9 +70,7 @@ public final class ProcessHistoryRecorder: Sendable {
         state.pending.removeAll(keepingCapacity: false)
     }
 
-    /// Takes the process sweep rather than the whole snapshot: it is all this
-    /// records, and a caller holding a snapshot with no processes in it has
-    /// nothing to hand over.
+    /// The sweep rather than the whole snapshot: it is all this records.
     public func record(_ processes: ProcessesSample) {
         let batch = state.withLock { state -> [ProcessRow]? in
             guard state.isEnabled else { return nil }
@@ -89,10 +83,9 @@ public final class ProcessHistoryRecorder: Sendable {
             }
             state.openBucket = bucket
 
-            // Every process the sampler thought worth naming, each counted once
-            // however many of the three lists it appears in. Which of them the
-            // bucket keeps is decided when it closes, over the whole bucket
-            // rather than over whichever sweep happened to be last.
+            // Each counted once however many of the three lists it is in.
+            // Which the bucket keeps is decided when it closes, over the whole
+            // bucket rather than whichever sweep was last.
             var seen: Set<String> = []
             for sample in processes.topByCPU + processes.topByMemory + processes.topByDisk
             where seen.insert(sample.name).inserted {
@@ -131,13 +124,10 @@ public final class ProcessHistoryRecorder: Sendable {
         try store.write(processes: batch, tier: tier)
     }
 
-    /// Ranks what the bucket saw and keeps the heaviest of it.
-    ///
-    /// Top ten by CPU unioned with top ten by footprint. Not by disk: a process
-    /// that only ever touched the disk is answered by the disk series itself,
-    /// and a third ranking would half again the rows for a question the readout
-    /// does not ask. Its rate is still stored for the processes that do make
-    /// the list.
+    /// Top ten by CPU unioned with top ten by footprint. Not by disk: that
+    /// question is answered by the disk series itself, and a third ranking would
+    /// half again the rows. The rate is still stored for whoever makes the
+    /// list.
     private static func close(bucket start: Date, in state: inout State) {
         let totals = state.open.map { name, accumulator in
             accumulator.row(name: name, timestamp: start)
@@ -153,12 +143,9 @@ public final class ProcessHistoryRecorder: Sendable {
         state.open.removeAll(keepingCapacity: true)
     }
 
-    /// Running mean CPU, peak footprint and mean disk rate over one bucket, for
-    /// one process.
-    ///
-    /// Peak footprint rather than mean because the question asked of a memory
-    /// history is what a process took at worst; means for the two rates because
-    /// what a bucket says about them is how busy it was overall.
+    /// Running mean CPU, peak footprint and mean disk rate over one bucket.
+    /// Peak for memory because the question is what a process took at worst;
+    /// means for the rates, which say how busy the bucket was overall.
     struct Accumulator {
         private var cpuTotal = 0.0
         private var diskTotal = 0.0
@@ -173,9 +160,9 @@ public final class ProcessHistoryRecorder: Sendable {
             count += 1
         }
 
-        /// A process seen only in sweeps that were all rejected as
-        /// non-finite still has a row: it was in the top ten, and a footprint
-        /// of zero says so more honestly than dropping it would.
+        /// A process whose sweeps were all rejected as non-finite still has a
+        /// row: it was in the top ten, and zero says so more honestly than
+        /// dropping it.
         func row(name: String, timestamp: Date) -> ProcessRow {
             let readings = Swift.max(count, 1)
             return ProcessRow(

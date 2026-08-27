@@ -65,12 +65,9 @@ public struct HistoryStore: Sendable {
 
     /// Writes one batch of process rows, interning their names.
     ///
-    /// Interning is two statements per name — insert-if-absent, then read the
-    /// id — memoised for the batch and no longer. A bucket holds at most twenty
-    /// names and a batch is a minute's worth, so a lookup a minute costs
-    /// nothing; a cache that outlived the transaction would instead have to be
-    /// invalidated when the settings button empties the name table underneath
-    /// it.
+    /// Interning is two statements per name, memoised for the batch and no
+    /// longer: a cache that outlived the transaction would have to be
+    /// invalidated when the settings button empties the name table.
     func write(processes rows: [ProcessRow], tier: ProcessTier) throws {
         guard !rows.isEmpty else { return }
 
@@ -104,12 +101,8 @@ public struct HistoryStore: Sendable {
         }
     }
 
-    /// How two writes of the same process bucket combine.
-    ///
-    /// The same rule as `mergeClause`, for the same reason: quitting and
-    /// relaunching inside one bucket must leave one row holding both partial
-    /// readings, not the second overwriting the first. Footprint is a peak, so
-    /// it widens rather than being re-weighted.
+    /// The same rule as `mergeClause`, for the same reason. Footprint is a
+    /// peak, so it widens rather than being re-weighted.
     static let processMergeClause = """
         cpu_permille = (cpu_permille * count + excluded.cpu_permille * excluded.count)
                        / (count + excluded.count),
@@ -132,11 +125,8 @@ public struct HistoryStore: Sendable {
         return id
     }
 
-    /// The processes stored for the bucket holding one moment, heaviest first.
-    ///
-    /// One bucket, never a span. A day of the finest tier is around sixty
-    /// thousand rows and the readout shows at most twenty of them, so the
-    /// cursor asks for the row it is standing on rather than the whole range.
+    /// One bucket, never a span: a day of the finest tier is around sixty
+    /// thousand rows and the readout shows twenty.
     func consumers(
         at moment: Date,
         tier: ProcessTier,
@@ -150,20 +140,14 @@ public struct HistoryStore: Sendable {
 
     /// How far back a moment may reach for the bucket that answers it.
     ///
-    /// The bucket a moment falls inside is usually not on disk yet. The process
-    /// recorder closes one only when a later sweep arrives, and writes on a
-    /// flush a minute apart; the metric tiers are far quicker, the ten-second
-    /// table being seconds behind the clock. So a cursor resting on the newest
-    /// metric bucket asks the process table for a bucket that is still in
-    /// memory — and gets nothing. That was the whole of "No processes recorded
-    /// for this bucket" on the one-hour view, on a Mac that had been recording
-    /// without a break all day.
+    /// The bucket a moment falls inside is usually not on disk yet: the process
+    /// recorder writes on a flush a minute apart, while the ten-second metric
+    /// table is seconds behind the clock. So a cursor on the newest metric
+    /// bucket asks the process table for a bucket still in memory.
     ///
-    /// One flush interval — asked of the writer rather than restated, so the
-    /// two cannot drift apart. Together with the bucket still filling, that is
-    /// the furthest the writer can be behind; past it, the answer would be
-    /// about a different moment than the one asked about, and no answer is the
-    /// honest one.
+    /// One flush interval, asked of the writer rather than restated. With the
+    /// bucket still filling, that is the furthest the writer can be behind;
+    /// past it the answer would be about a different moment.
     static func fetchConsumers(
         at moment: Date,
         tier: ProcessTier,
@@ -172,27 +156,18 @@ public struct HistoryStore: Sendable {
         in db: Database
     ) throws -> ProcessBucket {
         let asked = tier.bucketStart(of: moment)
-        // Reaching back is for one case only: the bucket the writer has not
-        // caught up with yet.
-        //
-        // A bucket old enough to have been written and still empty is a bucket
-        // with nothing in it — the Mac was asleep — and answering it with the
-        // readings from ninety seconds earlier would put a list of processes
-        // beside a metric row reading "—".
-        //
-        // And an empty bucket while nothing is recording is not lag either. The
-        // recorder throws its open bucket away the moment the setting goes off,
-        // on the grounds that a half-written one is not something the user
-        // agreed to keep; carrying the previous minute's list forward past that
-        // switch would put back what the switch was for. So the reader is told
-        // whether anyone is writing rather than inferring it from an absence.
+        // Reaching back covers one case only: the bucket the writer has not
+        // caught up with. A bucket old enough to have been written and still
+        // empty means the Mac was asleep, and answering it with readings from
+        // ninety seconds earlier would put processes beside a metric row
+        // reading "—". Nor is an empty bucket lag while nothing is recording —
+        // the recorder discards its open bucket when the setting goes off, so
+        // the reader is told whether anyone is writing rather than guessing.
         let reach = Double(tier.seconds) + ProcessTier.flushInterval
         let mayBeLagging = isRecording && now.timeIntervalSince(asked) <= reach
         let earliest = mayBeLagging ? asked.addingTimeInterval(-reach) : asked
-        // Read as the integer it is stored as. Timestamps go into these tables
-        // as seconds since the epoch, and letting the driver decide what an
-        // integer means when a `Date` is asked for is a guess this does not
-        // need to make.
+        // Read as the integer it is stored as: timestamps go in as seconds
+        // since the epoch, and asking for a `Date` lets the driver guess.
         let found = try Int.fetchOne(
             db,
             sql: """
@@ -227,8 +202,6 @@ public struct HistoryStore: Sendable {
         )
     }
 
-    /// Deletes every stored process row and every interned name.
-    ///
     /// The settings button behind "a behavioural record you can take back".
     func deleteProcessHistory() async throws {
         try await queue.write { db in
@@ -236,17 +209,12 @@ public struct HistoryStore: Sendable {
         }
     }
 
-    /// Removes everything the app has recorded — every metric tier as well as
-    /// the process history — and hands the space back to the filesystem.
-    /// One implementation, and it is the one the app runs.
+    /// Removes everything the app has recorded and hands the space back to the
+    /// filesystem.
     ///
-    /// There used to be a second copy of this sequence in `HistoryReader`, so
-    /// that the delete could be awaited. The extracted statements kept the two
-    /// copies' *SQL* in step but not their order, and the order — the deletes
-    /// inside a transaction, the reclaim outside one — is the load-bearing
-    /// part. Worse, the tests exercised this copy while the app ran the other:
-    /// the project's own lesson about a rule written at two call sites, in both
-    /// of its halves.
+    /// Keep it as one implementation. The order — deletes inside a transaction,
+    /// reclaim outside one — is the load-bearing part, and a second copy that
+    /// shares the SQL but not the order looks correct and is not.
     public func deleteEverything() async throws {
         try await queue.write { db in
             try Self.deleteEverything(in: db)
@@ -269,20 +237,14 @@ public struct HistoryStore: Sendable {
 
     /// Rewrites the file at the size its remaining contents need.
     ///
-    /// A full `VACUUM`, not the `incremental_vacuum` the process delete uses.
-    /// That one returns a bounded number of pages, which is right for a delete
-    /// the app carries on recording through; someone who asks to clear
-    /// everything is asking for the file to stop being that size, and only a
-    /// rewrite does that. It is a long lock over the whole file — every read
-    /// and write on this queue waits for it — which is why it is a separate
-    /// operation rather than the same one with a wider `DELETE`.
+    /// A full `VACUUM`, not the `incremental_vacuum` the process delete uses:
+    /// someone clearing everything is asking for the file to stop being that
+    /// size. It takes a long lock over the whole file, which is why it is a
+    /// separate operation rather than a wider `DELETE`.
     ///
-    /// Then a truncating checkpoint, or the claim is invisible: under WAL the
-    /// deleted rows live on in `history.sqlite-wal`, which keeps growing, and
-    /// the settings screen would report a file that never changed size.
-    ///
-    /// Must run outside a transaction — SQLite refuses both statements inside
-    /// one.
+    /// Then a truncating checkpoint, or the claim is invisible — under WAL the
+    /// deleted rows live on in `history.sqlite-wal`. Both statements must run
+    /// outside a transaction; SQLite refuses them inside one.
     static func reclaimSpace(in db: Database) throws {
         try db.execute(sql: "VACUUM")
         try db.execute(sql: "PRAGMA wal_checkpoint(TRUNCATE)")
@@ -294,8 +256,7 @@ public struct HistoryStore: Sendable {
             try db.execute(sql: "DELETE FROM \(tier.tableName)")
         }
         try db.execute(sql: "DELETE FROM process_names")
-        // Hand the pages back rather than leaving a file that is still the size
-        // of the record the user just asked to be rid of.
+        // Or the file stays the size of the record just deleted.
         try db.execute(sql: "PRAGMA incremental_vacuum(4096)")
     }
 
@@ -305,7 +266,7 @@ public struct HistoryStore: Sendable {
         }
     }
 
-    /// How many names are interned — what the garbage collector is measured by.
+    /// What the name garbage collector is measured by.
     func internedNameCount() throws -> Int {
         try queue.read { db in
             try Int.fetchOne(db, sql: "SELECT count(*) FROM process_names") ?? 0
@@ -338,12 +299,11 @@ public struct HistoryStore: Sendable {
 
     /// Shared by the blocking and the async readers, so there is one query.
     ///
-    /// One statement for all the series rather than one apiece. They share the
-    /// range and, at this tier, largely the same pages, so seven reads would
-    /// walk the same b-tree seven times — and a span boundary crossed between
-    /// them would hand the caller two tiers that no longer line up. Ordered by
-    /// `(series, timestamp)`, which is the primary key's own order, so SQLite
-    /// sorts nothing and each group arrives already oldest-first.
+    /// One statement for all the series: they share the range and largely the
+    /// same pages, and a span boundary crossed between separate reads would
+    /// hand the caller two tiers that no longer line up. Ordered by
+    /// `(series, timestamp)` — the primary key's own order — so SQLite sorts
+    /// nothing and each group arrives oldest-first.
     static func fetch(
         _ series: [MetricSeries],
         tier: HistoryTier,
@@ -375,8 +335,7 @@ public struct HistoryStore: Sendable {
 
         var grouped: [MetricSeries: [HistorySample]] = [:]
         for row in rows {
-            // A row naming a series this build no longer has is skipped rather
-            // than faulting: the store outlives any one version of the enum.
+            // The store outlives any one version of the enum.
             guard let name: String = row["series"],
                 let series = MetricSeries(rawValue: name)
             else { continue }
@@ -397,12 +356,9 @@ public struct HistoryStore: Sendable {
         return HistorySlice(tier: tier, start: start, end: end, rows: grouped)
     }
 
-    /// The tier that answers a range without handing the caller more points
-    /// than a chart can draw.
-    ///
-    /// Asking for a year at ten-second resolution would return three million
-    /// rows to plot on eight hundred pixels; the coarsest tier that still has
-    /// the detail is always the right answer.
+    /// The tier that answers a range without handing back more points than a
+    /// chart can draw — a year at ten-second resolution is three million rows
+    /// for eight hundred pixels.
     public static func tier(forRange seconds: TimeInterval, targetPoints: Int = 600) -> HistoryTier {
         let wanted = seconds / Double(max(targetPoints, 1))
         // The finest tier that still keeps the point count near the target —

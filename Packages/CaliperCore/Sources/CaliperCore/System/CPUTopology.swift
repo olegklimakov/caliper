@@ -3,14 +3,12 @@ import IOKit
 
 /// Works out which logical cores belong to which performance cluster.
 ///
-/// This cannot be guessed from `hw.perflevel*` alone. On an M5 Pro the fastest
-/// level (`perflevel0`, "Super", 5 cores) occupies logical CPUs 10–14 while the
-/// slower level sits at 0–9 — the reverse of the usual assumption — and the
-/// IORegistry labels those clusters `P` and `M` rather than the familiar
+/// Not guessable from `hw.perflevel*`: on an M5 Pro the fastest level
+/// (`perflevel0`, "Super", 5 cores) occupies logical CPUs 10–14 while the slower
+/// sits at 0–9, and the IORegistry labels those clusters `P` and `M` rather than
 /// `P`/`E`. So the layout is read from the IORegistry and matched against the
-/// sysctl performance levels, and only when the match is unambiguous. Anything
-/// unexpected yields no clusters at all and the UI falls back to unlabeled
-/// per-core readings.
+/// sysctl levels, only when unambiguous — anything else yields no clusters and
+/// the UI falls back to unlabeled per-core readings.
 enum CPUTopology {
     struct ClusterRun: Equatable {
         let type: String
@@ -29,8 +27,6 @@ enum CPUTopology {
         return matched(runs: contiguousRuns(of: cores), levels: performanceLevels()) ?? []
     }
 
-    /// Pairs IORegistry cluster runs with sysctl performance levels.
-    ///
     /// Split out from the hardware reads so the matching rules can be tested
     /// against the layouts of machines this one is not.
     static func matched(runs: [ClusterRun], levels: [PerformanceLevel]) -> [HostInfo.CoreCluster]? {

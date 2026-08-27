@@ -1,13 +1,10 @@
 import CaliperHistory
 import SwiftUI
 
-/// Every metric on one time axis, under one cursor.
-///
-/// The question the single-metric panes cannot answer: the temperature climbed
-/// *here* — what were the CPU and the memory doing at that moment? All the
-/// series are already recorded into buckets aligned to absolute time, so they
-/// line up without resampling; what was missing was a view that reads them
-/// together and a cursor that means the same instant in all of them.
+/// Every metric on one time axis, under one cursor — the question the
+/// single-metric panes cannot answer: the temperature climbed *here*, what were
+/// the CPU and the memory doing? The series are recorded into buckets aligned
+/// to absolute time, so they line up without resampling.
 struct OverviewPane: View {
     let metrics: LiveMetrics
     let history: HistoryReader?
@@ -19,28 +16,24 @@ struct OverviewPane: View {
     @State private var cursor: Date?
     @State private var loader: DashboardHistory?
 
-    /// The modules, in the sidebar's order, so the stack reads the same way the
-    /// rest of the window does.
+    /// In the sidebar's order, so the stack reads the way the window does.
     private static let modules = MenuBarModule.allCases
 
-    /// What a process-bucket lookup depends on: which moment, and how far back
-    /// the history is kept. Changing either has to ask again.
+    /// What a process-bucket lookup depends on; changing any of it asks
+    /// again.
     private struct Lookup: Equatable {
         let moment: Date?
         let retention: ProcessRetention
-        /// Whether anything is writing process rows. A missing bucket means
-        /// something different when nobody is recording, and the answer has to
-        /// be asked again when the switch moves.
+        /// A missing bucket means something different when nobody is
+        /// recording.
         let isRecording: Bool
     }
 
-    /// How many of the bucket's processes the pane has room for. The rest are
-    /// still recorded, and the footer says so rather than letting the list read
-    /// as the whole bucket.
+    /// How many the pane has room for. The rest are still recorded, and the
+    /// footer says so rather than letting the list read as the whole bucket.
     private static let shownConsumers = 5
 
-    /// How long the process history is kept, so the readout knows which moments
-    /// are still stored.
+    /// Says which moments are still stored.
     private let processRetention: ProcessRetention
     /// Whether the process history is being written at all.
     private let recordsProcesses: Bool
@@ -84,10 +77,8 @@ struct OverviewPane: View {
             consumers
         }
         .padding(20)
-        // Taller than the single-metric pane's minimum, and deliberately: five
-        // stacked charts and the readout under them stop being readable below
-        // this, so the window is not allowed to get there while the overview is
-        // showing.
+        // Taller than the single-metric pane's minimum: five stacked charts
+        // and the readout under them stop being readable below this.
         .frame(minWidth: 560, minHeight: 560, alignment: .topLeading)
         .task(id: span) {
             let loader = loader ?? preloaded ?? DashboardHistory(reader: history)
@@ -110,9 +101,7 @@ struct OverviewPane: View {
             )
         }
         // Not in the task above, which also runs on first appear and would
-        // throw away a cursor the preview harness had just set. A bucket of one
-        // span is not a bucket of another, so the moment cannot survive the
-        // change.
+        // throw away a cursor the preview harness had just set.
         .onChange(of: span) { cursor = nil }
         .onReceive(NotificationCenter.default.publisher(for: .historyDidChange)) {
             _ in loader?.reload()
@@ -120,12 +109,9 @@ struct OverviewPane: View {
         .onDisappear { loader?.stop() }
     }
 
-    /// Which bucket the readout is showing: the cursor's, or — with no cursor —
-    /// the most recent one that has anything in it.
-    ///
-    /// At rest the question "what is running" still has an answer, and giving
-    /// it means the readout is always on screen rather than appearing when a
-    /// drag starts and shoving the charts around.
+    /// The cursor's bucket, or the most recent one with anything in it. At rest
+    /// "what is running" still has an answer, and giving it keeps the readout on
+    /// screen rather than appearing mid-drag and shoving the charts around.
     private var inspectedMoment: Date? {
         guard let slice = active?.slice else { return nil }
         return inspected(in: slice) ?? slice.latestRecorded
@@ -136,12 +122,9 @@ struct OverviewPane: View {
     /// already complete and can be read straight away.
     private var active: DashboardHistory? { loader ?? preloaded }
 
-    /// The cursor, if the moment it pins is still inside the loaded range.
-    ///
-    /// The window keeps moving: a moment pinned twenty minutes ago falls off
-    /// the left of an hour-wide span the next time it reloads, and a rule drawn
-    /// past the end of the axis with every value reading "—" is worse than no
-    /// cursor at all.
+    /// The cursor, if the moment it pins is still inside the loaded range: the
+    /// window keeps moving, and a rule past the end of the axis with every value
+    /// reading "—" is worse than no cursor.
     private func inspected(in slice: HistorySlice) -> Date? {
         guard let cursor, slice.cursorRange?.contains(cursor) == true else { return nil }
         return cursor
@@ -149,9 +132,8 @@ struct OverviewPane: View {
 
     @ViewBuilder
     private var caption: some View {
-        // Nothing to scrub is nothing to say: over a placeholder, an invitation
-        // to drag across a chart is an invitation to an interaction that branch
-        // does not have.
+        // Over a placeholder, an invitation to drag is an invitation to an
+        // interaction that branch does not have.
         if active?.slice != nil {
             Text(captionText)
                 .font(.system(size: 11))
@@ -160,12 +142,11 @@ struct OverviewPane: View {
         }
     }
 
-    /// What the line under the header says — and, because it is the whole
-    /// answer in one sentence, what VoiceOver reads off the charts.
+    /// The line under the header, and what VoiceOver reads off the charts.
     private var captionText: String {
         guard let slice = active?.slice, let cursor = inspected(in: slice) else {
-            // Both ways in are named: the drag was the only one until the
-            // charts became focusable, and it is the one a keyboard cannot use.
+            // Both ways in are named: a drag is the one a keyboard cannot
+            // use.
             return "Drag across a chart, or press the arrow keys, to read every metric over one bucket"
         }
         return bucketLabel(cursor, in: slice, span: span)
@@ -174,25 +155,21 @@ struct OverviewPane: View {
     @ViewBuilder
     private var content: some View {
         if let slice = active?.slice {
-            // The rows share whatever height the window has rather than sitting
-            // at a fixed one and being clipped — and not in a `ScrollView`,
-            // which `ImageRenderer` draws as blank and would cost this pane the
-            // only visual check the project has. The spacing is what keeps one
-            // chart's bottom axis label clear of the next one's top.
+            // The rows share the window's height rather than being clipped —
+            // and not in a `ScrollView`, which `ImageRenderer` draws blank,
+            // costing this pane the project's only visual check. The spacing
+            // keeps one chart's bottom axis label clear of the next one's top.
             VStack(spacing: 16) {
                 ForEach(Array(Self.modules.enumerated()), id: \.element) { index, module in
                     row(module, slice: slice, showsTimeAxis: index == Self.modules.count - 1)
                 }
             }
-            // One tab stop for the five of them: they are one picture under one
-            // cursor, and five stops for one control would be noise.
+            // One picture under one cursor, so one tab stop.
             .chartCursorKeys($cursor, in: slice)
-            // `contain`, not the default: a label on a container is inherited
-            // by every child that has none of its own, and the module titles
-            // and their values were all being read out as this one sentence.
-            // No `accessibilityValue` either — VoiceOver treats value as a
-            // control's affordance and does not reliably speak it on a group,
-            // and the caption saying the same thing is already in the tree.
+            // `contain`, not the default: a container's label is inherited by
+            // every child without one, so the module titles and values all read
+            // out as this one sentence. No `accessibilityValue` either —
+            // VoiceOver does not reliably speak value on a group.
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Every metric over the \(span.title)")
         } else {
@@ -200,14 +177,9 @@ struct OverviewPane: View {
         }
     }
 
-    /// What was running over the bucket under the cursor.
-    ///
-    /// Deliberately a list for one bucket and never a series. Only the top ten
-    /// are stored, so a process missing from a bucket means "not in the top
-    /// ten", not "idle"; a line drawn through that gap would be a lie the UI
-    /// told confidently. The heading says which bucket it is for and that it is
-    /// a top ten, so the list cannot be read as the whole truth about the
-    /// machine at that moment.
+    /// What was running over the bucket under the cursor: one bucket, never a
+    /// series. Only the top ten are stored, so a missing process means "not in
+    /// the top ten", not "idle" — which is why the heading says so.
     @ViewBuilder
     private var consumers: some View {
         if active?.slice != nil {
@@ -220,11 +192,10 @@ struct OverviewPane: View {
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
 
-                    // Both rankings, side by side, because both are what the
-                    // bucket stores. Ordering one list by CPU and printing the
-                    // footprint beside it showed the CPU list twice over: a
-                    // process holding gigabytes while using no CPU — a browser
-                    // left open overnight — was recorded and never once shown.
+                    // Both rankings, because both are what the bucket stores.
+                    // One list ordered by CPU with the footprint printed beside
+                    // it never shows a process holding gigabytes at no CPU — a
+                    // browser left open overnight.
                     HStack(alignment: .top, spacing: 24) {
                         ranking("By CPU", bucket.consumers) { usage in
                             PercentFormatter.string(usage.cpu, decimals: 1)
@@ -234,30 +205,25 @@ struct OverviewPane: View {
                         }
                     }
 
-                    // Said outright, because the alternative is a list that
-                    // reads as everything that was running. Only the heaviest
-                    // are kept, so a process not here was not necessarily idle.
+                    // Otherwise the list reads as everything that was
+                    // running.
                     Text(
                         "\(min(Self.shownConsumers, bucket.consumers.count)) of each ranking, out of \(bucket.consumers.count) recorded — only the heaviest ten by CPU and by memory are kept"
                     )
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                 } else {
-                    // Not silence: a bucket with nothing in it is an answer —
-                    // the Mac was asleep, the recording is switched off, or the
-                    // moment is older than the history is kept for.
+                    // An empty bucket is an answer: asleep, switched off, or
+                    // older than the history is kept for.
                     Text("No processes recorded for this bucket")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
             }
-            // A fixed height, and this is the whole reason the readout is drawn
-            // even with no cursor on the charts. The five charts above are
-            // greedy, so a block that appeared when you started scrubbing took
-            // its height out of them and the picture you were pointing at
-            // jumped under the pointer. Reserved for the full five rows as
-            // well, or a bucket that happened to record two processes would
-            // resize everything again on the way past.
+            // Fixed, and the reason the readout is drawn with no cursor at
+            // all: the charts above are greedy, so a block appearing mid-scrub
+            // takes its height out of them and the picture jumps under the
+            // pointer. Reserved for five rows for the same reason.
             .frame(height: Self.consumersHeight, alignment: .topLeading)
         }
     }
@@ -306,8 +272,8 @@ struct OverviewPane: View {
                 Text(reading(presentation, sample: sample, inspecting: pinned != nil, slice: slice))
                     .font(.system(size: 15))
                     .monospacedDigit()
-                // The band is why min and max are stored at all: a bucket that
-                // averaged 20 % but touched 100 % is not a quiet bucket.
+                // Why min and max are stored: a bucket that averaged 20 % but
+                // touched 100 % is not a quiet bucket.
                 Text(band(presentation, sample: sample))
                     .font(.system(size: 10))
                     .monospacedDigit()
@@ -320,16 +286,14 @@ struct OverviewPane: View {
                 colour: presentation.colour,
                 range: presentation.range,
                 startsAtZero: presentation.startsAtZero,
-                // Forced rather than left to each series' own rows, so the rule
-                // drawn at one moment lands on the same x in all five — a
-                // series that stopped recording early would otherwise squeeze
-                // its chart into a shorter axis.
+                // Forced, so the rule lands on the same x in all five: a series
+                // that stopped recording early would squeeze its own axis.
                 timeDomain: slice.start...slice.end,
                 showsTimeAxis: showsTimeAxis,
                 yAxisValues: 3,
-                // Room for the widest label any of these five rows can print —
-                // "28,6 MB/s" at 50 points — so every plot is inset by the
-                // same amount and the columns of five charts are one column.
+                // The widest label these rows can print, "28,6 MB/s" at 50
+                // points, so every plot is inset the same and the five columns
+                // are one.
                 yAxisLabelWidth: 52,
                 cursor: pinned,
                 onScrub: { moment in
@@ -341,9 +305,8 @@ struct OverviewPane: View {
         }
     }
 
-    /// What the value column says: the inspected bucket's average, the latest
-    /// stored one when nothing is being inspected, and an em dash where the
-    /// moment has no row at all.
+    /// The inspected bucket's average, the latest stored one at rest, and an em
+    /// dash where the moment has no row.
     private func reading(
         _ presentation: MetricPresentation,
         sample: HistorySample?,
@@ -353,9 +316,8 @@ struct OverviewPane: View {
         if let sample {
             return presentation.format(sample.aggregate.average)
         }
-        // A cursor over a gap — the Mac asleep, or a sensor this machine does
-        // not have. Never the neighbouring bucket's value, which would be the
-        // readout disagreeing with the gap the chart is drawing.
+        // A cursor over a gap. Never the neighbouring bucket's value, which
+        // would disagree with the gap the chart is drawing.
         if inspecting {
             return "—"
         }

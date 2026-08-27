@@ -23,16 +23,11 @@ public struct Downsampler: Sendable {
     /// on the second.
     ///
     /// `now` is a parameter so compaction can be tested without waiting a day
-    /// for rows to age.
+    /// for rows to age. `processRetention` is the user's choice, capped per tier
+    /// by `ProcessTier.retention(keeping:)`.
     ///
-    /// `processRetention` is the user's choice for how long the process history
-    /// lives; each tier caps it as `ProcessTier.retention(keeping:)` says.
-    /// Off the caller's thread, like every other write in this package.
-    ///
-    /// It is the heaviest thing the app does to the store — three rollups, five
-    /// deletes and an incremental vacuum — and it used to run synchronously on
-    /// a cooperative thread while far cheaper reads were being careful to
-    /// await.
+    /// The heaviest thing the app does to the store — three rollups, five
+    /// deletes and an incremental vacuum — so it stays off the caller's thread.
     public func compact(
         now: Date = Date(),
         processRetention: TimeInterval = ProcessRetention.week.seconds
@@ -63,20 +58,14 @@ public struct Downsampler: Sendable {
         }
     }
 
-    /// How far back a rolled-up bucket is still rebuilt from its sources.
+    /// How far back a rolled-up bucket is still rebuilt from its sources. An
+    /// hour keeps the rewrite to a few hundred rows a pass.
     ///
-    /// Nothing ever writes fine rows for a span older than the one being
-    /// recorded, so an hour is far more slack than a flush interval or a
-    /// relaunch needs, and it keeps the rewrite to a few hundred rows a pass
-    /// rather than the ten thousand a full-retention rebuild would touch.
-    ///
-    /// Two things about this number are load-bearing. It must stay **shorter
-    /// than the shortest source retention** — a day, for the ten-second tier —
-    /// or a bucket could be rebuilt from sources that have partly aged out, and
-    /// a good row would be replaced by a thin one. And it must be a **whole
-    /// number of every tier's buckets**, which an hour is for all four widths,
-    /// so that the boundary between "settled" and "still rebuilt" always falls
-    /// on a bucket edge rather than through the middle of one.
+    /// Two constraints are load-bearing. It must stay **shorter than the
+    /// shortest source retention** — a day, for the ten-second tier — or a
+    /// bucket gets rebuilt from sources that have partly aged out, replacing a
+    /// good row with a thin one. And it must be a **whole number of every
+    /// tier's buckets**, so the settled boundary falls on a bucket edge.
     static let rebuildWindow: TimeInterval = 3600
 
     private func rollUp(
@@ -90,20 +79,15 @@ public struct Downsampler: Sendable {
         let cutoff = Int(now.timeIntervalSince1970) / target.seconds * target.seconds
         let settled = cutoff - Int(Self.rebuildWindow)
 
-        // Two passes over disjoint ranges.
+        // Two passes over disjoint ranges: settled buckets are built once, the
+        // recent end is rebuilt from its sources every pass.
         //
-        // Older than the window a bucket is built once and never touched again,
-        // which is all this used to do — a target bucket was said to be built
-        // from a source complete by construction. Six days of real recording
-        // say otherwise: 32 of 722 ten-minute buckets disagreed with the minute
-        // rows under them, by up to seven points of CPU, and every one was a
-        // span where recording had stopped and started. Fine rows landing after
-        // the bucket was built were locked out of it for the life of the file.
-        //
-        // So the recent end is rebuilt from its sources on every pass. A
-        // rolled-up value is a pure function of those rows, which makes
-        // recomputing it idempotent by construction; refusing to recompute was
-        // the fragile half.
+        // Build-once alone is not enough. Over six days of real recording, 32
+        // of 722 ten-minute buckets disagreed with the minute rows under them
+        // by up to seven points of CPU — every one a span where recording had
+        // stopped and started, with the late-arriving fine rows locked out for
+        // the life of the file. A rolled-up value is a pure function of its
+        // sources, so recomputing is idempotent.
         try rollUp(from: source, into: target, buckets: Int.min..<settled, rebuild: false, in: db)
         try rollUp(from: source, into: target, buckets: settled..<cutoff, rebuild: true, in: db)
     }
@@ -173,15 +157,10 @@ public struct Downsampler: Sendable {
         let cutoff = Int(now.timeIntervalSince1970) / target.seconds * target.seconds
         let settled = cutoff - Int(Self.rebuildWindow)
 
-        // The recent end is thrown away and built again, for the reason the
-        // metric rollup rebuilds it: a bucket built while recording was paused
-        // inside its span is missing the rows that arrived afterwards, and
-        // `DO NOTHING` would keep it that way for good.
-        //
-        // A delete rather than the metric tier's `DO UPDATE`, because this
-        // rollup re-ranks: a process that falls out of the top ten on the
-        // rebuild has to leave the bucket, and an update can only overwrite
-        // rows, never remove one. The whole compaction is one transaction, so
+        // Thrown away and rebuilt, for the reason the metric rollup rebuilds.
+        // A delete rather than `DO UPDATE` because this rollup re-ranks: a
+        // process that falls out of the top ten has to leave the bucket, and an
+        // update can overwrite rows but never remove one. One transaction, so
         // the window is never observed empty.
         try db.execute(
             sql: "DELETE FROM \(target.tableName) WHERE timestamp >= ? AND timestamp < ?",
@@ -235,11 +214,8 @@ public struct Downsampler: Sendable {
         )
     }
 
-    /// Drops interned names no tier refers to any more.
-    ///
-    /// Without this the name table grows forever with every short-lived build
-    /// script the machine ever ran — the rows it names are deleted by
-    /// retention, but the name outlives them.
+    /// Without this the name table grows forever: retention deletes the rows,
+    /// but the interned name outlives them.
     private func collectProcessNames(in db: Database) throws {
         let referenced = ProcessTier.allCases
             .map { "SELECT name_id FROM \($0.tableName)" }

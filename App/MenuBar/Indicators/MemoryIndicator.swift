@@ -3,18 +3,13 @@ import CaliperCore
 
 /// A column showing how much of memory is in use, with the percentage beside it.
 ///
-/// Upright, and that is the whole point of the shape. It was a horizontal
-/// capsule filled from the left, which is what every battery gauge on this
-/// platform looks like — including the real one three icons along in the same
-/// menu bar. Batteries are always horizontal, so standing the gauge up gives
-/// the module a silhouette of its own while keeping the "how full" reading a
-/// capsule was there for.
+/// Upright on purpose: a horizontal capsule filled from the left is what every
+/// battery gauge on this platform looks like, including the real one a few icons
+/// along in the same menu bar.
 ///
 /// The column's *height* is the used fraction and its *colour* is the kernel's
-/// pressure level. Those are two different questions and both are worth
-/// answering: a Mac sits near 90 % used and is perfectly happy, so a gauge read
-/// alone would look alarming every day, and the colour is the part that says
-/// whether to care.
+/// pressure level — two different questions. A Mac sits near 90 % used and is
+/// perfectly happy, so the colour is the part that says whether to care.
 @MainActor
 struct MemoryIndicator: MenuBarIndicator {
     let module = MenuBarModule.memory
@@ -28,9 +23,8 @@ struct MemoryIndicator: MenuBarIndicator {
 
     func identity(_ state: LiveMetrics) -> AnyHashable? {
         guard let memory = state.snapshot?.memory else { return nil }
-        // The fraction is the column's height and the number; the pressure is
-        // only what either the column or the symbol is coloured with. Neither
-        // is worth a redraw when the half it belongs to is not drawn.
+        // Neither is worth a redraw when the half it belongs to is not
+        // drawn.
         var identity: [Int] = []
         if layout.showsValue || layout.showsGraph {
             identity.append(Int((memory.usedFraction * 100).rounded()))
@@ -59,9 +53,7 @@ struct MemoryIndicator: MenuBarIndicator {
                 height: columnHeight
             )
 
-            // A small radius, not a capsule: rounded to the point of a stadium
-            // and it starts reading as a pill again, which is the shape being
-            // avoided.
+            // A small radius, not a capsule: a stadium reads as a pill again.
             let track = NSBezierPath(roundedRect: column, xRadius: 2, yRadius: 2)
             style.secondary(Palette.track).setFill()
             track.fill()

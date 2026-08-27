@@ -14,12 +14,10 @@ public struct HistoryReader: Sendable {
     }
 
     /// The last `span` of several series, from the coarsest tier that still has
-    /// the detail. Empty when nothing has been recorded yet — a fresh install
-    /// has no past, and that is not an error.
+    /// the detail. Empty when nothing has been recorded.
     ///
     /// One tier for all of them, which is what makes a shared cursor possible:
-    /// the buckets are the same width and aligned the same way, so one instant
-    /// picks out one row in each series without any resampling.
+    /// same width, same alignment, so one instant picks out one row in each.
     public func slice(
         _ series: [MetricSeries],
         span: TimeInterval,
@@ -33,17 +31,13 @@ public struct HistoryReader: Sendable {
         }
     }
 
-    /// The processes stored for the bucket holding one moment, or `nil` when
-    /// nothing holds it any more.
+    /// The processes stored for the bucket holding one moment. One bucket
+    /// rather than a span: a span read is tens of thousands of rows to show
+    /// twenty.
     ///
-    /// One bucket rather than a span, because that is the whole question: the
-    /// cursor is standing somewhere and this is what was running there. A span
-    /// read would be tens of thousands of rows to show twenty of them.
-    ///
-    /// `nil` and an empty bucket are different answers. `nil` is "no tier keeps
-    /// that moment", which is a fact about retention; empty is "that moment is
-    /// kept and holds nothing", which is the Mac having been asleep or the
-    /// recording having been switched off at the time.
+    /// `nil` and an empty bucket are different answers — `nil` is "no tier keeps
+    /// that moment", empty is "kept, and holds nothing": asleep, or recording
+    /// switched off.
     public func consumers(
         at moment: Date,
         retention: ProcessRetention,
@@ -54,32 +48,24 @@ public struct HistoryReader: Sendable {
         return try await store.consumers(at: moment, tier: tier, now: now, isRecording: isRecording)
     }
 
-    /// Removes every stored process row and every interned name.
-    ///
-    /// Off the caller's thread like the reads: it is two table-wide deletes and
-    /// a vacuum, and the caller is a settings window.
+    /// Removes every stored process row and every interned name. Off the
+    /// caller's thread: two table-wide deletes and a vacuum, from a settings
+    /// window.
     public func deleteProcessHistory() async throws {
         try await store.deleteProcessHistory()
     }
 
-    /// Removes everything recorded, metric history included, and rebuilds the
-    /// file at its new size.
-    ///
-    /// Off the caller's thread like the reads: a vacuum rewrites the whole file,
-    /// and the caller is a settings window.
+    /// Removes everything recorded and rebuilds the file at its new size. Off
+    /// the caller's thread: a vacuum rewrites the whole file.
     public func deleteAll() async throws {
         try await store.deleteEverything()
     }
 
-    /// Size on disk, for the footprint budget and for the settings screen to
-    /// answer "what is this costing me".
-    /// The write-ahead log and its index count, not just the database file.
+    /// Size on disk, counting the write-ahead log and its index.
     ///
-    /// Under WAL most of a recording session lives in `history.sqlite-wal`
-    /// until something checkpoints it, so the database file alone reads as four
-    /// kilobytes on a store holding a day of samples — a number that would tell
-    /// the settings screen nothing and would never move when the history was
-    /// cleared.
+    /// Under WAL most of a recording session lives in `history.sqlite-wal` until
+    /// something checkpoints it, so the database file alone reads as four
+    /// kilobytes on a store holding a day of samples.
     public func storeSize() -> UInt64 {
         let path = store.databaseQueue.path
         return ["", "-wal", "-shm"].reduce(into: UInt64(0)) { total, suffix in

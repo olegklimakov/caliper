@@ -9,13 +9,10 @@ import Foundation
 struct DiskActivitySampler {
     private var previous: [UInt64: Counters] = [:]
     private var window = RateWindow()
-    /// Device identity by registry entry, resolved once.
-    ///
-    /// Working out whether a driver is a real disk means walking to its parent
-    /// and reading two property dictionaries, and the answer cannot change
-    /// while the device stays plugged in — so paying for it every second was
-    /// most of what this sampler cost. `nil` records "not a real device", so a
-    /// mounted disk image is rejected once rather than re-examined.
+    /// Device identity by registry entry, resolved once: deciding whether a
+    /// driver is a real disk walks to its parent and reads two property
+    /// dictionaries, and the answer cannot change while it stays plugged in.
+    /// `nil` records "not a real device", so a disk image is rejected once.
     private var deviceNames: [UInt64: String?] = [:]
 
     private struct Counters {
@@ -66,9 +63,8 @@ struct DiskActivitySampler {
 
     private mutating func readDevices() -> [UInt64: Counters] {
         var devices: [UInt64: Counters] = [:]
-        // Every driver this sweep saw, named or not. `devices` cannot stand in
-        // for it: a file-backed device has no product name and never gets in
-        // there, and those are exactly the entries the cache has to keep.
+        // Named or not: a file-backed device has no product name and never
+        // reaches `devices`, and those are the entries the cache has to keep.
         var present: Set<UInt64> = []
 
         IORegistry.forEachService(matching: "IOBlockStorageDriver") { driver in
@@ -91,16 +87,10 @@ struct DiskActivitySampler {
 
             devices[id] = Counters(name: name, read: read, written: written)
         }
-        // Forget devices that are gone. Every mounted disk image adds an entry,
-        // and a developer's Mac mounts a lot of them over a long-running
-        // session.
-        //
-        // Against what this sweep actually saw, not against `devices`. A
-        // file-backed device is cached as a `nil` name — that negative answer
-        // is what stops it being looked up in the IORegistry every tick — and
-        // it never reaches `devices`, so keying the filter on `devices` kept
-        // every image ever mounted for the life of the process. Which is the
-        // one case this comment exists to describe.
+        // Forget devices that are gone — every mounted disk image adds an
+        // entry. Against what this sweep saw, not against `devices`: a
+        // file-backed device is cached as a `nil` name and never reaches
+        // `devices`, so filtering on that keeps every image ever mounted.
         deviceNames = deviceNames.filter { present.contains($0.key) }
         return devices
     }

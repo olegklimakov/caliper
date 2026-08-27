@@ -8,15 +8,14 @@ struct DashboardView: View {
     @Environment(\.controlActiveState) private var controlActiveState
     let metrics: LiveMetrics
     let history: HistoryReader?
-    /// How long the process history is kept, which is what says whether the
-    /// moment under the cursor is still stored.
-    /// The settings room reads and writes these directly; every other room only
-    /// needs what the preferences already decided.
+    /// How long the process history is kept — what says whether the moment
+    /// under the cursor is still stored. The settings room reads and writes
+    /// these directly.
     let preferences: Preferences
     let historyActions: HistoryActions?
     let updater: UpdaterService
-    /// Which room is showing. Owned by the window controller, so the status bar
-    /// menu can open the window straight onto the settings.
+    /// Owned by the window controller, so the status bar menu can open the
+    /// window straight onto the settings.
     @Bindable var navigation: DashboardNavigation
 
     var body: some View {
@@ -35,23 +34,18 @@ struct DashboardView: View {
                 .tag(section)
             }
             .navigationSplitViewColumnWidth(min: 170, ideal: 180, max: 220)
-            // No sidebar toggle. This window has no toolbar for one to live in,
-            // so SwiftUI parks it in the title bar beside the title, where it
-            // reads as a stray control — and it slides sideways when the
-            // sidebar collapses, because it follows the sidebar's own edge.
-            // Six rooms are the whole navigation of this window and hiding them
-            // is not a feature it needs.
+            // No sidebar toggle: with no toolbar to live in, SwiftUI parks it
+            // in the title bar as a stray control that slides sideways when the
+            // sidebar collapses.
             .toolbar(removing: .sidebarToggle)
-            // Pinned to the foot of the sidebar, under the metrics, the way the
-            // mockup draws it: settings are not a sixth thing to monitor.
+            // Pinned under the metrics: settings are not a sixth thing to
+            // monitor.
             .safeAreaInset(edge: .bottom, spacing: 0) { settingsRow }
         } detail: {
             switch navigation.section {
             case .overview:
-                // Read here rather than captured when the window was built: the
-                // settings room writes this very preference, and a window
-                // holding the value from launch would keep asking the store the
-                // old question.
+                // Read here, not captured at build: the settings room writes
+                // this very preference.
                 OverviewPane(
                     metrics: metrics,
                     history: history,
@@ -72,17 +66,14 @@ struct DashboardView: View {
         .navigationTitle("Caliper")
     }
 
-    /// The one row that is not a metric, drawn to match the ones that are.
-    ///
-    /// Outside the `List` because it is pinned rather than listed, which means
-    /// its selected look is drawn by hand — the same accent fill and radius the
-    /// sidebar gives its own rows.
+    /// Pinned rather than listed, so its selected look is drawn by hand — the
+    /// same accent fill and radius the sidebar gives its own rows.
     private var settingsRow: some View {
         let isSelected = navigation.section == .settings
-        // The system's own selection colours rather than white on the accent:
-        // an accent of yellow or graphite would leave white text unreadable,
-        // and a sidebar whose window is not key draws its selection grey — this
-        // row would otherwise stay lit while every row above it went quiet.
+        // The system's selection colours, not white on the accent: yellow or
+        // graphite leaves white text unreadable, and an inactive sidebar draws
+        // its selection grey — this row would stay lit while the rest went
+        // quiet.
         let isKey = controlActiveState != .inactive
         let fill = Color(isKey ? .selectedContentBackgroundColor : .unemphasizedSelectedContentBackgroundColor)
         let label = Color(isKey ? .alternateSelectedControlTextColor : .labelColor)
@@ -103,8 +94,7 @@ struct DashboardView: View {
                     )
             }
             .buttonStyle(.plain)
-            // The row is drawn selected; VoiceOver has to be told so as well,
-            // because nothing about a `Button` says which one is current.
+            // Nothing about a `Button` says which one is current.
             .accessibilityAddTraits(isSelected ? .isSelected : [])
             .padding(8)
         }
@@ -127,20 +117,17 @@ struct DashboardView: View {
     }
 }
 
-/// What the sidebar can select.
-///
-/// A type of its own rather than more `MenuBarModule` cases: neither the
-/// overview nor the settings is a metric, neither has an indicator to draw or a
-/// panel to open, and adding them there would mean excluding them again
-/// everywhere the menu bar iterates the modules.
+/// What the sidebar can select. Its own type rather than more `MenuBarModule`
+/// cases: neither the overview nor the settings has an indicator to draw or a
+/// panel to open, and they would have to be excluded everywhere the menu bar
+/// iterates the modules.
 enum DashboardSection: Hashable {
     case overview
     case module(MenuBarModule)
 
     case settings
 
-    /// What the sidebar's list holds. Settings is not in it: it is pinned under
-    /// the list rather than listed among the metrics.
+    /// Settings is not in it — it is pinned under the list.
     static let listed: [DashboardSection] = [.overview] + MenuBarModule.allCases.map(DashboardSection.module)
 
     var title: String {
@@ -159,8 +146,8 @@ struct DashboardPane: View {
     let metrics: LiveMetrics
     let history: HistoryReader?
     let module: MenuBarModule
-    /// Handed in by the preview harness, which can neither wait for a query nor
-    /// place a cursor.
+    /// Handed in by the preview harness, which can neither wait for a query
+    /// nor place a cursor.
     private let preloaded: DashboardHistory?
 
     @State private var span: HistorySpan = .day
@@ -219,24 +206,21 @@ struct DashboardPane: View {
             Spacer()
         }
         .padding(20)
-        // What the content actually needs: 40 of padding, five 16 pt gaps, the
-        // header, the caption, the chart at its own 220 pt minimum inside a
-        // 12 pt card, a stat card and a mini card. Below this the chart will not
-        // compress and the cards at the bottom are squeezed instead.
+        // What the content needs: 40 of padding, five 16 pt gaps, header,
+        // caption, the chart's own 220 pt minimum inside a 12 pt card, a stat
+        // card and a mini card. Below this the cards are squeezed instead.
         .frame(minWidth: 560, minHeight: 580, alignment: .topLeading)
         .task(id: TaskKey(module: module, span: span)) {
             let loader = loader ?? preloaded ?? DashboardHistory(reader: history)
             self.loader = loader
-            // The companions come out of the same query as the metric itself:
-            // one round trip, one slice, and two charts that cannot be showing
-            // a different stretch of time from the one above them.
+            // Same query as the metric itself, so the companions cannot be
+            // showing a different stretch of time.
             loader.load(
                 ([module] + presentation.companions).map { MetricPresentation(module: $0).series },
                 span: span
             )
         }
-        // A bucket of one span is not a bucket of another, so the moment cannot
-        // survive the change — nor a move to a different metric.
+        // A bucket of one span is not a bucket of another.
         .onChange(of: TaskKey(module: module, span: span)) { cursor = nil }
         .onReceive(NotificationCenter.default.publisher(for: .historyDidChange)) {
             _ in loader?.reload()
@@ -254,29 +238,25 @@ struct DashboardPane: View {
     /// already complete and can be read straight away.
     private var active: DashboardHistory? { loader ?? preloaded }
 
-    /// The cursor, if the moment it pins is still inside the loaded range.
-    ///
-    /// The window keeps moving: a moment pinned twenty minutes ago falls off the
-    /// left of an hour-wide span the next time it reloads.
+    /// The cursor, if the moment it pins is still inside the loaded range — the
+    /// window keeps moving, and a moment pinned twenty minutes ago falls off the
+    /// left of an hour-wide span.
     private func inspected(in slice: HistorySlice) -> Date? {
         guard let cursor, slice.cursorRange?.contains(cursor) == true else { return nil }
         return cursor
     }
 
-    /// The line under the header — and, being the whole answer in one sentence,
-    /// what VoiceOver reads off the chart.
-    ///
-    /// The stat cards below are aggregates over the entire span and stay that
-    /// way; a cursor asks a different question and gets its own line rather than
-    /// overwriting theirs.
+    /// The line under the header, and what VoiceOver reads off the chart. The
+    /// stat cards below are aggregates over the whole span; a cursor asks a
+    /// different question and gets its own line rather than overwriting
+    /// theirs.
     private func captionText(_ presentation: MetricPresentation) -> String {
         guard let slice = active?.slice, let moment = inspected(in: slice) else {
             return "Drag across the chart, or press the arrow keys, to read one bucket"
         }
         let bucket = bucketLabel(moment, in: slice, span: span)
 
-        // Never the neighbouring bucket's value: the chart draws a gap there,
-        // and a readout that filled it would disagree with its own picture.
+        // Never the neighbouring bucket's value: the chart draws a gap there.
         guard let sample = slice.sample(presentation.series, at: moment) else {
             return "\(bucket) · —"
         }
@@ -287,11 +267,10 @@ struct DashboardPane: View {
 
     @ViewBuilder
     private func chart(_ presentation: MetricPresentation) -> some View {
-        // The *pane's own* series decides this, not the loader's state. The
-        // query now asks for the companions too, and a slice counts as loaded
-        // when any series in it has rows — so a Mac whose sensors this build
-        // cannot read would draw an empty temperature chart with axes and no
-        // stat cards, where it used to say so.
+        // The *pane's own* series, not the loader's state: the query asks for
+        // the companions too, and a slice counts as loaded when any series in it
+        // has rows — so a Mac with no readable sensors would draw an empty
+        // temperature chart with axes instead of saying so.
         if case .loaded(let slice) = active?.state, !slice[presentation.series].isEmpty {
             HistoryChart(
                 runs: slice.runs(presentation.series),
@@ -312,16 +291,15 @@ struct DashboardPane: View {
         }
     }
 
-    /// What the placeholder should say. A loaded slice with nothing for this
-    /// metric is "no history yet" rather than "cannot read the store", which is
-    /// what the loader's own state would still be reporting.
+    /// A loaded slice with nothing for this metric is "no history yet" rather
+    /// than the "cannot read the store" the loader's state still reports.
     private var emptyState: DashboardHistory.State? {
         guard case .loaded = active?.state else { return active?.state }
         return .empty
     }
 
-    /// Average, peak and low over the *stored* span, which is what the chart is
-    /// showing — not over the live buffer.
+    /// Over the *stored* span, which is what the chart shows — not the live
+    /// buffer.
     private func statistics(_ presentation: MetricPresentation) -> [(label: String, value: String)] {
         guard let samples = active?.slice?[presentation.series], !samples.isEmpty else { return [] }
         let averages = samples.map(\.aggregate.average)
@@ -350,8 +328,6 @@ struct SpanPicker: View {
     }
 }
 
-/// What stands in for a chart that has nothing to draw.
-///
 /// "Cannot read the data" and "no data yet" call for different reactions, so
 /// they do not share a message.
 struct HistoryPlaceholder: View {
@@ -387,11 +363,9 @@ struct HistoryPlaceholder: View {
     }
 }
 
-/// Everything that differs between metrics, decided once.
-///
-/// Which series is charted, its scale and how its numbers are written all vary
-/// the same way and for the same reason, so they are chosen together rather
-/// than in parallel switches that have to be kept in step.
+/// Everything that differs between metrics, decided once: which series is
+/// charted, its scale and how its numbers are written vary together, and
+/// parallel switches would have to be kept in step.
 @MainActor
 struct MetricPresentation {
     let series: MetricSeries
@@ -400,17 +374,12 @@ struct MetricPresentation {
     /// Rates and fractions are measured from zero; temperature is not.
     let startsAtZero: Bool
     let format: (Double) -> String
-    /// The two other metrics this one's pane draws small underneath itself.
+    /// The two neighbours that most often explain this metric, drawn small
+    /// underneath it — a chart of one metric rarely answers *why*. Each card
+    /// carries the neighbour's sidebar title, so it doubles as a pointer.
     ///
-    /// A chart of one metric rarely answers *why*: the CPU climbed, and the
-    /// question is at once what memory and the die were doing. The overview
-    /// answers that by stacking all five under one cursor; a single-metric pane
-    /// answers it by naming the two neighbours that most often explain this
-    /// one — and because each card carries the neighbour's own sidebar title,
-    /// it doubles as a pointer to where the full picture lives.
-    ///
-    /// CPU is in all four of the others, which is right: it explains most of
-    /// what the machine does.
+    /// CPU is in all four of the others: it explains most of what the machine
+    /// does.
     let companions: [MenuBarModule]
 
     init(module: MenuBarModule) {
@@ -421,8 +390,8 @@ struct MetricPresentation {
             startsAtZero = true
             range = 0...1
             format = { PercentFormatter.string($0) }
-            // The mockup's own pair: load is explained by what it was working
-            // on, and the die follows the load a few buckets later.
+            // Load is explained by what it was working on, and the die follows
+            // it a few buckets later.
             companions = [.memory, .temperature]
         case .memory:
             series = .memory
@@ -440,9 +409,8 @@ struct MetricPresentation {
             format = { TemperatureFormatter.string($0) }
             // The two things in this app that make heat.
             companions = [.cpu, .disk]
-        // The full rate form, not the menu bar's compact one: a window has the
-        // room for "11,7 MB/s", and a reading of "11,7 M" leaves both the unit
-        // and the per-second to be guessed at.
+        // The full rate form, not the menu bar's compact one: "11,7 M" leaves
+        // both the unit and the per-second to be guessed at.
         case .network:
             series = .networkDownload
             colour = Color(Palette.networkDown)
@@ -463,8 +431,8 @@ struct MetricPresentation {
     }
 }
 
-/// The surface every block on the dashboard sits on, written once so the chart,
-/// the stat cards and the mini charts cannot drift apart.
+/// The surface every block on the dashboard sits on, written once so the
+/// chart, the stat cards and the mini charts cannot drift apart.
 extension View {
     func dashboardCard() -> some View {
         padding(12)
@@ -472,8 +440,8 @@ extension View {
     }
 }
 
-/// One companion metric: its name, what it read last, and its shape over the
-/// same span.
+/// One companion metric: its name, last reading, and shape over the same
+/// span.
 private struct MiniChartCard: View {
     let module: MenuBarModule
     let slice: HistorySlice?
@@ -506,13 +474,11 @@ private struct MiniChartCard: View {
         .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 12))
     }
 
-    /// The latest stored bucket, not the live value.
-    ///
-    /// The sidebar's live reading is a different quantity for two of the
-    /// modules — memory as bytes used, disk as free capacity — so a live number
-    /// over a read-rate line would be a card whose figure and whose chart
-    /// disagree. This one comes out of the same samples the line is drawn from,
-    /// and for every span but the longest it is "now" to within a bucket.
+    /// The latest stored bucket, not the live value: the sidebar's live reading
+    /// is a different quantity for two modules — memory as bytes used, disk as
+    /// free capacity — so the card's figure and its chart would disagree. Out of
+    /// the same samples the line is drawn from, so it is "now" to within a
+    /// bucket.
     private func reading(_ presentation: MetricPresentation, samples: [HistorySample]) -> String {
         guard let latest = samples.last else { return "—" }
         return presentation.format(latest.aggregate.average)

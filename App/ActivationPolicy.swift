@@ -2,15 +2,13 @@ import AppKit
 
 /// Whether the app has a Dock tile and a menu bar across the top of the screen.
 ///
-/// A monitor that lives in the status bar has no business holding a Dock slot
-/// while nothing of its own is on screen — but a window shown by an accessory
-/// app has no visible Quit, no Window menu and no discoverable ⌘W, because an
-/// accessory app's main menu is never drawn. So the app switches, and the
-/// switch belongs to whatever is currently showing.
+/// A status bar monitor has no business holding a Dock slot with nothing on
+/// screen, but an accessory app draws no main menu, so a window it shows has no
+/// Quit, no Window menu and no discoverable ⌘W. So the app switches with
+/// whatever is showing.
 ///
-/// Which is why this is a set rather than a flag: the history window and
-/// Sparkle's update window can both be up at once, and whichever closes first
-/// must not strip the Dock icon and the menu bar off the one still open.
+/// A set rather than a flag: the history window and Sparkle's update window can
+/// both be up, and whichever closes first must not undress the other.
 @MainActor
 final class ActivationPolicy {
     enum Holder: Hashable {
@@ -35,15 +33,10 @@ final class ActivationPolicy {
     func release(_ holder: Holder) {
         holders.remove(holder)
         guard holders.isEmpty else { return }
-        // After this call returns, not inside it: dropping back to accessory
-        // while AppKit is still closing the window leaves the app frontmost
-        // with nothing on screen, and the Dock icon outlives the window by a
-        // beat.
-        //
-        // Re-checked rather than assumed: closing and reopening in the same
-        // breath — the status bar menu is one click away from doing exactly
-        // that — would otherwise land this after a `hold` and strip the Dock
-        // icon and the menu bar off a window that is on screen.
+        // After this call returns: dropping back to accessory while AppKit is
+        // still closing the window leaves the app frontmost with nothing on
+        // screen. Re-checked rather than assumed, or a close-and-reopen — one
+        // click apart in the status bar menu — lands this after a `hold`.
         Task { @MainActor [weak self] in
             guard let self, holders.isEmpty else { return }
             NSApp.setActivationPolicy(.accessory)
