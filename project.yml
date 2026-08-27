@@ -60,11 +60,10 @@ targets:
       - path: App
       - path: assets/icon/AppIcon.icns
         buildPhase: resources
-      # Bundled, not merely committed: GRDB is linked into the executable and
-      # Sparkle ships beside it, and the MIT licence both carry grants what it
-      # grants on the condition that their notice travels with the copy. A file
-      # in the repository does not travel with a disk image. Settings → About →
-      # Acknowledgements reads this very file out of the bundle.
+      # Bundled, not merely committed: a notice in the repository does not
+      # travel with a disk image. Settings → About → Acknowledgements reads this
+      # very file back out of the bundle, Scripts/smoke_test.sh fails when it is
+      # missing, and NOTICE itself says what is owed and why.
       - path: NOTICE
         buildPhase: resources
     dependencies:
