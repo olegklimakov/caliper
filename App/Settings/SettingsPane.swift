@@ -1,12 +1,9 @@
 import CaliperHistory
 import SwiftUI
 
-/// What the settings screen may do to the recorded history.
-///
-/// One value rather than three optionals threaded separately: the size and the
-/// two deletes always travel together, and none of them is the store itself —
-/// clearing has to reach the recorders as well, and only the delegate holds
-/// both.
+/// What the settings screen may do to the recorded history. One value rather
+/// than three optionals: the size and the two deletes travel together, and none
+/// of them is the store itself — clearing has to reach the recorders too.
 @MainActor
 struct HistoryActions {
     let sizeOnDisk: () -> UInt64
@@ -14,21 +11,16 @@ struct HistoryActions {
     let deleteEverything: () async throws -> Void
 }
 
-/// The settings room of the history window.
-///
-/// A room rather than a window of its own. It was a SwiftUI `Settings` scene,
-/// which only `showSettingsWindow:` could open — and that did nothing at all
-/// from a status bar menu, so every setting this app had was unreachable. The
-/// mockup never asked for a second window either: it draws Settings at the foot
-/// of the sidebar, under the metrics.
+/// The settings room of the history window — a room rather than a window of its
+/// own, because a SwiftUI `Settings` scene opens only through
+/// `showSettingsWindow:`, which a status bar menu cannot reach.
 struct SettingsPane: View {
     @Environment(\.controlActiveState) private var controlActiveState
     @Bindable var preferences: Preferences
-    /// `nil` when the store could not be opened, which is also when there is
-    /// nothing to do to it.
+    /// `nil` when the store could not be opened.
     let history: HistoryActions?
-    /// What the menu bar previews draw. The same store the strip itself reads,
-    /// so the row shows the icon that is up there rather than a mock-up of it.
+    /// The same store the strip reads, so the row shows the icon that is up
+    /// there rather than a mock-up of it.
     let metrics: LiveMetrics
     let updater: UpdaterService
     @State private var launchesAtLogin: Bool
@@ -36,15 +28,13 @@ struct SettingsPane: View {
     @State private var confirming: Deletion?
     @State private var deleteError: String?
     @State private var showingAcknowledgements = false
-    /// Read on appear and after either delete, not on every render: it is a
-    /// file-attribute call, and the only moments it can change are those.
+    /// A file-attribute call, so it is read on appear and after either delete
+    /// rather than on every render.
     @State private var storeSize: UInt64 = 0
 
-    /// Which of the two deletes is being confirmed.
-    ///
-    /// They ask different questions because they are different promises: one
-    /// takes back a behavioural record and leaves the charts alone, the other
-    /// empties the file and rebuilds it at its new size.
+    /// The two deletes ask different questions because they are different
+    /// promises: one takes back a behavioural record and leaves the charts
+    /// alone, the other empties the file and rebuilds it.
     enum Deletion {
         case processHistory
         case everything
@@ -89,9 +79,8 @@ struct SettingsPane: View {
             form
         }
         .frame(minWidth: 560, minHeight: 420, alignment: .topLeading)
-        // On appear and whenever the window comes forward again: the window is
-        // kept when it closes, so `onAppear` alone would show whatever the
-        // store weighed the first time it was opened.
+        // Also on the window coming forward: it is kept when closed, so
+        // `onAppear` alone would show the size from the first open.
         .onAppear { storeSize = history?.sizeOnDisk() ?? 0 }
         .onChange(of: controlActiveState) { _, state in
             guard state != .inactive else { return }
@@ -101,10 +90,8 @@ struct SettingsPane: View {
 
     private var form: some View {
         Form {
-            // One row per module: whether it is up there, which halves it
-            // draws, and a live picture of the result — in the order the strip
-            // draws them, which is also the order the rows can be dragged into
-            // once the modules share an item.
+            // In the order the strip draws them, which is also the order the
+            // rows can be dragged into once the modules share an item.
             Section("Menu bar") {
                 Toggle("Combine into one item", isOn: $preferences.combinesModules)
                 List {
@@ -119,12 +106,10 @@ struct SettingsPane: View {
                 .listStyle(.plain)
                 .scrollDisabled(true)
                 .scrollContentBackground(.hidden)
-                // Exactly the rows, so no row is clipped and none is reachable
-                // only by scrolling: a list inside a form is a list, and one
-                // that keeps its own scroller traps the pointer on its way down
-                // the settings. The row height is measured in the running app —
-                // a row holding a picker is 32 points — because SwiftUI will
-                // clip silently rather than report that it did not fit.
+                // Exactly the rows: a list inside a form keeps its own
+                // scroller and traps the pointer on its way down the settings.
+                // The 32 points is measured in the running app, because SwiftUI
+                // clips silently rather than reporting it did not fit.
                 .frame(height: CGFloat(preferences.menuBar.order.count) * 32)
                 Toggle("Colour indicators", isOn: $preferences.colouredIndicators)
                 Text(menuBarHint)
@@ -132,10 +117,9 @@ struct SettingsPane: View {
                     .foregroundStyle(.secondary)
             }
 
-            // The switch, the retention and the delete button in one place and
-            // visible together. A per-minute log of which applications ran is a
-            // behavioural record, and finding out about it later — from a
-            // setting buried somewhere else — is the wrong way round.
+            // Switch, retention and delete visible together: a per-minute log
+            // of which applications ran is a behavioural record, and finding out
+            // about it later is the wrong way round.
             Section("History") {
                 Toggle("Record top processes", isOn: $preferences.recordsProcessHistory)
                 Picker("Keep for", selection: $preferences.processRetention) {
@@ -179,8 +163,8 @@ struct SettingsPane: View {
                             try preferences.setLaunchesAtLogin(enabled)
                             loginError = nil
                         } catch {
-                            // The registration is the system's to refuse, so say
-                            // so and put the switch back rather than pretending.
+                            // The system's to refuse, so put the switch back
+                            // rather than pretending.
                             loginError = error.localizedDescription
                             launchesAtLogin = preferences.launchesAtLogin
                         }
@@ -259,9 +243,7 @@ struct SettingsPane: View {
             Toggle(module.title, isOn: enabledBinding(module))
                 .frame(width: 104, alignment: .leading)
                 .disabled(isLastEnabled(module))
-            // Three states rather than a checkbox: with the picture gone,
-            // "8 %" and "65 %" are two anonymous percentages, and the symbol is
-            // what names a number for twelve points instead of twenty-eight.
+            // Three states rather than a checkbox; see `IndicatorGraphic`.
             Picker("", selection: graphicBinding(module)) {
                 Text(module.graphTitle).tag(IndicatorGraphic.graph)
                 Text("Icon").tag(IndicatorGraphic.icon)
@@ -270,8 +252,7 @@ struct SettingsPane: View {
             .labelsHidden()
             .frame(width: 116)
             .disabled(!preferences.menuBar[module].isEnabled)
-            // A checkbox rather than a switch: this is a setting *of* the
-            // module beside it, not another module.
+            // A setting *of* the module beside it, not another module.
             Toggle(module.valueTitle, isOn: valueBinding(module))
                 .toggleStyle(.checkbox)
                 .frame(width: 112, alignment: .leading)
@@ -288,7 +269,7 @@ struct SettingsPane: View {
     }
 
     /// The ⌘-drag advice is true of separate items only: one item has no items
-    /// to drag, which is exactly why its order is ours to keep.
+    /// to drag, which is why its order is ours to keep.
     private var menuBarHint: String {
         preferences.combinesModules
             ? "Every module in one button, and clicking it opens all of them at once. Drag the rows to set the order they are drawn in."
@@ -302,9 +283,8 @@ struct SettingsPane: View {
         )
     }
 
-    /// The last module in the menu bar stays there. An empty strip is an app
-    /// with no button to right-click, and the menu behind that button is the
-    /// only way to the settings and to Quit.
+    /// The last module stays: an empty strip has no button to right-click, and
+    /// that menu is the only way to the settings and to Quit.
     private func isLastEnabled(_ module: MenuBarModule) -> Bool {
         preferences.menuBar.enabled == [module]
     }
@@ -312,9 +292,8 @@ struct SettingsPane: View {
     private func graphicBinding(_ module: MenuBarModule) -> Binding<IndicatorGraphic> {
         Binding(
             get: { preferences.menuBar[module].graphic },
-            // Asking for no picture with no number would leave an empty status
-            // item; the stored value refuses that and hands the number back, so
-            // the checkbox beside this ticks itself.
+            // The stored value refuses picture-and-number-off and hands the
+            // number back, so the checkbox beside this ticks itself.
             set: { preferences.menuBar[module].graphic = $0 }
         )
     }
@@ -327,8 +306,7 @@ struct SettingsPane: View {
     }
 
     /// With nothing in the picture slot the number is all there is, so it
-    /// cannot be switched off — and a module that is not in the menu bar has
-    /// nothing to configure at all.
+    /// cannot be switched off.
     private func isValueLocked(_ module: MenuBarModule) -> Bool {
         let parts = preferences.menuBar[module]
         return !parts.isEnabled || parts.graphic == .off
@@ -343,25 +321,20 @@ struct SettingsPane: View {
                 }
                 deleteError = nil
             } catch {
-                // Said rather than swallowed: a delete button that quietly
-                // failed would leave the user believing a record is gone when
-                // it is not.
+                // A delete button that quietly failed leaves the user believing
+                // a record is gone when it is not.
                 deleteError = error.localizedDescription
             }
-            // Whether it worked or not: the number on screen should be what the
-            // file now weighs, not what it weighed before the attempt.
+            // Worked or not, the number on screen should be what the file now
+            // weighs.
             storeSize = history?.sizeOnDisk() ?? 0
         }
     }
 }
 
-/// The very image the menu bar will draw, at the size it will draw it.
-///
-/// Which half of a module to switch off is a question about how the strip will
-/// look, and answering it by reading two checkbox labels and then going up to
-/// the menu bar to see what happened is the long way round. Rendered through
-/// the same indicator the status item uses, so there is no second drawing of
-/// the icon to keep in step with the first.
+/// The very image the menu bar will draw, at the size it will draw it —
+/// rendered through the same indicator the status item uses, so there is no
+/// second drawing to keep in step.
 private struct MenuBarIndicatorPreview: View {
     let module: MenuBarModule
     let parts: ModuleParts
@@ -372,11 +345,9 @@ private struct MenuBarIndicatorPreview: View {
         let indicator = module.indicator(parts: parts)
         Image(nsImage: indicator.makeImage(metrics, style: IndicatorStyle(isTemplate: !coloured)))
             .renderingMode(coloured ? .original : .template)
-            // Reading the identity is what subscribes this view to the metrics.
-            // `makeImage` hands AppKit a drawing block that runs when the image
-            // is painted, which is after the body that would have tracked what
-            // it read — without this the preview would draw once and then sit
-            // at whatever the values were when the window opened.
+            // Reading the identity is what subscribes this view to the
+            // metrics: `makeImage`'s drawing block runs when the image is
+            // painted, after the body that would have tracked what it read.
             .id(indicator.identity(metrics))
             // Everything it shows is in the row's own checkboxes and in the
             // status item this is a picture of.

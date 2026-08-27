@@ -1,22 +1,17 @@
 import AppKit
 
-/// The menu bar an app gets for free from `SwiftUI.App` and does not get from a
-/// bare AppKit bootstrap.
+/// The menu bar an app gets for free from `SwiftUI.App` and not from a bare
+/// AppKit bootstrap.
 ///
-/// `NSApp.mainMenu` is nil without this, and a nil main menu is not merely a
-/// missing menu: key equivalents resolve through it, so ⌘C, ⌘V, ⌘X, ⌘A, ⌘Z and
-/// ⌘W are all dead in the history window — a text field in the settings could
-/// not be pasted into. The menu is only *drawn* while the history window has
-/// put the app in `.regular` (see `DashboardWindowController`); its key
-/// equivalents resolve either way, which is exactly why its absence was easy to
-/// miss for as long as the app was always an accessory.
+/// Key equivalents resolve through `NSApp.mainMenu`, so without this ⌘C, ⌘V,
+/// ⌘X, ⌘A, ⌘Z and ⌘W are dead in the history window and a settings text field
+/// cannot be pasted into. The menu is only *drawn* while the app is `.regular`,
+/// but resolves either way — which is why its absence was easy to miss.
 ///
-/// Deliberately only the items that do something here, not a full standard set:
-/// this app has no documents to open, nothing to print and nothing to find.
-/// The app menu is the exception and carries what macOS puts there — About,
-/// Settings, the hide commands — because now that the menu is drawn, ⌘H and ⌘,
-/// are keystrokes the user has every reason to expect, and a key equivalent
-/// only exists if an item carries it.
+/// Only the items that do something: this app has no documents to open, nothing
+/// to print and nothing to find. The app menu is the exception and carries what
+/// macOS puts there, because a key equivalent only exists if an item carries
+/// it.
 @MainActor
 enum MainMenu {
     static func install() {

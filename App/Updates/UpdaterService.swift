@@ -4,26 +4,22 @@ import Sparkle
 
 /// Sparkle's updater, wrapped so the settings screen can observe it.
 ///
-/// Sparkle owns the persisted state — it writes `SUEnableAutomaticChecks` and
-/// friends into `UserDefaults` itself — so the properties here are mirrors that
-/// write through on `didSet`. Deliberately not part of `Preferences`: a second
-/// store of the same switch would only be able to disagree with the first.
+/// Sparkle owns the persisted state, so these properties are mirrors that write
+/// through on `didSet`. Not part of `Preferences`: a second store of the same
+/// switch could only disagree with the first.
 ///
-/// Starting the updater is what schedules background checks and, on first
-/// launch, asks whether they are wanted at all; that prompt is Sparkle's own.
+/// Starting the updater schedules background checks and, on first launch, puts
+/// up Sparkle's own prompt asking whether they are wanted.
 @MainActor
 @Observable
 final class UpdaterService: NSObject, SPUStandardUserDriverDelegate {
-    /// False while a check is in flight — the menu item and the button
-    /// disable on it.
+    /// The menu item and the button disable on it.
     private(set) var canCheckForUpdates = false
     private(set) var lastUpdateCheckDate: Date?
 
-    /// An update a scheduled check found and nobody has looked at yet.
-    ///
-    /// The menu bar shows it rather than a window (see
-    /// `supportsGentleScheduledUpdateReminders`), and the strip reads this to
-    /// decide whether to mark itself.
+    /// An update a scheduled check found and nobody has looked at yet. The
+    /// strip reads this to mark itself; see
+    /// `supportsGentleScheduledUpdateReminders`.
     private(set) var hasUnseenUpdate = false
 
     var automaticallyChecksForUpdates: Bool {
@@ -45,13 +41,12 @@ final class UpdaterService: NSObject, SPUStandardUserDriverDelegate {
         }
     }
 
-    /// Called when the badge on the menu bar should appear or go away.
+    /// When the menu bar badge should appear or go away.
     var onUnseenUpdateChange: ((Bool) -> Void)?
 
-    /// Sparkle's windows need a Dock tile and a menu bar the same way the
-    /// history window does, and for the same reason: an accessory app's main
-    /// menu is never drawn, so ⌘W and Quit would be missing from a window the
-    /// user is expected to read and dismiss.
+    /// Sparkle's windows need a Dock tile and a menu bar for the reason the
+    /// history window does: an accessory app draws no main menu, so ⌘W and Quit
+    /// would be missing from a window the user has to read and dismiss.
     @ObservationIgnored private let activation: ActivationPolicy
     @ObservationIgnored private var controller: SPUStandardUpdaterController!
     @ObservationIgnored private var canCheckObservation: NSKeyValueObservation?
@@ -60,9 +55,8 @@ final class UpdaterService: NSObject, SPUStandardUserDriverDelegate {
 
     init(activation: ActivationPolicy) {
         self.activation = activation
-        // Placeholders: the real values are read off the updater immediately
-        // after it exists, and Swift wants every stored property set before
-        // `super.init`.
+        // Placeholders: Swift wants every stored property set before
+        // `super.init`, and the real values are read off the updater after.
         automaticallyChecksForUpdates = true
         automaticallyDownloadsUpdates = false
         super.init()
@@ -77,15 +71,13 @@ final class UpdaterService: NSObject, SPUStandardUserDriverDelegate {
         automaticallyChecksForUpdates = updater.automaticallyChecksForUpdates
         automaticallyDownloadsUpdates = updater.automaticallyDownloadsUpdates
 
-        // `canCheckForUpdates` flips false while a check runs and back when it
-        // ends, which also makes it the moment the last-check date is new.
+        // It flips false while a check runs and back when it ends, which is
+        // also when the last-check date is new.
         canCheckObservation = updater.observe(\.canCheckForUpdates, options: [.new]) {
             [weak self] _, change in
             guard let canCheck = change.newValue else { return }
             // KVO fires outside any actor, so the hop carries the new value and
-            // nothing else. Not the updater the observation was handed: it is
-            // not Sendable, and reading it again on the other side costs one
-            // property access to keep the boundary honest.
+            // not the updater, which is not Sendable.
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 canCheckForUpdates = canCheck
@@ -94,18 +86,15 @@ final class UpdaterService: NSObject, SPUStandardUserDriverDelegate {
         }
     }
 
-    /// Asked for by hand, from a menu item or the settings button. Sparkle
-    /// shows its window straight away for this one — the user is waiting for an
-    /// answer, and "no updates" is an answer.
+    /// Asked for by hand. Sparkle shows its window straight away for this one:
+    /// the user is waiting, and "no updates" is an answer.
     func checkForUpdates() {
         clearUnseenUpdate()
         activation.hold(.updater)
         updater.checkForUpdates()
     }
 
-    /// The running build, as `0.1.0 (1)` — the marketing version with the
-    /// integer Sparkle actually compares. The one thing worth having in front
-    /// of you when reporting a bug.
+    /// `0.1.0 (1)` — the marketing version with the integer Sparkle compares.
     static var version: String {
         let info = Bundle.main.infoDictionary
         let short = info?["CFBundleShortVersionString"] as? String ?? "?"
@@ -115,23 +104,19 @@ final class UpdaterService: NSObject, SPUStandardUserDriverDelegate {
 
     // MARK: - SPUStandardUserDriverDelegate
 
-    /// A menu bar monitor is watched, not used: it has no window in front of
-    /// anyone, and a scheduled check that threw one up would interrupt whatever
-    /// the machine is actually for. With this on, Sparkle hands a scheduled
-    /// find back here instead of showing it, and the strip carries the news
-    /// until the user asks.
+    /// A menu bar monitor is watched, not used, so a scheduled check that threw
+    /// up a window would interrupt whatever the machine is for. With this on,
+    /// Sparkle hands the find back here and the strip carries the news.
     nonisolated var supportsGentleScheduledUpdateReminders: Bool { true }
 
     nonisolated func standardUserDriverShouldHandleShowingScheduledUpdate(
         _ update: SUAppcastItem,
         andInImmediateFocus immediateFocus: Bool
     ) -> Bool {
-        // Always ours, and `immediateFocus` is deliberately ignored. It reads
-        // like "the user is looking at the app", and it is not: Sparkle sets it
-        // when it proposes to take utmost focus, which it does when the app was
-        // launched recently or the machine has been idle. Returning it put a
-        // window over the screen at every login — the one moment a menu bar
-        // monitor is least entitled to one.
+        // `immediateFocus` is deliberately ignored. It reads like "the user is
+        // looking at the app" and is not — Sparkle sets it when it proposes to
+        // take utmost focus, which it does after a recent launch or an idle
+        // machine. Honouring it put a window on screen at every login.
         false
     }
 
@@ -154,8 +139,7 @@ final class UpdaterService: NSObject, SPUStandardUserDriverDelegate {
         Task { @MainActor [weak self] in
             guard let self else { return }
             clearUnseenUpdate()
-            // Whether the session ended in an install or a "you are up to
-            // date", the Dock tile it borrowed goes back.
+            // Install or "up to date", the borrowed Dock tile goes back.
             activation.release(.updater)
         }
     }

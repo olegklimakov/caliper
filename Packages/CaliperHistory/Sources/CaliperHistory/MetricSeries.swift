@@ -1,11 +1,8 @@
 import Foundation
 
-/// The series the history keeps.
-///
-/// Deliberately a short, fixed list of *aggregate* numbers. Per-core loads and
-/// per-process rows are what a live panel shows; recording them for two years
-/// would multiply the store by the width of the machine and answer a question
-/// nobody asks of history.
+/// The series the history keeps: a short, fixed list of *aggregate* numbers.
+/// Per-core loads and per-process rows belong to the live panels — recording
+/// them for two years would multiply the store by the width of the machine.
 public enum MetricSeries: String, Sendable, CaseIterable, Codable {
     /// Busy fraction across all cores, 0…1.
     case cpu
@@ -40,11 +37,9 @@ public enum HistoryTier: String, Sendable, CaseIterable, Codable {
         }
     }
 
-    /// How long rows of this tier are kept.
-    ///
-    /// Fine detail is only interesting while it is recent: nobody asks what the
-    /// CPU did at ten-second resolution last March, but "the last day, second
-    /// by second" is exactly what you want after something went wrong.
+    /// Fine detail is only interesting while it is recent: nobody asks what
+    /// last March did second by second, but the last day is exactly what you
+    /// want after something went wrong.
     public var retention: TimeInterval {
         switch self {
         case .tenSeconds: 24 * 3600
@@ -64,7 +59,7 @@ public enum HistoryTier: String, Sendable, CaseIterable, Codable {
         }
     }
 
-    /// How wide a bucket of this tier is, as a reader writes it.
+    /// How wide a bucket is, as a reader writes it.
     public var label: String {
         switch self {
         case .tenSeconds: "10 s"
@@ -74,12 +69,8 @@ public enum HistoryTier: String, Sendable, CaseIterable, Codable {
         }
     }
 
-    /// The start of the bucket a moment falls in.
-    ///
-    /// Aligned to absolute time, not to when the app started, so two runs on the
-    /// same machine produce rows that line up — and so a reader can find the row
-    /// holding a given moment by arithmetic rather than by searching for the
-    /// nearest one.
+    /// Aligned to absolute time, not to when the app started, so two runs line
+    /// up and a reader can find a moment's row by arithmetic.
     public func bucketStart(of date: Date) -> Date {
         CaliperHistory.bucketStart(of: date, width: seconds)
     }
@@ -94,20 +85,16 @@ public enum HistoryTier: String, Sendable, CaseIterable, Codable {
     }
 }
 
-/// One bucket of one series: what the metric did over that span.
-///
-/// Minimum and maximum alongside the average because an average hides exactly
-/// what a monitor is for — a machine that averaged 20 % but hit 100 % for
-/// thirty seconds is a different machine from one that sat at 20 %.
+/// One bucket of one series. Minimum and maximum alongside the average because
+/// an average hides what a monitor is for: 20 % with a thirty-second spike to
+/// 100 % is a different machine from a flat 20 %.
 public struct Aggregate: Sendable, Codable, Equatable {
     public let minimum: Double
     public let average: Double
     public let maximum: Double
-    /// How many readings the average is over.
-    ///
-    /// Stored because without it two aggregates cannot be merged: the mean of
-    /// means is only the true mean when both cover the same number of samples,
-    /// and neither a re-flushed bucket nor a rollup across a gap does.
+    /// How many readings the average is over. Without it two aggregates cannot
+    /// be merged — the mean of means is the true mean only when both cover the
+    /// same count, which neither a re-flush nor a rollup across a gap does.
     public let count: Int
 
     public init(minimum: Double, average: Double, maximum: Double, count: Int = 1) {
@@ -139,12 +126,9 @@ public struct HistorySample: Sendable, Codable, Equatable {
     }
 }
 
-/// Several series read over one range, at one tier.
-///
-/// A type rather than a bare dictionary because the tier is part of the answer:
-/// it is what says how wide a bucket is, and therefore which row holds a given
-/// moment. A caller holding only the rows would have to guess, and a view whose
-/// whole purpose is "all of these at the same instant" cannot afford to.
+/// Several series read over one range, at one tier. A type rather than a bare
+/// dictionary because the tier is part of the answer: it says how wide a bucket
+/// is, and therefore which row holds a given moment.
 public struct HistorySlice: Sendable, Equatable {
     public let tier: HistoryTier
     public let start: Date
@@ -163,28 +147,19 @@ public struct HistorySlice: Sendable, Equatable {
         self.rows = rows
     }
 
-    /// Every stored bucket of one series, oldest first.
-    ///
-    /// Empty rather than absent for a series with nothing recorded: a machine
-    /// whose sensors this build cannot read has no temperature history, and
-    /// that is a fact about the machine, not a failure to report.
+    /// Every stored bucket of one series, oldest first. Empty rather than
+    /// absent for a series with nothing recorded.
     public subscript(series: MetricSeries) -> [HistorySample] {
         rows[series] ?? []
     }
 
     /// The same buckets, split into unbroken runs.
     ///
-    /// A stored row exists only for a bucket that was actually recorded, so two
-    /// neighbouring elements of the array can be hours apart — a sleeping Mac
-    /// writes nothing. Handed to a chart as one series, that reads as a
-    /// straight line across the hole, and the min/max band fills the space
-    /// under it: a smooth sixteen-hour ramp that nothing ever measured. On a
-    /// monitor whose whole claim is a real record of what the machine did,
-    /// inventing the quiet hours is the worst thing the picture can do.
-    ///
-    /// The split lives here because this is the only type holding both halves
-    /// of the rule — the rows, and the tier that says how far apart two
-    /// consecutive buckets are entitled to be.
+    /// A sleeping Mac writes nothing, so two neighbouring rows can be hours
+    /// apart. Handed to a chart as one series that reads as a straight line
+    /// across the hole — a ramp nothing ever measured. Split here because this
+    /// is the only type holding both the rows and the tier that says how far
+    /// apart two consecutive buckets are entitled to be.
     public func runs(_ series: MetricSeries) -> [[HistorySample]] {
         let samples = self[series]
         guard !samples.isEmpty else { return [] }
@@ -207,24 +182,19 @@ public struct HistorySlice: Sendable, Equatable {
         rows.values.allSatisfy(\.isEmpty)
     }
 
-    /// The bucket a moment belongs to — where a cursor anywhere in the slice
-    /// snaps to.
+    /// Where a cursor anywhere in the slice snaps to.
     public func bucket(containing date: Date) -> Date {
         tier.bucketStart(of: date)
     }
 
-    /// The buckets a cursor can sit on: the first one that starts inside the
-    /// slice, through the last one that starts before it ends.
+    /// The buckets a cursor can sit on: the first that starts inside the slice
+    /// through the last that starts before it ends. `nil` when no whole bucket
+    /// starts inside it.
     ///
-    /// Not `start...end`. Those are wall-clock edges, and only a *bucket's*
-    /// start is somewhere a cursor means anything. `start` is "now minus the
-    /// span" and is therefore almost never aligned, so the bucket containing it
-    /// begins before the slice does — clamping there would put the cursor
-    /// outside the range the view then checks it against, and the rule would
-    /// simply vanish.
-    ///
-    /// `nil` when no whole bucket starts inside the slice at all, which a span
-    /// narrower than one bucket can produce.
+    /// Not `start...end` — those are wall-clock edges. `start` is "now minus the
+    /// span" and almost never aligned, so the bucket containing it begins before
+    /// the slice, and clamping there puts the cursor outside the range the view
+    /// checks it against.
     public var cursorRange: ClosedRange<Date>? {
         let containing = tier.bucketStart(of: start)
         let first =
@@ -235,28 +205,19 @@ public struct HistorySlice: Sendable, Equatable {
         return first...last
     }
 
-    /// The newest bucket that actually holds a row, in whichever series has one.
+    /// The newest bucket holding a row, in whichever series has one.
     public var latestRecorded: Date? {
         rows.values.compactMap { $0.last?.timestamp }.max()
     }
 
-    /// The bucket `steps` away from a moment, for a cursor being moved a key
-    /// at a time.
+    /// The bucket `steps` away, for a cursor moved a key at a time. Clamped at
+    /// both ends.
     ///
-    /// By the tier's width, so it crosses a gap rather than stepping over it: a
-    /// stretch the Mac slept through is still made of buckets, and landing on
-    /// one and reading "—" is the truth about that moment. Skipping to the next
-    /// bucket that happens to hold a row would quietly redraw the night as
-    /// shorter than it was.
-    ///
-    /// With no cursor yet, the answer is the newest bucket that has something
-    /// in it, whichever way the first key went. Not simply the last bucket of
-    /// the range: the recorder flushes once a minute and the rollup runs every
-    /// ten, so the bucket at the right-hand edge is usually still filling, and a
-    /// first keypress landing there would answer "—" and look broken.
-    ///
-    /// Clamped at both ends, so holding an arrow down parks the cursor on the
-    /// edge instead of walking it off the axis.
+    /// By the tier's width, so it crosses a gap rather than stepping over it —
+    /// skipping to the next bucket that holds a row would redraw a night as
+    /// shorter than it was. With no cursor yet the answer is the newest bucket
+    /// holding something, not the last of the range: the recorder flushes once
+    /// a minute, so the right-hand bucket is usually still filling.
     public func bucket(from moment: Date?, steppedBy steps: Int) -> Date? {
         guard let range = cursorRange else { return nil }
         guard let moment else {
@@ -271,15 +232,12 @@ public struct HistorySlice: Sendable, Equatable {
         return Swift.min(Swift.max(stepped, range.lowerBound), range.upperBound)
     }
 
-    /// What one series did over one bucket, or `nil` where nothing was
-    /// recorded: the Mac asleep, or a sampler that had not answered yet.
-    ///
-    /// Never interpolated across. The chart draws a gap there, and a readout
-    /// that quietly filled it with the neighbouring value would disagree with
-    /// the picture it is annotating.
+    /// `nil` where nothing was recorded, never interpolated: the chart draws a
+    /// gap there, and a readout that filled it would disagree with the picture
+    /// it annotates.
     public func sample(_ series: MetricSeries, at bucket: Date) -> HistorySample? {
-        // A search rather than a scan: the rows come back ordered by timestamp,
-        // and a scrub asks this of every series on every pointer move.
+        // A scrub asks this of every series on every pointer move, and the
+        // rows come back ordered.
         let samples = self[series]
         var low = samples.startIndex
         var high = samples.endIndex
@@ -296,11 +254,8 @@ public struct HistorySlice: Sendable, Equatable {
     }
 }
 
-/// Where a bucket of a given width starts, aligned to absolute time.
-///
-/// Shared by both tier types rather than written out twice: a process bucket and
-/// a metric bucket that report the same start have to *be* the same span, and
-/// two copies of this arithmetic could drift apart.
+/// Shared by both tier types: a process bucket and a metric bucket reporting
+/// the same start have to *be* the same span.
 func bucketStart(of date: Date, width: Int) -> Date {
     let interval = date.timeIntervalSince1970
     return Date(timeIntervalSince1970: (interval / Double(width)).rounded(.down) * Double(width))

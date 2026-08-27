@@ -25,14 +25,8 @@ final class StatusItemController {
     /// per second — layer update and a round trip to the window server, almost
     /// none of it our drawing. A scrolling sparkline changes every tick by
     /// definition, so the only lever is how often it is pushed. Two seconds is
-    /// the difference between fitting the footprint budget and not.
-    ///
-    /// It used to halve while a panel was open, on the theory that someone
-    /// watching the numbers move deserved every tick. They are watching the
-    /// *panel* — which opens directly beneath the strip and shows the same
-    /// readings larger — so that bought a second redraw of the one surface the
-    /// panel is covering, and cost about half a percent of a core for as long
-    /// as it was open.
+    /// the difference between fitting the footprint budget and not. Do not
+    /// quicken it while a panel is open: the panel covers the strip.
     private static let redrawInterval: Duration = .seconds(2)
 
     /// Rebuilt whenever the parts change: an indicator is told which halves it
@@ -40,43 +34,36 @@ final class StatusItemController {
     private var indicators: [MenuBarModule: any MenuBarIndicator] = [:]
     private var parts = MenuBarParts()
     private var combines = false
-    /// Whether the strip is wearing the update dot. A scheduled check that
-    /// finds something says so here rather than by opening a window; see
+    /// A scheduled check that finds something says so here rather than by
+    /// opening a window; see
     /// `UpdaterService.supportsGentleScheduledUpdateReminders`.
     private var isUpdateAvailable = false
 
-    /// Called when a module's button is clicked, with the button to anchor a
-    /// popover to. Set by the app delegate, which owns the panels.
+    /// The button is what a popover anchors to. Set by the app delegate, which
+    /// owns the panels.
     var onSelect: ((MenuBarModule, NSStatusBarButton) -> Void)?
-
-    /// Called when the combined item is clicked. It stands for every module at
-    /// once, so it opens the window that shows every module at once.
+    /// The combined item stands for every module, so it opens the window that
+    /// shows every module.
     var onSelectCombined: ((NSStatusBarButton) -> Void)?
-
-    /// Called when the menu's Settings item is picked.
     var onOpenSettings: (() -> Void)?
-
-    /// Called when the menu's Check for Updates item is picked.
     var onCheckForUpdates: (() -> Void)?
 
-    /// Shares one metrics store with the panels: they show the same numbers,
-    /// and two stores would guarantee they disagree by a tick.
+    /// Shares one metrics store with the panels: two stores would guarantee
+    /// they disagree by a tick.
     init(metrics: LiveMetrics, layout: MenuBarParts, combined: Bool) {
         self.state = metrics
         apply(layout, combined: combined)
     }
 
-    /// The arrangement, in one call: every preference writes through one
-    /// callback, and the modules, their parts and whether they share an item
-    /// are three answers to the same question.
+    /// One call, because the modules, their parts and whether they share an
+    /// item are three answers to the same question.
     func setLayout(_ parts: MenuBarParts, combined: Bool) {
         guard parts != self.parts || combined != self.combines else { return }
         apply(parts, combined: combined)
     }
 
-    /// The update dot, on or off. Redraws through `forgetDrawings` because the
-    /// badge is part of the image, and the identity that decides whether to
-    /// redraw knows only about the reading.
+    /// Redraws through `forgetDrawings` because the badge is part of the image,
+    /// and the identity that gates a redraw knows only about the reading.
     func setUpdateAvailable(_ available: Bool) {
         guard available != isUpdateAvailable else { return }
         isUpdateAvailable = available
@@ -87,11 +74,10 @@ final class StatusItemController {
     func setColoured(_ coloured: Bool) {
         guard style.isTemplate == coloured else { return }
         style = IndicatorStyle(isTemplate: !coloured)
-        forgetDrawings()  // Force a redraw in the new style.
+        forgetDrawings()
         refresh()
     }
 
-    /// Called after the shared store has taken the snapshot.
     func snapshotDidChange() {
         let now = ContinuousClock.now
         if let lastRedraw, now - lastRedraw < Self.redrawInterval { return }
@@ -125,13 +111,13 @@ final class StatusItemController {
             }
         }
         forgetDrawings()
-        // Drawn now rather than at the next tick: two seconds is a long time to
-        // leave an item that has just been created or resized showing nothing.
+        // Now rather than at the next tick: two seconds is a long time to leave
+        // an item that was just created or resized showing nothing.
         refresh()
     }
 
-    /// Both the width and the content may have changed; `refresh` re-assigns
-    /// `item.length` from the new indicator as it redraws.
+    /// Width as well as content; `refresh` re-assigns `item.length` from the
+    /// new indicator as it redraws.
     private func forgetDrawings() {
         lastIdentity.removeAll()
         lastCombinedIdentity = nil
@@ -148,34 +134,26 @@ final class StatusItemController {
     }
 
     private func refreshSeparate() {
-        // Every module is asked what it has before anything is written, because
-        // two of the answers depend on all of them: which item wears the update
-        // dot, and whether the strip is silent enough to need its stand-in.
-        // Deciding those inside the walk meant the first item was hidden by the
-        // loop and then drawn over by the stand-in — each of them undoing the
-        // other's bookkeeping, so both fired again on the very next refresh.
-        // Read once: `enabled` filters the order into a fresh array on every
-        // call, and this walks it three times.
+        // Every module is asked what it has before anything is written: two of
+        // the answers depend on all of them — which item wears the update dot,
+        // and whether the strip is silent enough to need its stand-in. Deciding
+        // those inside the walk has each undo the other's bookkeeping. Read
+        // once, because `enabled` filters into a fresh array per call.
         let enabled = parts.enabled
         var identities: [MenuBarModule: AnyHashable] = [:]
         for module in enabled {
-            // The item as well as the indicator: a module with nowhere to draw
-            // cannot be the one that wears the update dot, nor the one that
-            // stands in for a silent strip.
+            // The item as well as the indicator: a module with nowhere to
+            // draw can be neither the dot's host nor the stand-in.
             guard items[module] != nil, let indicator = indicators[module] else { continue }
             identities[module] = indicator.identity(state)
         }
 
-        // The first module that *draws*, not the first that is enabled: with
-        // Sensors dragged to the front of a Mac that reports none, the leading
-        // item is hidden, and a dot given to it would be a dot given to
-        // nothing. Which is what "first" meant here before, so a found update
-        // announced itself nowhere at all.
+        // The first that *draws*, not the first enabled: with Sensors dragged
+        // to the front of a Mac that reports none, the leading item is hidden
+        // and a dot on it is a dot on nothing.
         let firstDrawn = enabled.first { identities[$0] != nil }
-        // Walked in the strip's own order, so the item that stands in for a
-        // silent strip is its first one rather than whichever the dictionary
-        // happened to hand over first. It is the stand-in *instead* of being
-        // hidden, never both.
+        // The strip's own order, not the dictionary's. The stand-in is drawn
+        // *instead* of the item being hidden, never both.
         let standIn = firstDrawn == nil ? enabled.first(where: { items[$0] != nil }) : nil
 
         for module in enabled {
@@ -189,25 +167,18 @@ final class StatusItemController {
             }
 
             guard let identity = identities[module] else {
-                // Nothing to show — a machine with no sensors, or a metric that
-                // has not produced its first reading yet.
-                //
-                // Recorded as a state of its own rather than by clearing the
-                // entry: "hidden" is somewhere the strip can already be, and
-                // forgetting it meant re-hiding an item that was hidden — four
-                // AppKit writes per refresh for the rest of the session, on
-                // every module this machine cannot report.
+                // Nothing to show — no sensors, or no first reading yet.
+                // Recorded as a state rather than by clearing the entry, so
+                // that re-hiding a hidden item costs no AppKit writes.
                 guard lastIdentity[module] != Self.hiddenIdentity else { continue }
                 lastIdentity[module] = Self.hiddenIdentity
                 hide(item)
                 continue
             }
 
-            // Ahead of the identity check, not inside it: the label carries the
-            // reading whether or not the picture drew it, and a module showing
-            // only its symbol has an identity that never moves — which would
-            // leave VoiceOver reading the first sample out for the rest of the
-            // session. The image is what the identity is there to spare.
+            // Ahead of the identity check: a module showing only its symbol
+            // has an identity that never moves, which would leave VoiceOver
+            // reading the first sample out forever.
             speak(indicator.accessibilityLabel(state), from: item)
 
             guard lastIdentity[module] != identity else { continue }
@@ -222,9 +193,8 @@ final class StatusItemController {
     }
 
     private func refreshCombined(_ item: NSStatusItem) {
-        // Only the modules with something to say: one that has not produced a
-        // reading yet leaves no gap in the strip, the way its own item would
-        // simply not be there.
+        // Only the modules with something to say, so one without a reading
+        // leaves no gap.
         var drawn: [any MenuBarIndicator] = []
         var identities: [AnyHashable] = []
         for module in parts.enabled {
@@ -240,11 +210,8 @@ final class StatusItemController {
             return
         }
 
-        // One item speaking for all of them: VoiceOver reads the strip in the
-        // order it is drawn, which is the order the settings list shows. Said
-        // before the identity check for the reason the separate items say it
-        // there — a strip of symbols alone has an identity that stands still
-        // while the readings behind it move.
+        // Read in the order it is drawn, which is the order the settings list
+        // shows. Before the identity check, for the reason above.
         speak(drawn.map { $0.accessibilityLabel(state) }.joined(separator: ", "), from: item)
 
         let identity = AnyHashable(identities)
@@ -259,16 +226,11 @@ final class StatusItemController {
         )
     }
 
-    /// Puts a drawing into an item at the width it was drawn at, wearing the
-    /// update dot if this is the item that carries it.
+    /// Image and length in one call: the dot takes room of its own, and an item
+    /// sized for the drawing it had before the dot has the dot cropped off.
     ///
-    /// One call rather than an image and a length assigned separately: the dot
-    /// takes room of its own, and an item sized for the drawing it had before
-    /// the dot is an item with the dot cropped off.
-    ///
-    /// `badged` says only whether this item is the one *allowed* to wear it —
-    /// the first in the separate arrangement, the only one in the combined.
-    /// Four items wearing four dots would read as four updates.
+    /// `badged` says only whether this item is *allowed* to wear it — four items
+    /// wearing four dots would read as four updates.
     private func draw(
         _ image: NSImage,
         width: CGFloat,
@@ -276,10 +238,9 @@ final class StatusItemController {
         badged: Bool
     ) {
         let wearsBadge = isUpdateAvailable && badged
-        // Assigned only when it moves. A status item's length is a pure
-        // function of the layout and the badge, so re-stating it on every draw
-        // was a second window-server round trip per redrawn module — and each
-        // one relays every item to its left.
+        // Only when it moves: re-stating the length costs a second
+        // window-server round trip per module, and each relays every item to
+        // its left.
         let length = wearsBadge ? width + MenuBarBadge.width : width
         if item.length != length {
             item.length = length
@@ -287,17 +248,12 @@ final class StatusItemController {
         item.button?.image = wearsBadge ? MenuBarBadge.over(image, style: style) : image
     }
 
-    /// The one thing a drawn image cannot carry. Label and tooltip are the same
-    /// sentence: the strip draws no text, so what VoiceOver reads and what the
-    /// pointer reveals are both the reading spelled out.
+    /// Label and tooltip are the same sentence — the strip draws no text.
     ///
-    /// Said outside the redraw guard, because a module showing only its symbol
-    /// has an identity that never moves while the reading behind it does — and
-    /// then said only when the sentence changes. Assigning a tooltip tears down
-    /// the button's tracking rectangle and installs a new one, so repeating
-    /// yesterday's sentence is not free; the strip did it for every enabled
-    /// module, twice a second, forever. The tooltip is the whole state: it and
-    /// the label are only ever set together.
+    /// Guarded on the text rather than on the redraw: assigning a tooltip tears
+    /// down the button's tracking rectangle and installs a new one, so
+    /// repeating yesterday's sentence twice a second is not free. The tooltip
+    /// is the whole state; the two are only ever set together.
     private func speak(_ label: String, from item: NSStatusItem) {
         guard let button = item.button, button.toolTip != label else { return }
         button.setAccessibilityLabel(label)
@@ -317,8 +273,8 @@ final class StatusItemController {
     private func hide(_ item: NSStatusItem) {
         item.button?.image = nil
         item.length = 0
-        // And says nothing: a zero-width item that still carries a label reads
-        // its last measurement out to VoiceOver forever.
+        // A zero-width item that still carries a label reads its last
+        // measurement out to VoiceOver forever.
         item.button?.setAccessibilityLabel(nil)
         item.button?.toolTip = nil
     }
@@ -329,12 +285,10 @@ final class StatusItemController {
         guard let indicator = indicators[module] else { return }
         let item = makeItem(identifier: module.rawValue)
         item.length = indicator.width
-        // No placeholder tooltip. `speak` writes the label and the tooltip
-        // together and skips when the sentence has not moved, so seeding the
-        // tooltip with the module's name meant the first real sentence that
-        // happened to *be* that name — "Sensors", before the first temperature
-        // — was taken for a repeat, and VoiceOver got no label at all. The
-        // refresh at the end of `apply` fills both in a moment either way.
+        // No placeholder tooltip: `speak` skips when the sentence has not
+        // moved, so seeding it with the module's name would swallow a first
+        // real sentence that happens to be that name ("Sensors", before the
+        // first temperature). The refresh in `apply` fills both in anyway.
         items[module] = item
     }
 
@@ -342,9 +296,8 @@ final class StatusItemController {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.target = self
         item.button?.action = #selector(buttonClicked(_:))
-        // Right-click opens the menu, left-click opens the panel. A status item
-        // with a `menu` set never reports clicks at all, so the two have to be
-        // told apart here.
+        // A status item with a `menu` set never reports clicks, so right-click
+        // (menu) and left-click (panel) have to be told apart here.
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         item.button?.identifier = NSUserInterfaceItemIdentifier(identifier)
         return item
@@ -369,9 +322,8 @@ final class StatusItemController {
         }
     }
 
-    /// Settings and Quit. An app with no Dock icon and no window has nowhere
-    /// else to put them, and without a Quit item the only way to stop Caliper
-    /// would be Activity Monitor.
+    /// Settings and Quit. An accessory app draws no main menu, so without this
+    /// the only way to quit Caliper would be Activity Monitor.
     private func showMenu(from button: NSStatusBarButton) {
         let menu = NSMenu()
         menu.addItem(
@@ -379,10 +331,8 @@ final class StatusItemController {
             action: #selector(openSettings),
             keyEquivalent: ","
         ).target = self
-        // Named for what it will do rather than what it is: with the dot
-        // showing, the answer is already known and the item is the way to see
-        // it. This menu is the only one an accessory app draws, so it is also
-        // the only place the dot can be acted on.
+        // With the dot showing the answer is already known, so the item is
+        // named for what it will do. The only place the dot can be acted on.
         menu.addItem(
             withTitle: isUpdateAvailable ? "Update Available…" : "Check for Updates…",
             action: #selector(checkForUpdates),
@@ -395,8 +345,7 @@ final class StatusItemController {
             keyEquivalent: "q"
         )
 
-        // Attaching the menu makes the item show it and then detaching keeps
-        // left-clicks working as panel toggles.
+        // Attach to show, detach to keep left-clicks working as panel toggles.
         let item = combinedItem?.button === button
             ? combinedItem
             : items.first { $0.value.button === button }?.value
@@ -405,14 +354,9 @@ final class StatusItemController {
         item?.menu = nil
     }
 
-    /// Asked of the app rather than sent into the responder chain.
-    ///
-    /// This used to be `NSApp.sendAction(Selector(("showSettingsWindow:")))`,
-    /// which is how a SwiftUI `Settings` scene is opened from AppKit — and it
-    /// did nothing. The action *was* delivered: `target(forAction:)` finds
-    /// SwiftUI's own app delegate, which then ignored it, and no window was ever
-    /// created. The settings are a room of the history window now, and the app
-    /// opens its own windows.
+    /// Asked of the app, not sent into the responder chain. `NSApp.sendAction`
+    /// with `showSettingsWindow:` delivers to SwiftUI's app delegate, which
+    /// ignores it, and no window is ever created.
     @objc private func openSettings() {
         onOpenSettings?()
     }
@@ -422,9 +366,8 @@ final class StatusItemController {
     }
 
     private static let combinedIdentifier = "combined"
-    /// The two states the strip can be in that are not a reading. Both are
-    /// identities like any other, so that arriving at one costs a single write
-    /// and staying there costs none.
+    /// The two non-reading states, as identities like any other: arriving costs
+    /// one write, staying costs none.
     private static let placeholderIdentity = AnyHashable("placeholder")
     private static let hiddenIdentity = AnyHashable("hidden")
 }

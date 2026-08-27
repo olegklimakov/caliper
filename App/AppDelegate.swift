@@ -9,12 +9,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// there is nothing for a scene to wait for and no optional to unwrap.
     let metrics = LiveMetrics()
     let preferences = Preferences()
-    /// `nil` only when the store could not be opened at all.
+    /// `nil` only when the store could not be opened.
     ///
-    /// Built in `init`, not in `applicationDidFinishLaunching`: SwiftUI
-    /// evaluates the scene graph before the delegate finishes launching, so a
-    /// value assigned later is captured as nil and the window shows "history
-    /// unavailable" for the life of the process.
+    /// Built in `init`, not `applicationDidFinishLaunching`: SwiftUI evaluates
+    /// the scene graph before the delegate finishes launching, so a value
+    /// assigned later is captured as nil for the life of the process.
     let history: HistoryReader?
 
     private let coordinator = SamplingCoordinator()
@@ -33,9 +32,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var updater: UpdaterService?
     private var updates: Task<Void, Never>?
     private var isDashboardVisible = false
-    /// What the open panel is drawing, and `nil` when none is. One optional
-    /// rather than a flag beside a set: two of those can disagree, and the one
-    /// that would be believed is the one deciding what the machine pays.
+    /// What the open panel is drawing, `nil` when none is. One optional rather
+    /// than a flag beside a set, which can disagree.
     private var openPanelMetrics: Set<MetricKind>?
 
     override init() {
@@ -48,9 +46,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
             downsampler = Downsampler(store: store)
         } else {
-            // History is best-effort: a machine whose store cannot be opened —
-            // a full disk, a container the app cannot reach — still shows live
-            // metrics.
+            // Best-effort: a machine whose store cannot be opened still shows
+            // live metrics.
             history = nil
             recorder = nil
             processRecorder = nil
@@ -69,9 +66,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         statusItemController.setColoured(preferences.colouredIndicators)
 
-        // After the status item, because starting the updater can find an
-        // update straight away and the dot it asks for needs somewhere to land;
-        // before the window, because the settings room draws its switches.
+        // After the status item, so the dot an immediate update asks for has
+        // somewhere to land; before the window, whose settings room draws its
+        // switches.
         let updater = UpdaterService(activation: activation)
         updater.onUnseenUpdateChange = { [weak statusItemController] hasUpdate in
             statusItemController?.setUpdateAvailable(hasUpdate)
@@ -104,9 +101,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemController.onSelectCombined = { [weak panels] button in
             panels?.toggleCombined(from: button)
         }
-        // Two doors into the settings, one call: the status item's right-click
-        // menu and the Settings button in a panel's footer. History is the
-        // third door and opens a different room, below.
+        // Two doors, one call: the status item's right-click menu and a
+        // panel's footer button.
         statusItemController.onOpenSettings = { [weak dashboard] in
             dashboard?.show(.settings)
         }
@@ -147,23 +143,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// The app menu's Settings item. It carries no target, so it travels the
-    /// responder chain and arrives here — the delegate owns the window
-    /// controller, and the menu is installed before that controller exists.
+    /// No target, so it travels the responder chain and arrives here: the menu
+    /// is installed before the window controller exists.
     @objc func openSettings(_ sender: Any?) {
         dashboard?.show(.settings)
     }
 
-    /// The app menu's Check for Updates item, arriving down the responder chain
-    /// the way Settings does.
+    /// Down the responder chain, the way Settings is.
     @objc func checkForUpdates(_ sender: Any?) {
         updater?.checkForUpdates()
     }
 
-    /// A popover is a window. Without this, closing one — which is what
-    /// happens the moment you open a second panel — closes the app's only
-    /// window, and AppKit's default is to quit an app whose last window went
-    /// away. The app then vanishes cleanly, with no crash to point at.
+    /// A popover is a window, so closing one — which opening a second panel
+    /// does — takes away the app's last window, and AppKit quits an app whose
+    /// last window went away. Cleanly, with no crash to point at.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }
@@ -182,12 +175,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let downsampler else { return }
 
         compaction = Task.detached(priority: .utility) { [preferences] in
-            // Rolling up every ten minutes keeps each pass small; the finest
-            // tier only needs compacting as fast as it fills.
+            // Every ten minutes keeps each pass small; the finest tier only
+            // needs compacting as fast as it fills.
             while !Task.isCancelled {
-                // Read each pass rather than captured once: retention is a
-                // setting, and a pass that used the value from launch would
-                // keep honouring it until the app was restarted.
+                // Read each pass: retention is a setting, and a value captured
+                // at launch would be honoured until restart.
                 let retention = await preferences.processRetention.seconds
                 try? await downsampler.compact(processRetention: retention)
                 try? await Task.sleep(for: .seconds(600))
@@ -195,13 +187,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// What the settings screen may do to the recorded history, or `nil` when
-    /// there is no store to do it to.
+    /// `nil` when there is no store to act on.
     var historyActions: HistoryActions? {
         guard let history else { return nil }
-        // Captured strongly: the delegate lives as long as the process, and a
-        // weak capture would have reported *success* to the settings screen if
-        // it were ever nil.
+        // Strongly: the delegate lives as long as the process, and a weak
+        // capture would report *success* to the settings screen if nil.
         return HistoryActions(
             sizeOnDisk: { history.storeSize() },
             deleteProcessHistory: { try await self.deleteProcessHistory() },
@@ -209,12 +199,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
-    /// Empties the recorded process history, including what the recorder is
-    /// still holding in memory.
-    ///
-    /// Both halves, or the button lies: deleting the tables while a bucket and
-    /// a minute of pending rows sit in the recorder would write part of the
-    /// record straight back.
+    /// Both the tables and what the recorder still holds in memory, or the
+    /// button lies: a bucket and a minute of pending rows would be written
+    /// straight back.
     private func deleteProcessHistory() async throws {
         processRecorder?.discardPending()
         try await history?.deleteProcessHistory()
@@ -222,17 +209,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Empties everything recorded and rebuilds the file at its new size.
     ///
-    /// Both recorders first, for the same reason, and a notification after: a
-    /// dashboard left open reloads on a tenth of its span, which is eight
-    /// minutes on the year view, and until then it would go on charting rows
-    /// that are gone.
+    /// Both recorders first, for the reason above, then a notification: a
+    /// dashboard reloads on a tenth of its span — eight minutes on the year
+    /// view — and until then charts rows that are gone.
     private func deleteEverything() async throws {
         recorder?.discardPending()
         processRecorder?.discardPending()
-        // Posted whether or not the delete finishes. The rows are dropped in
-        // the first of two statements, so a vacuum that throws still leaves a
-        // window charting history that is gone — telling it only on success
-        // would leave the failure on screen in the wrong place.
+        // Whether or not the delete finishes: the rows are dropped in the
+        // first of two statements, so a vacuum that throws still leaves a
+        // window charting history that is gone.
         defer { NotificationCenter.default.post(name: .historyDidChange, object: nil) }
         try await history?.deleteAll()
     }
@@ -249,20 +234,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// One place decides the sampling rate, from everything that can be looking
     /// at the data at once.
     ///
-    /// The menu bar strip contributes nothing: its four live modules run at the
-    /// base rate whatever happens, and its temperature badge reads the slow
-    /// sweep without ever looking stale. Only something the user has opened
-    /// raises a metric — and only the metrics that surface actually draws,
-    /// which is what keeps a CPU panel from paying for the sensors.
+    /// The menu bar strip contributes nothing — see `MetricDemand.menuBar`.
+    /// Only something the user has opened raises a metric, and only the metrics
+    /// that surface draws, which keeps a CPU panel from paying for the sensors.
     ///
-    /// Set rather than awaited: `setDemand` takes a lock the next tick reads,
-    /// so this cannot leave a change queued behind another one.
+    /// Set rather than awaited: `setDemand` takes a lock the next tick reads.
     private func updateDemand() {
         // The union, not whichever is uppermost: nothing closes a popover when
-        // the window is showing, so a panel opened over the dashboard is a
-        // second surface drawing, and taking only the window's list would drop
-        // that panel's process rows to the background rate while they are being
-        // read.
+        // the window is showing, so a panel over the dashboard is a second
+        // surface drawing.
         var drawn = openPanelMetrics ?? []
         if isDashboardVisible {
             drawn.formUnion(DashboardWindowController.drawnMetrics)
@@ -275,8 +255,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         workspace.addObserver(
             self, selector: #selector(systemDidWake),
             name: NSWorkspace.didWakeNotification, object: nil)
-        // A dark display is the one case where this app can tell that nobody is
-        // looking without a window of its own being involved.
+        // The one case where this app can tell nobody is looking without a
+        // window of its own being involved.
         workspace.addObserver(
             self, selector: #selector(becomeHidden),
             name: NSWorkspace.screensDidSleepNotification, object: nil)
@@ -292,9 +272,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func becomeVisible() {
-        // Without an activity assertion the system throttles our timer as soon
-        // as the app looks idle to it, which for a menu bar app is most of the
-        // time. With the screens off there is nothing to throttle us away from.
+        // Without an assertion the system throttles the timer as soon as the
+        // app looks idle, which for a menu bar app is most of the time. With the
+        // screens off there is nothing to throttle away from.
         appNap = AppNapAssertion(reason: "Sampling system metrics for the menu bar")
         areScreensAwake = true
         updateDemand()

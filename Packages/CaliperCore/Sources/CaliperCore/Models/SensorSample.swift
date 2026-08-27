@@ -12,11 +12,10 @@ public struct SensorsSample: Sendable, Codable, Equatable {
     /// The hottest reading worth showing, or `nil` on a machine that reports
     /// none.
     ///
-    /// Here rather than at each place that wants it. Which sensors count is a
-    /// fact about this type — the calibration reference reads about twenty
+    /// Here rather than at each place that wants it: which sensors count is a
+    /// fact about this type. The calibration reference reads about twenty
     /// degrees above every real one and would pin a badge, a chart and a
-    /// recorded series to a number that means nothing — and it was written out
-    /// three times, in two packages, before it was written down once.
+    /// recorded series to a number that means nothing.
     public var peakTemperature: Double? {
         temperatures.lazy.filter { $0.group != .calibration }.map(\.celsius).max()
     }

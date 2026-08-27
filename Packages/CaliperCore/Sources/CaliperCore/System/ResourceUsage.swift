@@ -45,13 +45,10 @@ enum ResourceUsage {
         )
     }
 
-    /// Display name for a pid.
-    ///
-    /// `proc_pidpath` gives the real executable name, where `proc_name`
-    /// truncates at sixteen characters and turns "Google Chrome Helper" into
-    /// noise. But the path is unreadable for processes another user owns, and a
-    /// runaway root process is exactly the one worth seeing, so a truncated
-    /// name — and failing that the bare pid — beats dropping it from the list.
+    /// `proc_pidpath` gives the real executable name where `proc_name`
+    /// truncates at sixteen characters, but the path is unreadable for another
+    /// user's processes — and a runaway root process is the one worth seeing, so
+    /// a truncated name beats dropping it.
     static func name(for pid: pid_t) -> String {
         // `PROC_PIDPATHINFO_MAXSIZE` is a macro Swift does not import.
         var pathBuffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))

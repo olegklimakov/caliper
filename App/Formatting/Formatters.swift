@@ -33,12 +33,10 @@ enum RateFormatter {
     }
 }
 
-/// Numbers written the way the user's Mac writes them.
-///
-/// `String(format:)` without a locale always produces a full stop, while
-/// `ByteCountFormatter` always follows the region setting — so a panel that
-/// used both put "17.5%" one line above "625,8 MB". Every fractional number
-/// this app prints goes through here or through `ByteCountFormatter`.
+/// Numbers written the way the user's Mac writes them: `String(format:)`
+/// without a locale always produces a full stop while `ByteCountFormatter`
+/// follows the region setting, so a panel using both puts "17.5%" one line above
+/// "625,8 MB".
 enum Decimals {
     static func string(_ format: String, _ value: Double) -> String {
         String(format: format, locale: .current, value)

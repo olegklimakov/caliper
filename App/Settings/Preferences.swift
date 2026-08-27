@@ -9,11 +9,10 @@ import ServiceManagement
 @Observable
 final class Preferences {
     private enum Key {
-        // Not the older `menuBarModules`/`menuBarParts`: what a module stores
-        // now includes whether it is in the menu bar at all, and reading the
-        // old shape under the new rules would take every module for switched
-        // off — an empty strip on first launch. A new name reads as absent and
-        // falls back to the defaults, which is what a format change means.
+        // Not the older `menuBarModules`/`menuBarParts`: a module now stores
+        // whether it is in the menu bar at all, and the old shape read under the
+        // new rules is an empty strip on first launch. A new key reads as absent
+        // and falls back to the defaults.
         static let layout = "menuBarLayout"
         static let order = "menuBarOrder"
         static let combined = "combinedMenuBarItem"
@@ -22,13 +21,9 @@ final class Preferences {
         static let processRetention = "processHistoryRetention"
     }
 
-    /// The whole arrangement of the menu bar: which modules are up there, in
-    /// what order, and which halves of each icon are drawn.
-    ///
     /// Per module rather than one switch for the strip: a CPU sparkline earns
     /// its width for someone watching a build and is dead space to someone who
-    /// only reads the number, and the two are often the same person on
-    /// different days.
+    /// only reads the number.
     var menuBar: MenuBarParts {
         didSet {
             defaults.set(menuBar.stored, forKey: Key.layout)
@@ -39,10 +34,9 @@ final class Preferences {
 
     /// Whether the modules share one status item instead of taking one each.
     ///
-    /// Five items is five click targets and five separate popovers, and on a
-    /// laptop with a notch the bar runs out long before the modules do. One
-    /// item draws the same strip and opens one window onto all of it — at the
-    /// cost of ⌘-drag, which is why the order becomes ours to keep.
+    /// On a laptop with a notch the bar runs out long before the modules do. One
+    /// item draws the same strip and opens one window onto all of it, at the
+    /// cost of ⌘-drag — which is why the order becomes ours to keep.
     var combinesModules: Bool {
         didSet {
             defaults.set(combinesModules, forKey: Key.combined)
@@ -60,11 +54,9 @@ final class Preferences {
         }
     }
 
-    /// Whether the top processes of each bucket are written to the history.
-    ///
-    /// On by default. A history nobody switched on is not there when the thing
-    /// you wanted to explain has already happened — and this is the half of
-    /// "what was going on at 3am" that the metric series cannot answer.
+    /// On by default: a history nobody switched on is not there when the thing
+    /// you wanted to explain has already happened, and this is the half of "what
+    /// was going on at 3am" the metric series cannot answer.
     var recordsProcessHistory: Bool {
         didSet {
             defaults.set(recordsProcessHistory, forKey: Key.processHistory)
@@ -72,11 +64,9 @@ final class Preferences {
         }
     }
 
-    /// How long the minute-resolution process log is kept.
-    ///
-    /// A per-minute record of which applications ran is categorically more
-    /// sensitive than a CPU percentage, even though it never leaves the machine,
-    /// so how long it lives is the user's to set.
+    /// A per-minute record of which applications ran is more sensitive than a
+    /// CPU percentage, even though it never leaves the machine, so how long it
+    /// lives is the user's to set.
     var processRetention: ProcessRetention {
         didSet {
             defaults.set(processRetention.rawValue, forKey: Key.processRetention)
@@ -84,9 +74,8 @@ final class Preferences {
         }
     }
 
-    /// Called after any change lands. A direct callback rather than an
-    /// observation loop: re-arming `withObservationTracking` leaves a window
-    /// between the change and the next arm, where an edit is simply lost.
+    /// A direct callback rather than an observation loop: re-arming
+    /// `withObservationTracking` leaves a window where an edit is lost.
     var onChange: (() -> Void)?
 
     private let defaults: UserDefaults

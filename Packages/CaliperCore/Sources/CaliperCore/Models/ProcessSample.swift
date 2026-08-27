@@ -25,20 +25,17 @@ public struct ProcessSample: Sendable, Codable, Equatable {
 public struct ProcessesSample: Sendable, Codable, Equatable {
     /// When this sweep was taken.
     ///
-    /// A snapshot carries the newest value of every metric rather than only
-    /// what was read on its own tick, so the same process sweep is delivered
-    /// again every second until the next one — up to thirty times when the app
-    /// is hidden. Anything folding these readings into an average has to be
-    /// able to tell a new one from the same one repeated, and only the sampler
-    /// knows which it handed out.
+    /// A snapshot carries the newest value of every metric, not only what was
+    /// read on its own tick, so the same sweep arrives again every second — up
+    /// to thirty times when hidden. Anything averaging these has to tell a new
+    /// one from the same one repeated.
     public let sampledAt: Date
     public let topByCPU: [ProcessSample]
     public let topByMemory: [ProcessSample]
     public let topByDisk: [ProcessSample]
 
-    /// Public because a sweep is something other modules build, not only read:
-    /// the preview harness feeds synthetic ones through the real recorder, and
-    /// the history tests build them to prove the folding is right.
+    /// Public because other modules build sweeps, not only read them: the
+    /// preview harness and the history tests both do.
     public init(
         sampledAt: Date,
         topByCPU: [ProcessSample],

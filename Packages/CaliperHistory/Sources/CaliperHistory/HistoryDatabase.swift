@@ -20,15 +20,13 @@ public enum HistoryDatabase {
         return queue
     }
 
-    /// Where the store lives.
+    /// Where the store lives: the group container for a build that actually
+    /// holds the entitlement, Application Support for everything else.
     ///
-    /// The group container is where it belongs — a sandboxed widget can read
-    /// nothing else — but only for a build that actually holds the entitlement.
-    /// `containerURL(forSecurityApplicationGroupIdentifier:)` hands back a path
-    /// to any caller, entitled or not, and an unentitled process that writes
-    /// there finds the directory wedged: even `readdir` blocks afterwards. So
-    /// the entitlement is checked rather than the path, and everything else
-    /// records to Application Support.
+    /// `containerURL(forSecurityApplicationGroupIdentifier:)` hands a path to
+    /// any caller, entitled or not, and an unentitled process that writes there
+    /// wedges the directory — even `readdir` blocks afterwards. So the
+    /// entitlement is checked rather than the path.
     public static func defaultURL() throws -> URL {
         let directory =
             groupContainer()
@@ -39,8 +37,8 @@ public enum HistoryDatabase {
         guard let directory else {
             throw CocoaError(.fileNoSuchFile)
         }
-        // Not swallowed: a directory that cannot be created turns into an
-        // opaque "unable to open database" a moment later.
+        // Or it turns into an opaque "unable to open database" a moment
+        // later.
         try FileManager.default.createDirectory(
             at: directory,
             withIntermediateDirectories: true
@@ -48,14 +46,11 @@ public enum HistoryDatabase {
         return directory.appendingPathComponent("history.sqlite")
     }
 
-    /// The group container, if this build is signed in a way that actually
-    /// grants it.
+    /// The group container, if this build is signed in a way that grants it.
     ///
-    /// Declaring the entitlement is not enough, and checking only for it is a
-    /// trap: ad-hoc signing embeds the entitlements blob verbatim, so a local
-    /// build claims the group it will never be given. A team identifier is what
-    /// separates a signed build from an ad-hoc one, and only a signed build is
-    /// allowed into the container.
+    /// Checking the entitlement alone is a trap: ad-hoc signing embeds the blob
+    /// verbatim, so a local build claims a group it will never be given. A team
+    /// identifier is what separates a signed build from an ad-hoc one.
     static func groupContainer() -> URL? {
         guard let task = SecTaskCreateFromSelf(nil),
             let groups = SecTaskCopyValueForEntitlement(
@@ -80,8 +75,7 @@ public enum HistoryDatabase {
             let staticCode
         else { return false }
 
-        // The team identifier is only worth reading out of a signature that is
-        // actually valid.
+        // Only worth reading out of a signature that is actually valid.
         guard SecStaticCodeCheckValidity(staticCode, [], nil) == errSecSuccess else {
             return false
         }
@@ -103,21 +97,17 @@ public enum HistoryDatabase {
         configuration.busyMode = .timeout(2)
         configuration.prepareDatabase { db in
             try db.execute(sql: "PRAGMA synchronous = NORMAL")
-            // Must be set before the first table exists, or changing it later
-            // needs a full VACUUM — and without it `incremental_vacuum` is
-            // silently a no-op, so retention would free pages inside the file
-            // that never come back to the filesystem.
+            // Before the first table exists, or changing it later needs a full
+            // VACUUM — and without it `incremental_vacuum` is silently a no-op,
+            // so retention frees pages that never reach the filesystem.
             try db.execute(sql: "PRAGMA auto_vacuum = INCREMENTAL")
         }
         return configuration
     }
 
-    /// One table per tier, each keyed by series and bucket start.
-    ///
-    /// `WITHOUT ROWID` with that composite key stores the row in the index
-    /// itself: for a table that is only ever read as "this series, this time
-    /// range", a separate rowid would be pure overhead in a file meant to hold
-    /// two years of samples.
+    /// One table per tier, keyed by series and bucket start. `WITHOUT ROWID`
+    /// stores the row in the index itself: for a table only ever read as "this
+    /// series, this time range", a rowid is pure overhead.
     static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("tiered samples") { db in
@@ -136,9 +126,8 @@ public enum HistoryDatabase {
                 )
             }
         }
-        // A migration of its own rather than an edit to the one above: a store
-        // already on disk has the first schema recorded as applied, so editing
-        // it in place leaves a table that does not match what the code expects.
+        // Its own migration, not an edit to the one above: a store on disk has
+        // the first schema recorded as applied.
         migrator.registerMigration("sample counts") { db in
             for tier in HistoryTier.allCases {
                 try db.execute(
@@ -149,13 +138,9 @@ public enum HistoryDatabase {
                 )
             }
         }
-        // Which processes were running, keyed the same way and stored as scaled
-        // integers: SQLite varint-encodes a small integer to one or two bytes
-        // where a `DOUBLE` always costs eight, and none of these three needs
-        // three significant digits.
-        //
-        // Names are interned because otherwise `com.apple.WebKit.WebContent` is
-        // written out 2880 times a day.
+        // Scaled integers: SQLite varint-encodes a small integer to one or two
+        // bytes where a `DOUBLE` always costs eight. Names are interned because
+        // otherwise `com.apple.WebKit.WebContent` is written 2880 times a day.
         migrator.registerMigration("process history") { db in
             try db.execute(
                 sql: """

@@ -3,8 +3,6 @@ import CaliperCore
 
 /// Draws the little line charts the menu bar indicators are built from.
 enum Sparkline {
-    /// Strokes `values` across `rect`, scaled to `range`.
-    ///
     /// A fixed range is deliberate for percentages: auto-scaling makes an idle
     /// machine's noise look like a workload.
     static func stroke(
@@ -14,9 +12,9 @@ enum Sparkline {
         lineWidth: CGFloat,
         range: ClosedRange<Double> = 0...1
     ) {
-        // Five minutes of samples into twenty-eight points of width is ten
-        // samples per pixel: nine tenths of the path is invisible, and stroking
-        // it was a measurable share of the app's whole CPU budget.
+        // Five minutes into twenty-eight points is ten samples per pixel: nine
+        // tenths of the path is invisible, and stroking it was a measurable
+        // share of the app's CPU budget.
         let values = Downsample.peaks(of: values, to: Int(rect.width))
         guard values.count > 1 else { return }
 
@@ -41,9 +39,8 @@ enum Sparkline {
         path.stroke()
     }
 
-    /// Fills bars across `rect`, one per value — what the network indicator and
-    /// the per-core strip use, where each sample is its own thing rather than a
-    /// point on a continuous line.
+    /// For the network indicator and the per-core strip, where each sample is
+    /// its own thing rather than a point on a continuous line.
     static func fillBars(
         values: some RandomAccessCollection<Double>,
         in rect: CGRect,
@@ -54,10 +51,9 @@ enum Sparkline {
     ) {
         guard !values.isEmpty else { return }
 
-        // A bar needs a point of its own and a point of gap. Downsampled rather
-        // than truncated, so every module in the strip covers the same span of
-        // time — showing the last ten seconds beside a five-minute line would
-        // invite comparing them.
+        // A bar needs a point of its own and a point of gap. Downsampled, not
+        // truncated, so every module covers the same span — ten seconds beside a
+        // five-minute line would invite comparing them.
         let visible = Downsample.peaks(of: values, to: max(1, Int(rect.width / (1 + spacing))))
         let slot = rect.width / CGFloat(visible.count)
         let barWidth = max(1, slot - spacing)
@@ -85,9 +81,7 @@ enum Sparkline {
 
 extension String {
     /// Right-aligned so a value that loses a digit does not shift its label.
-    ///
-    /// Drawing only ever happens on the main actor — this is called from an
-    /// `NSImage` drawing handler on the status item — so the attribute cache is
+    /// Drawing only happens on the main actor, so the attribute cache is
     /// isolated to it rather than locked.
     @MainActor
     func drawRightAligned(in rect: CGRect, font: NSFont, colour: NSColor) {
@@ -103,12 +97,9 @@ extension String {
     }
 }
 
-/// Reuses the attribute dictionaries the indicators draw with.
-///
-/// There are four of them across the whole strip, and building one per draw
-/// call meant allocating a dictionary several times a second for the life of
-/// the app — the menu bar redraws whenever a value changes, which for a
-/// sparkline is every tick.
+/// Reuses the attribute dictionaries the indicators draw with: there are four
+/// across the whole strip, and one per draw call is a dictionary allocated
+/// several times a second for the life of the app.
 @MainActor
 final class TextAttributes {
     static let shared = TextAttributes()

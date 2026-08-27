@@ -2,14 +2,12 @@ import AppKit
 import CaliperCore
 import CaliperHistory
 
-/// Writes every menu bar indicator, panel and the dashboard pane to PNGs,
-/// drawn from real samples.
+/// Writes every menu bar indicator, panel and the dashboard pane to PNGs, drawn
+/// from real samples.
 ///
-/// The menu bar is the one surface that cannot be inspected from a test: it has
-/// no view hierarchy to query and no window to screenshot without a screen
-/// recording entitlement. Rendering the same images to disk is how the app gets
-/// checked against the mockups — by a person now, and by Phase 5's visual pass
-/// later.
+/// The menu bar cannot be inspected from a test: no view hierarchy to query, and
+/// no window to screenshot without a screen recording entitlement. Rendering the
+/// same images to disk is how it gets checked against the mockups.
 enum UIPreview {
     static let flag = "--preview-ui"
 
@@ -18,9 +16,8 @@ enum UIPreview {
         let snapshots = await coordinator.snapshots()
         await coordinator.start()
 
-        // Enough ticks for the sparklines to have a shape: a single sample
-        // draws nothing, and two draw a straight line that tells you nothing
-        // about how the strip will look in use.
+        // Enough for the sparklines to have a shape: one sample draws nothing
+        // and two draw a straight line.
         let state = await MainActor.run { LiveMetrics() }
         var ticks = 0
         for await snapshot in snapshots {
@@ -122,18 +119,16 @@ enum UIPreview {
                                 write(image, to: url.appendingPathComponent(name))
                             }
                         }
-                        // The whole strip in one item, which is the only place
-                        // the gaps between modules can be judged.
+                        // The only place the gaps between modules show.
                         let combined = CombinedStrip.image(
                             of: MenuBarParts().enabled.map { $0.indicator(parts: MenuBarParts()[$0]) },
                             state: state,
                             style: style
                         )
                         write(combined, to: url.appendingPathComponent("combined-\(suffix)-\(appearance).png"))
-                        // Wearing the update dot. Over the busiest strip
-                        // there is, because the dot has to read as a separate
-                        // mark rather than as one more thing a module drew —
-                        // which is the mistake the first version made.
+                        // The update dot over the busiest strip there is: it
+                        // has to read as a separate mark rather than as one more
+                        // thing a module drew.
                         write(
                             MenuBarBadge.over(combined, style: style),
                             to: url.appendingPathComponent("combined-badged-\(suffix)-\(appearance).png")
@@ -155,12 +150,10 @@ enum UIPreview {
     /// A day of plausible history in a throwaway store, and the moment worth
     /// parking the overview's cursor on.
     ///
-    /// Synthetic rather than whatever this machine happens to have recorded: a
-    /// preview is checked against the mockups, and a dev machine that sat idle
-    /// all night would render five flat lines that say nothing about whether
-    /// the layout works. The shape is a load burst with the temperature
-    /// following it a few buckets late — the correlation the pane exists to
-    /// show.
+    /// Synthetic rather than recorded: a dev machine that sat idle all night
+    /// renders five flat lines that say nothing about the layout. The shape is a
+    /// load burst with the temperature following a few buckets late — the
+    /// correlation the pane exists to show.
     private static func previewHistory() async -> (slice: HistorySlice, cursor: Date, consumers: ProcessBucket?)? {
         let directory = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("caliper-preview-\(UUID().uuidString)", isDirectory: true)
@@ -181,9 +174,7 @@ enum UIPreview {
             let timestamp = end.addingTimeInterval(-Double((buckets - 1 - index) * tier.seconds))
             let phase = Double(index) / Double(buckets)
             let load = exp(-pow((phase - 0.66) * 11, 2))
-            // The die follows the load rather than tracking it: heat arrives
-            // late and leaves slowly, which is exactly what a shared cursor is
-            // for reading.
+            // Heat arrives late and leaves slowly.
             let heat = exp(-pow((phase - 0.71) * 9, 2))
             let ripple = 0.5 + 0.5 * sin(phase * 34)
 
@@ -219,23 +210,18 @@ enum UIPreview {
         return (slice, cursor, await previewConsumers(store: store, reader: reader, at: cursor))
     }
 
-    /// The processes that were running over the bucket the cursor sits on.
-    ///
-    /// Fed through the real recorder rather than written as rows: what is being
-    /// previewed is the readout, and the readout shows what the recorder chose
-    /// to keep — the mean over the bucket, the peak footprint, the top ten by
-    /// each. Building rows by hand here would preview a list this app never
-    /// actually stores.
+    /// Fed through the real recorder rather than written as rows: the readout
+    /// shows what the recorder chose to keep, and hand-built rows would preview
+    /// a list this app never stores.
     private static func previewConsumers(
         store: HistoryStore,
         reader: HistoryReader,
         at cursor: Date
     ) async -> ProcessBucket? {
         let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
-        // The two rankings deliberately disagree. A browser left open holds
-        // gigabytes while using almost no CPU, and a compiler is the other way
-        // round — if the synthetic set ranked the same way by both, the preview
-        // would show two identical columns and prove nothing about the readout.
+        // The two rankings deliberately disagree — a browser holds gigabytes
+        // at no CPU, a compiler the other way round. Ranking alike would show
+        // two identical columns and prove nothing.
         let load: [(String, Double, UInt64)] = [
             ("Xcode", 3.4, 1_100_000_000),
             ("swift-frontend", 2.1, 620_000_000),
@@ -245,8 +231,8 @@ enum UIPreview {
             ("WindowServer", 0.3, 410_000_000),
             ("Telegram", 0.1, 830_000_000),
         ]
-        // Two sweeps inside the one bucket, so the stored numbers are a mean of
-        // more than one reading — which is what the recorder is for.
+        // Two sweeps in one bucket, so the stored numbers are a mean of more
+        // than one reading.
         for offset in [0.0, 15.0] {
             recorder.record(
                 ProcessesSample(
@@ -276,12 +262,9 @@ enum UIPreview {
         defaults: UserDefaults(suiteName: "caliper.preview") ?? .standard
     )
 
-    /// The three shapes a module can be configured into.
-    ///
-    /// Rendered in full, because a half on its own is where the layout can go
-    /// wrong — a number clipped by a width that was measured for two things, a
-    /// five-point gauge sitting against the edge of its item — and the menu bar
-    /// has no view hierarchy to inspect afterwards.
+    /// The three shapes a module can be configured into, rendered in full: a
+    /// half on its own is where the layout goes wrong — a number clipped by a
+    /// width measured for two things, a five-point gauge against its edge.
     private static let partVariants: [(name: String, parts: ModuleParts)] = [
         ("full", ModuleParts(isEnabled: true, graphic: .graph, showsValue: true)),
         ("graph", ModuleParts(isEnabled: true, graphic: .graph, showsValue: false)),
@@ -290,8 +273,8 @@ enum UIPreview {
         ("value", ModuleParts(isEnabled: true, graphic: .off, showsValue: true)),
     ]
 
-    /// Drawn at a scale where the shapes can be judged, and — for template
-    /// images, which are pure alpha — over a mid grey so they are visible at all.
+    /// Scaled up to be judged, and over a mid grey because template images are
+    /// pure alpha.
     @MainActor
     private static func write(
         _ image: NSImage,

@@ -4,48 +4,29 @@ import CaliperHistory
 import Observation
 import SwiftUI
 
-/// Which room of the window is showing.
-///
-/// Held outside the view so that anything can point the window at a section —
-/// the status bar menu is AppKit and cannot reach into a SwiftUI selection, and
-/// "open Settings" has to be a property assignment rather than a message the
-/// view must be persuaded to receive.
+/// Which room of the window is showing. Held outside the view because the
+/// status bar menu is AppKit and cannot reach into a SwiftUI selection.
 @MainActor
 @Observable
 final class DashboardNavigation {
     var section: DashboardSection = .overview
 }
 
-/// The history window, owned by the app rather than by a scene graph.
+/// The history window, owned by the app rather than by a scene graph: SwiftUI
+/// `Window` and `Settings` scenes can only be opened from inside SwiftUI, and
+/// the status bar menu is AppKit.
 ///
-/// It used to be a SwiftUI `Window` scene, and the settings were a `Settings`
-/// scene beside it. Both could only be opened from inside SwiftUI — the panel
-/// footer through `@Environment(\.openWindow)`, the settings through
-/// `showSettingsWindow:` — and the status bar menu, which is AppKit, could
-/// reach neither. That is not a detail: the Settings menu item did nothing at
-/// all, and every setting this app had was unreachable.
-///
-/// Owning the window here gives every caller the same call. The hosting
-/// controller is built on first use and kept: unlike a panel, this window holds
-/// a query and a refresh clock that should survive being closed and reopened.
+/// The hosting controller is built on first use and kept — unlike a panel, this
+/// window holds a query and a refresh clock that should survive a close.
 @MainActor
 final class DashboardWindowController: NSObject, NSWindowDelegate {
-    /// What this window draws from the live snapshot, as opposed to from the
-    /// recorded history.
+    /// What this window draws live rather than out of the history store: the
+    /// sidebar's summary column and the settings room's menu bar previews.
     ///
-    /// Much less than the window's size suggests: every chart and every stat
-    /// card in both panes is read out of the history store. What is live is the
-    /// column of summary numbers down the sidebar, and the settings room, whose
-    /// menu bar previews are the real indicators rendered from the real
-    /// snapshot — every module's, whether or not it is in the strip.
-    ///
-    /// Listed here for the same reason `MenuBarModule.panelMetrics` is listed
-    /// beside `PanelFactory` — it is the bill this window sends the sampler,
-    /// and a stale entry is either a frozen number or CPU spent on a metric
-    /// nobody is reading. Complete rather than pruned to the kinds whose rate
-    /// would actually change: what a surface draws is a fact about the surface,
-    /// and a list that also encodes the cadence table's current numbers would
-    /// have to be revisited every time those move.
+    /// The bill this window sends the sampler, like `MenuBarModule.panelMetrics`
+    /// — a stale entry is a frozen number or CPU spent on nothing. Kept complete
+    /// rather than pruned to the kinds whose rate would actually change, so it
+    /// does not have to be revisited when the cadence table moves.
     static let drawnMetrics: Set<MetricKind> = [
         .cpu, .memory, .network, .diskActivity, .volumes, .sensors,
     ]
@@ -57,13 +38,10 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
     private let preferences: Preferences
     /// What the settings room may do to the recorded history.
     private let historyActions: HistoryActions?
-    /// Whether the app shows a Dock tile and a menu bar. Shared with the
-    /// updater, which puts up windows of its own.
+    /// Shared with the updater, which puts up windows of its own.
     private let activation: ActivationPolicy
-    /// Sparkle, for the settings room's Updates section.
     private let updater: UpdaterService
-    /// Reported so the sampler can run at dashboard rates while the window is
-    /// on screen, and drop back when it is not.
+    /// Lets the sampler run at dashboard rates only while the window is up.
     private let onVisibilityChange: (Bool) -> Void
 
     private var window: NSWindow?
@@ -86,17 +64,14 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
         self.onVisibilityChange = onVisibilityChange
     }
 
-    /// Opens the window at one of its rooms, or brings it forward if it is
-    /// already up.
+    /// Opens the window at one of its rooms, or brings it forward.
     func show(_ section: DashboardSection) {
         navigation.section = section
         let window = window ?? makeWindow()
         self.window = window
 
-        // The Dock icon and the menu bar across the top of the screen belong to
-        // the windows that are showing, not to the app; ActivationPolicy holds
-        // the reasoning and the fact that this window is not the only one that
-        // can ask.
+        // The Dock icon and the menu bar belong to the windows that are
+        // showing, not to the app; see `ActivationPolicy`.
         activation.hold(.dashboard)
         window.makeKeyAndOrderFront(nil)
         onVisibilityChange(true)
@@ -120,29 +95,22 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
                 navigation: navigation
             )
         )
-        // Where the user last left it, and centred the first time.
-        //
-        // `setFrameUsingName` is what says whether there *was* a saved frame.
-        // Testing the origin does not: a titled window built from a zero-origin
-        // content rect comes back at (0, 90) — AppKit has already offset it for
-        // the title bar and constrained it to the visible frame — so a window
-        // that had never been placed would open flush into the bottom-left
-        // corner instead of the middle of the screen.
+        // `setFrameUsingName`'s return is what says whether there *was* a
+        // saved frame. Testing the origin does not: a titled window built from
+        // a zero-origin content rect comes back at (0, 90), already offset for
+        // the title bar.
         if !window.setFrameUsingName("dashboard") {
-            // Sized here rather than by the `contentRect` above: assigning the
-            // hosting controller shrinks the window to what SwiftUI says it
-            // needs, which is the panes' *minimum* — 748 × 612, and a first
-            // launch that opens at the smallest size the window allows.
+            // Not the `contentRect` above: assigning the hosting controller
+            // shrinks the window to the panes' *minimum*, 748 × 612.
             window.setContentSize(NSSize(width: 1000, height: 640))
             window.center()
         }
         window.setFrameAutosaveName("dashboard")
-        // The delegate rather than the view's `onDisappear`: a window that is
-        // closed keeps its view tree, so SwiftUI never reports it gone and the
-        // sampler would stay at dashboard rates for the life of the process.
+        // The delegate rather than the view's `onDisappear`: a closed window
+        // keeps its view tree, so SwiftUI never reports it gone.
         window.delegate = self
-        // Released by us, not by AppKit: the controller keeps the window so its
-        // loaded history survives a close.
+        // The controller keeps the window so its loaded history survives a
+        // close.
         window.isReleasedWhenClosed = false
         return window
     }
@@ -152,17 +120,10 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
         activation.release(.dashboard)
     }
 
-    /// Closing is not the only way a window stops being looked at.
-    ///
-    /// ⌘M and ⌘H leave it open and invisible, and reporting only `willClose`
-    /// would hold the sampler at dashboard rates for the rest of the session.
-    /// Occlusion covers all of those, including another app's window laid over
-    /// this one.
-    /// `isVisible` as well as the occlusion bit, because these arrive
-    /// asynchronously and one can land *after* `windowWillClose` — reporting a
-    /// window that is already gone as visible, and holding the sampler at
-    /// window rates with nothing on screen for the rest of the session. The
-    /// closed window's own answer to `isVisible` is the tie-breaker.
+    /// ⌘M and ⌘H leave a window open and invisible, which `willClose` never
+    /// reports. `isVisible` as well as the occlusion bit: these arrive
+    /// asynchronously and one can land *after* `windowWillClose`, reporting a
+    /// window that is already gone as visible.
     func windowDidChangeOcclusionState(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
         onVisibilityChange(window.isVisible && window.occlusionState.contains(.visible))

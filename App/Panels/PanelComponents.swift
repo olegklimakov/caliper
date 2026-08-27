@@ -1,12 +1,11 @@
 import SwiftUI
 
 /// The pieces every panel is built from, matching the components in
-/// `Caliper.pen`: panel header, section label, metric row, chip.
+/// `Caliper.pen`.
 ///
-/// Colours here are semantic (`.primary`, `.secondary`) rather than the painted
-/// fills of the mockup. The panel sits on the system's `.popover` material, and
-/// semantic colours are what keep it legible through vibrancy and under
-/// Increase Contrast and Reduce Transparency.
+/// Colours are semantic rather than the mockup's painted fills: the panel sits
+/// on the `.popover` material, and only semantic colours stay legible through
+/// vibrancy and under Increase Contrast and Reduce Transparency.
 enum PanelMetrics {
     static let width: CGFloat = 320
     static let padding: CGFloat = 16
@@ -17,9 +16,8 @@ enum PanelMetrics {
 
 /// Title, big value, and up to two chips — the top of every panel.
 struct PanelHeader: View {
-    /// Set only when the panel was opened from the combined window, where the
-    /// title is also the way back. Nothing else in the app has a level above a
-    /// panel to return to.
+    /// Set only from the combined window, where the title is also the way back
+    /// — nothing else has a level above a panel.
     var onBack: (() -> Void)?
     let title: String
     let value: String
@@ -37,9 +35,8 @@ struct PanelHeader: View {
                                 .font(.system(size: 13, weight: .medium))
                             SectionLabel(title)
                         }
-                        // Brighter than the label it replaces: this one can be
-                        // clicked, and the accent colour is not an option over
-                        // a translucent popover.
+                        // Brighter than the label it replaces, because this one
+                        // can be clicked. Not the accent: see the footer.
                         .foregroundStyle(.primary)
                         .contentShape(Rectangle())
                     }
@@ -117,10 +114,9 @@ struct MetricRow: View {
     var fraction: Double?
     var colour: Color = .accentColor
     var barWidth: CGFloat = 68
-    /// Wide enough for the longest value any panel prints. That is "1 022,3 MB"
-    /// at 72 points — measured in this Mac's locale, where a thousands
-    /// separator and a decimal comma both take room the bare "1022.3 MB" does
-    /// not, and where getting it wrong truncates the number to "1 013,4…".
+    /// The longest value any panel prints: "1 022,3 MB" at 72 points, measured
+    /// in a locale with a thousands separator and a decimal comma. Too narrow
+    /// truncates the number to "1 013,4…".
     var valueWidth: CGFloat = 74
 
     var body: some View {
@@ -138,11 +134,10 @@ struct MetricRow: View {
                 .font(.system(size: 13))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
-                // Fixed exactly when there is a bar to keep in line: a column
-                // that grows with its own text puts "637 MB" and "637,4 MB" at
-                // different widths, and every bar in the list then starts at a
-                // different place. Rows without a bar keep their natural width,
-                // because an IP address does not fit in a value column.
+                // Fixed only where there is a bar to keep in line: "637 MB" and
+                // "637,4 MB" at different widths start every bar in a different
+                // place. Rows without one keep their natural width, because an
+                // IP address does not fit a value column.
                 .frame(width: fraction == nil ? nil : valueWidth, alignment: .trailing)
         }
     }
@@ -163,9 +158,8 @@ struct ProportionBar: View {
         }
     }
 
-    /// A minimum of two points so that a small value is still visible as a
-    /// value — but nothing at all at zero, or a stopped fan reads as turning
-    /// slowly next to the word "Off".
+    /// Two points minimum so a small value is still visible — but nothing at
+    /// zero, or a stopped fan reads as turning slowly beside the word "Off".
     private func width(in available: CGFloat) -> CGFloat {
         guard fraction > 0 else { return 0 }
         return max(2, available * min(1, fraction))
@@ -185,10 +179,9 @@ struct ChartCard<Content: View>: View {
     }
 }
 
-/// Tertiary detail on the left, the shared History affordance on the right.
-///
-/// Every panel carries the same affordance in the same place, so "where is the
-/// history" has one answer rather than five.
+/// Tertiary detail on the left, the History affordance on the right. Every
+/// panel carries it in the same place, so "where is the history" has one
+/// answer.
 struct PanelFooter: View {
     let detail: String
     /// Dismisses the popover; opening the window is this view's own business.
@@ -202,17 +195,14 @@ struct PanelFooter: View {
                 .foregroundStyle(.tertiary)
             Spacer()
             Button(action: openHistory) {
-                // A text chevron rather than an SF Symbol: it inherits the
-                // label's metrics, so the affordance never shifts by a point
-                // when the font size changes.
+                // Text rather than an SF Symbol: it inherits the label's
+                // metrics, so it never shifts when the font size changes.
                 Text("History \u{203A}")
                     .font(.system(size: 11, weight: .medium))
-                    // Semantic rather than the accent colour, over a fill of
-                    // its own. A popover is translucent, and the accent is a
-                    // fixed colour that cannot know what is behind it: with a
-                    // blue window under the panel, blue-on-blue left nothing
-                    // to see. The hierarchical styles are vibrant — the
-                    // material blends them against whatever is actually there.
+                    // Semantic, not the accent: a popover is translucent and
+                    // the accent cannot know what is behind it — over a blue
+                    // window, blue-on-blue leaves nothing to see. Hierarchical
+                    // styles are vibrant and blend against what is there.
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)

@@ -13,28 +13,21 @@ protocol MenuBarIndicator {
     /// it, which is why every indicator is handed one when it is made.
     var layout: IndicatorLayout { get }
 
-    /// Everything that will be visible, reduced to a value that compares equal
-    /// when the drawing would be identical. `nil` means the module has nothing
-    /// to show and should disappear.
-    ///
-    /// The controller redraws only when this changes, so a machine sitting at
-    /// the same rounded percentage costs nothing per tick.
+    /// Everything visible, reduced to a value that compares equal when the
+    /// drawing would be identical; `nil` to disappear. The controller redraws
+    /// only when it changes, so a steady reading costs nothing per tick.
     func identity(_ state: LiveMetrics) -> AnyHashable?
 
     func draw(_ state: LiveMetrics, in bounds: CGRect, style: IndicatorStyle)
 
-    /// What the module's symbol is tinted with when it stands in for the live
-    /// drawing — the accent, or whatever severity that drawing would have
-    /// carried.
+    /// The accent, or whatever severity the live drawing would have carried.
     func iconColour(_ state: LiveMetrics) -> NSColor
 
-    /// What VoiceOver reads. The indicator is a drawn image with no text in it,
-    /// so without this the whole module is silent — and it is the only thing
-    /// this app puts on screen when nothing is open.
+    /// The indicator is a drawn image with no text in it, so without this the
+    /// module is silent to VoiceOver.
     func accessibilityLabel(_ state: LiveMetrics) -> String
 }
 
-/// The modules a user can put in the menu bar.
 enum MenuBarModule: String, CaseIterable, Sendable {
     case cpu
     case memory
@@ -45,28 +38,24 @@ enum MenuBarModule: String, CaseIterable, Sendable {
 
 /// What a module draws where its picture goes.
 ///
-/// Three states rather than a switch, because switching the picture off is what
-/// makes the number ambiguous: "8 %" and "65 %" side by side in the menu bar
-/// are two anonymous percentages. The symbol is the cheap way to keep a number
-/// named — twelve points against the sparkline's twenty-eight.
+/// Three states rather than a flag: with the picture off, "8 %" and "65 %" side
+/// by side are two anonymous percentages. The symbol keeps a number named for
+/// twelve points against the sparkline's twenty-eight.
 enum IndicatorGraphic: String, CaseIterable, Sendable {
-    /// The live drawing: a sparkline, a gauge, a severity dot.
+    /// A sparkline, a gauge, a severity dot.
     case graph
     /// The symbol that names the module.
     case icon
     case off
 }
 
-/// What one module puts in the menu bar.
 struct ModuleParts: Equatable, Sendable {
-    /// Whether the module is in the menu bar at all. Here rather than in a list
-    /// of its own: a module's presence and what it draws are the same
-    /// question asked twice, and two answers can disagree.
+    /// Here rather than in a list of its own: a module's presence and what it
+    /// draws are the same question, and two answers can disagree.
     var isEnabled: Bool
     var graphic: IndicatorGraphic
     var showsValue: Bool
 
-    /// What every module drew before any of this was configurable.
     static let shown = ModuleParts(isEnabled: true, graphic: .graph, showsValue: true)
     static let hidden = ModuleParts(isEnabled: false, graphic: .graph, showsValue: true)
 
@@ -80,8 +69,7 @@ struct ModuleParts: Equatable, Sendable {
         self.showsValue = showsValue
     }
 
-    /// Plist-native tokens: whether it is up there, what the picture is, and
-    /// the number if it is drawn.
+    /// Plist-native tokens.
     init(stored: [String]) {
         isEnabled = stored.contains(Self.enabledToken)
         let states = Set([Self.enabledToken, Self.valueToken])
@@ -99,23 +87,15 @@ struct ModuleParts: Equatable, Sendable {
     private static let valueToken = "value"
 }
 
-/// The whole arrangement of the menu bar: which modules are in it, in what
-/// order, and what each of them draws.
-///
-/// Total by construction: every module has an answer here, so nothing that
-/// reads it has to decide what a missing one would mean. The repair, the
-/// defaulting and the shape it is stored in all live in this one type — a fact
-/// kept in one place and defaulted in three is three facts.
+/// The whole arrangement of the menu bar. Total by construction — every module
+/// has an answer here, so nothing that reads it has to decide what a missing one
+/// would mean. Repair, defaulting and storage all live in this one type.
 struct MenuBarParts: Equatable {
     private var parts: [MenuBarModule: ModuleParts]
-    /// Every module, in the order the strip draws them.
-    ///
-    /// All of them, not only the ones switched on: a module that is off still
-    /// has a place in the settings list, and it should come back where it was
-    /// rather than at the end.
+    /// Every module, including the switched-off ones: they still have a place in
+    /// the settings list, and should come back where they were.
     private(set) var order: [MenuBarModule]
 
-    /// The modules in the menu bar, in the order they are drawn.
     var enabled: [MenuBarModule] { order.filter { self[$0].isEnabled } }
 
     init() {
@@ -127,8 +107,7 @@ struct MenuBarParts: Equatable {
         }
     }
 
-    /// Whatever was stored, ignoring anything it cannot use: a module or a
-    /// state this build no longer has, or a module left drawing nothing.
+    /// Whatever was stored, ignoring anything this build cannot use.
     init(stored: [String: [String]], order storedOrder: [String]) {
         self.init()
         let restored = storedOrder.compactMap(MenuBarModule.init(rawValue:))
@@ -151,16 +130,13 @@ struct MenuBarParts: Equatable {
 
     subscript(module: MenuBarModule) -> ModuleParts {
         get { parts[module] ?? .shown }
-        // The one place the "something has to be drawn" rule lives: asking for
-        // no picture with no number gets the number back rather than an empty
-        // status item.
+        // Asking for no picture and no number gets the number back rather than
+        // an empty status item.
         set {
             var parts = newValue
             if !parts.isDrawable { parts.showsValue = true }
-            // And the strip itself cannot be emptied: with nothing in the menu
-            // bar there is no button to right-click, and Settings and Quit live
-            // in that menu — the app would still be running with no way back to
-            // it.
+            // And the strip cannot be emptied: Settings and Quit live in the
+            // right-click menu, so an empty strip is an app with no way back.
             if !parts.isEnabled, enabled == [module] { parts.isEnabled = true }
             self.parts[module] = parts
         }
@@ -171,29 +147,23 @@ struct MenuBarParts: Equatable {
     }
 }
 
-/// Where each half of an indicator goes, and what the whole thing measures.
-///
-/// The picture sits at the leading edge and the value is right-aligned at the
-/// trailing one — which is how all five modules were already drawn. Writing it
-/// down once gives a switched-off half somewhere to take its width from.
+/// Where each half of an indicator goes: picture at the leading edge, value
+/// right-aligned at the trailing one. Written down once so a switched-off half
+/// has somewhere to take its width from.
 @MainActor
 struct IndicatorLayout {
     let parts: ModuleParts
-    /// The module's own drawing — the sparkline's width, the gauge's, the dot's.
+    /// The sparkline's width, the gauge's, the dot's.
     let graphWidth: CGFloat
     let valueWidth: CGFloat
-    /// What separates that drawing from the number.
     let gap: CGFloat
 
     var showsGraph: Bool { parts.graphic == .graph }
     var showsGraphic: Bool { parts.graphic != .off }
     var showsValue: Bool { parts.showsValue }
 
-    /// Points of menu bar this claims.
-    ///
     /// Floored, because a lone graphic can be five points wide — the memory
-    /// gauge is — and a status item that narrow is a click target nobody can
-    /// hit.
+    /// gauge is — and that narrow is a click target nobody can hit.
     var width: CGFloat {
         var total = graphicWidth
         if showsValue {
@@ -203,14 +173,12 @@ struct IndicatorLayout {
         return max(total, MenuBarMetrics.minimumWidth)
     }
 
-    /// Where the module draws its own picture, or `nil` when the slot holds a
-    /// symbol or nothing at all.
     func graph(in bounds: CGRect) -> CGRect? {
         showsGraph ? graphicRect(in: bounds) : nil
     }
 
-    /// Where the module's symbol goes. Drawn the same way for every module,
-    /// which is why it is not the indicator's business.
+    /// Drawn the same way for every module, which is why it is not the
+    /// indicator's business.
     func icon(in bounds: CGRect) -> CGRect? {
         parts.graphic == .icon ? graphicRect(in: bounds) : nil
     }
@@ -248,11 +216,8 @@ struct IndicatorLayout {
 }
 
 extension MenuBarModule {
-    /// The renderer for this module, drawing the halves it was asked for.
-    ///
     /// One factory rather than a table in the status bar controller: the
-    /// settings screen renders the same images to preview them, and two lists
-    /// of which module maps to which indicator would drift.
+    /// settings screen renders the same images to preview them.
     @MainActor
     func indicator(parts: ModuleParts) -> any MenuBarIndicator {
         switch self {
@@ -264,7 +229,7 @@ extension MenuBarModule {
         }
     }
 
-    /// The symbol that names the module when its live drawing is not there.
+    /// Stands in for the live drawing.
     var symbolName: String {
         switch self {
         case .cpu: "cpu"
@@ -275,7 +240,6 @@ extension MenuBarModule {
         }
     }
 
-    /// The colour the module is drawn in, when colour is switched on.
     var accent: NSColor {
         switch self {
         case .cpu: Palette.cpu
@@ -286,10 +250,9 @@ extension MenuBarModule {
         }
     }
 
-    /// What this module's own drawing is called in its settings row. "Graph" is
-    /// wrong for a gauge and for a severity dot, and a settings screen that
-    /// calls every picture the same thing makes you switch one off to find out
-    /// what it was.
+    /// "Graph" is wrong for a gauge and for a severity dot, and a settings
+    /// screen that calls every picture the same thing makes you switch one off
+    /// to find out what it was.
     var graphTitle: String {
         switch self {
         case .memory: "Gauge"
@@ -298,7 +261,6 @@ extension MenuBarModule {
         }
     }
 
-    /// And what its number is called.
     var valueTitle: String {
         switch self {
         case .network, .disk: "Rates"
@@ -314,34 +276,26 @@ extension MenuBarModule {
 struct IndicatorStyle {
     var isTemplate: Bool
 
-    /// The colour to draw a metric's accent in, or black for template images —
-    /// template rendering uses only the alpha channel, so the colour is
-    /// irrelevant there but the shape is not.
+    /// Black for template images: that rendering uses only the alpha channel.
     func accent(_ colour: NSColor) -> NSColor {
         isTemplate ? .black : colour
     }
 
-    /// Secondary content — a sparkline behind a number, an upload line under a
-    /// download one — needs to stay distinguishable in monochrome.
+    /// A sparkline behind a number, an upload line under a download one: it has
+    /// to stay distinguishable in monochrome.
     func secondary(_ colour: NSColor) -> NSColor {
         isTemplate ? NSColor.black.withAlphaComponent(0.55) : colour
     }
 }
 
 extension MenuBarIndicator {
-    /// Points of menu bar width this module claims, whatever the value.
     var width: CGFloat { layout.width }
 
-    /// Most modules have no severity to carry, so their symbol is just the
-    /// module's colour.
+    /// Most modules have no severity to carry.
     func iconColour(_ state: LiveMetrics) -> NSColor { module.accent }
 
-    /// Everything this module puts on screen, drawn into `bounds`.
-    ///
-    /// Separate from `draw` because the symbol is the same drawing for every
-    /// module — done here rather than five times over in the indicators — and
-    /// because the combined item draws each module into a slice of one image
-    /// rather than into an image of its own.
+    /// Separate from `draw`: the symbol is the same drawing for every module,
+    /// and the combined item renders each into a slice of one image.
     func render(_ state: LiveMetrics, in bounds: CGRect, style: IndicatorStyle) {
         if let icon = layout.icon(in: bounds) {
             MenuBarSymbol.draw(module.symbolName, in: icon, colour: style.accent(iconColour(state)))
@@ -349,8 +303,8 @@ extension MenuBarIndicator {
         draw(state, in: bounds, style: style)
     }
 
-    /// Renders at the size the menu bar gives us, letting AppKit ask for the
-    /// backing scale it needs rather than assuming @2x.
+    /// Sized in points, so AppKit asks for the backing scale it needs rather
+    /// than being assumed @2x.
     func makeImage(_ state: LiveMetrics, style: IndicatorStyle) -> NSImage {
         let size = CGSize(width: width, height: MenuBarMetrics.imageHeight)
         let image = NSImage(size: size, flipped: false) { bounds in
@@ -362,15 +316,10 @@ extension MenuBarIndicator {
     }
 }
 
-/// What the strip shows when no module has anything to say: at the cold start,
-/// before the first sample, and on a machine whose every enabled module is
-/// still silent.
-///
-/// Something rather than nothing, because a status item with no image has no
-/// width, and an item with no width cannot be right-clicked — taking the menu
-/// that holds Settings and Quit with it. Both arrangements need it: the
-/// combined item is the only item there is, and separate items can all fall
-/// silent at once.
+/// What the strip shows before the first sample, or when every enabled module
+/// is silent. Something rather than nothing: an item with no image has no
+/// width, and an item with no width cannot be right-clicked — taking Settings
+/// and Quit with it.
 @MainActor
 enum MenuBarPlaceholder {
     static func image(style: IndicatorStyle) -> NSImage {
@@ -386,19 +335,15 @@ enum MenuBarPlaceholder {
     private static let symbol = "gauge.with.dots.needle.bottom.50percent"
 }
 
-/// The dot the strip wears while an update is waiting to be looked at.
+/// The dot the strip wears while an update is waiting.
 ///
-/// In its own space at the trailing edge, not laid over the drawing. The first
-/// attempt put it in the top corner on the theory that no module draws there,
-/// and the temperature module's degree sign proved otherwise — a notice that
-/// eats a digit is worse than no notice, because the strip is read.
-///
-/// The item does get wider while it is showing, which is the one jitter the
-/// fixed widths allow: it happens when an update appears and again when it is
-/// dismissed, not twice a second.
+/// Its own space at the trailing edge, never laid over the drawing: the top
+/// corner collides with the temperature module's degree sign, and a notice that
+/// eats a digit is worse than no notice. The item does get wider while it is up
+/// — the one jitter the fixed widths allow, twice per update rather than twice
+/// a second.
 @MainActor
 enum MenuBarBadge {
-    /// What an item claims on top of its drawing while the dot is up.
     static let width: CGFloat = diameter + gap
 
     static func over(_ image: NSImage, style: IndicatorStyle) -> NSImage {
@@ -415,8 +360,8 @@ enum MenuBarBadge {
             NSBezierPath(ovalIn: dot).fill()
             return true
         }
-        // Template rendering follows the image it extends: a badge that opted
-        // out would be the one coloured thing in a monochrome strip.
+        // Follows the image it extends: a badge that opted out would be the
+        // one coloured thing in a monochrome strip.
         badged.isTemplate = image.isTemplate
         return badged
     }
@@ -425,11 +370,9 @@ enum MenuBarBadge {
     private static let gap: CGFloat = 3
 }
 
-/// The one image the modules share when they share a status item.
-///
-/// Here rather than in the status bar controller because the preview harness
-/// renders the same strip, and a second copy of "how are the modules laid out
-/// side by side" would be a second answer.
+/// The one image the modules share when they share a status item. Here rather
+/// than in the status bar controller because the preview harness renders the
+/// same strip.
 @MainActor
 enum CombinedStrip {
     static func width(of indicators: [any MenuBarIndicator]) -> CGFloat {
@@ -460,7 +403,6 @@ enum CombinedStrip {
     }
 }
 
-/// Draws an SF Symbol into a menu bar indicator.
 @MainActor
 enum MenuBarSymbol {
     static func draw(_ name: String, in rect: CGRect, colour: NSColor) {
@@ -494,8 +436,6 @@ enum MenuBarMetrics {
     /// Narrower than this and the status item stops being clickable, whatever
     /// it has been asked to draw.
     static let minimumWidth: CGFloat = 18
-    /// A symbol standing in for the live drawing, and the air it needs beside
-    /// the number.
     static let iconWidth: CGFloat = 12
     static let iconGap: CGFloat = 4
     /// What separates two modules inside the combined item. Wider than the gap

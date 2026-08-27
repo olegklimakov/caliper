@@ -1,12 +1,9 @@
 import Foundation
 import SwiftUI
 
-/// Every module at a glance, behind the one combined menu bar item.
-///
-/// One window with two levels rather than five popovers: the list answers "how
-/// is the machine", and a row opens the module's own panel in place — the same
-/// panel its own status item would have opened, with its title turned into the
-/// way back.
+/// Every module at a glance, behind the one combined menu bar item. Two levels
+/// rather than five popovers: the list answers "how is the machine", and a row
+/// opens the module's own panel in place, its title turned into the way back.
 struct CombinedPanel: View {
     let metrics: LiveMetrics
     /// Read live rather than captured: the settings screen can be open beside
@@ -15,8 +12,8 @@ struct CombinedPanel: View {
     let openHistory: () -> Void
     let openSettings: () -> Void
 
-    /// Which module the window has been drilled into, if any. State rather than
-    /// a second popover: the window the user opened is the window they keep.
+    /// State rather than a second popover: the window the user opened is the
+    /// window they keep.
     @State private var opened: MenuBarModule?
 
     var body: some View {
@@ -108,9 +105,8 @@ struct CombinedPanel: View {
         }
     }
 
-    /// Since boot, from the process's own clock rather than a sampler: nothing
-    /// polls it, and it is the one number here that changes by the second and
-    /// matters by the day.
+    /// From the process's own clock rather than a sampler: nothing polls it,
+    /// and it changes by the second while mattering by the day.
     private static var uptime: String {
         let seconds = Int(ProcessInfo.processInfo.systemUptime)
         let days = seconds / 86_400
@@ -129,8 +125,7 @@ private struct CombinedRow: View {
         let reading = ModuleReading(module, metrics: metrics)
         HStack(spacing: 8) {
             SectionLabel(module.title)
-                // Wide enough for "NETWORK" on one line: the longest label
-                // decides the column, and a wrapped one makes its row taller
+                // "NETWORK" on one line: a wrapped label makes its row taller
                 // than every other.
                 .lineLimit(1)
                 .frame(width: 66, alignment: .leading)
@@ -203,10 +198,9 @@ private struct RowButtonStyle: ButtonStyle {
         Row(configuration: configuration)
     }
 
-    /// A view of its own rather than `configuration.label` decorated in place.
-    /// SwiftUI installs `@State` storage on views; a `ButtonStyle` is not one,
-    /// so state held there is rebuilt on every render and `onHover` writes into
-    /// nothing — the highlight simply never appears.
+    /// A view of its own rather than `configuration.label` decorated in place:
+    /// SwiftUI installs `@State` storage on views and a `ButtonStyle` is not
+    /// one, so `onHover` writes into storage rebuilt on every render.
     private struct Row: View {
         let configuration: Configuration
         @State private var isHovered = false

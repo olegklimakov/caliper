@@ -18,11 +18,9 @@ public actor SamplingCoordinator {
     /// What the app says is on screen.
     ///
     /// A lock rather than actor state, so the app can set it on the main thread
-    /// the moment a panel opens and be done. Hopping onto the actor took a
-    /// `Task` per change, and two of those — a popover closing as a window
-    /// opens — are two independent jobs the runtime is free to run in either
-    /// order. Losing that race latches the *higher* demand for the life of the
-    /// process, which is the one failure this whole mechanism exists to avoid.
+    /// and be done. Hopping onto the actor takes a `Task` per change, and two of
+    /// those — a popover closing as a window opens — can run in either order,
+    /// latching the *higher* demand for the life of the process.
     private let demand: Mutex<MetricDemand>
 
     private var tickCount: UInt64 = 0
@@ -48,9 +46,9 @@ public actor SamplingCoordinator {
     private var latestDiskActivity: DiskActivitySample?
     private var latestVolumes: [VolumeSample]?
     private var latestConnection: ConnectionSample?
-    /// Holds whatever the last probe found, empty arrays included, so that a
-    /// machine reporting nothing is not mistaken for one that has not been
-    /// sampled yet — which would re-probe on every single tick.
+    /// Holds whatever the last probe found, empty arrays included: a machine
+    /// reporting nothing must not be taken for one not yet sampled, which would
+    /// re-probe every tick.
     private var latestSensors: SensorsSample?
     private var latestDriveHealth: DriveHealth?
     private var latestProcesses: ProcessesSample?
@@ -100,12 +98,9 @@ public actor SamplingCoordinator {
 
     // MARK: - Output
 
-    /// A stream of composed snapshots, one per tick.
-    ///
-    /// Several consumers subscribe at once — menu bar renderers, an open panel
-    /// and the history recorder all watch the same ticks — so each caller gets
-    /// its own stream. Only the newest snapshot is buffered: a consumer that
-    /// falls behind wants current values, not a backlog of stale ones.
+    /// A stream of composed snapshots, one per tick, per caller — the menu bar,
+    /// an open panel and the recorder all watch the same ticks. Only the newest
+    /// is buffered: a consumer that falls behind wants current values.
     public func snapshots() -> AsyncStream<SystemSnapshot> {
         let id = UUID()
         let (stream, continuation) = AsyncStream<SystemSnapshot>.makeStream(
@@ -124,12 +119,9 @@ public actor SamplingCoordinator {
 
     // MARK: - Sampling
 
-    /// Runs a tick from the timer, dropping the ones that bunch up.
-    ///
-    /// Each timer event hops onto the actor as its own task, so a tick that
-    /// overruns its interval — a pid sweep on a loaded machine — leaves the
-    /// next ones queued behind it. Running them back to back would report
-    /// several "seconds" of load inside a few milliseconds.
+    /// Runs a tick from the timer, dropping the ones that bunch up: each event
+    /// hops onto the actor as its own task, so a tick that overruns — a pid
+    /// sweep on a loaded machine — leaves the next ones queued behind it.
     private func timerFired() {
         let now = ContinuousClock.now
         if let lastTick, now - lastTick < Self.baseInterval / 2 { return }
@@ -137,10 +129,8 @@ public actor SamplingCoordinator {
         tick(at: now)
     }
 
-    /// Samples every metric due on this tick and publishes the result.
-    ///
-    /// Internal rather than private so tests can drive ticks directly instead of
-    /// waiting on wall-clock time.
+    /// Internal rather than private so tests can drive ticks directly instead
+    /// of waiting on wall-clock time.
     func tick(at instant: ContinuousClock.Instant = .now) {
         tickCount += 1
 
@@ -218,10 +208,9 @@ public actor SamplingCoordinator {
         )
     }
 
-    /// A machine that reports neither temperatures nor fans gets `nil`, and the
-    /// Sensors feature disappears rather than showing an empty shell. Reporting
-    /// only one of the two is a real state — a fanless Mac has temperatures —
-    /// and is passed through as it is.
+    /// Neither temperatures nor fans gets `nil`, and the Sensors feature
+    /// disappears rather than showing an empty shell. One of the two is a real
+    /// state — a fanless Mac has temperatures — and passes through.
     private func sensors() -> SensorsSample? {
         guard let latestSensors,
             !latestSensors.temperatures.isEmpty || !latestSensors.fans.isEmpty

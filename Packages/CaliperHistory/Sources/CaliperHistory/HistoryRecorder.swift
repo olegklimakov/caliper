@@ -5,14 +5,12 @@ import Synchronization
 /// Folds one-second snapshots into ten-second buckets and writes them in
 /// batches.
 ///
-/// Two reasons not to write every tick. A transaction per second is a disk
-/// wakeup per second, which is exactly the cost this app promises not to have.
-/// And ten-second buckets with min/avg/max lose nothing a chart can draw while
-/// storing a sixth as many rows.
+/// A transaction per tick is a disk wakeup per tick, and ten-second buckets with
+/// min/avg/max lose nothing a chart can draw while storing a sixth as many rows.
 ///
-/// A lock rather than an actor, so the flush that runs when the app is quitting
-/// can be synchronous: `applicationWillTerminate` returns and the process dies,
-/// which is not long enough for an awaited task to finish.
+/// A lock rather than an actor, so the flush at quit can be synchronous:
+/// `applicationWillTerminate` returns and the process dies, which is not long
+/// enough for an awaited task.
 public final class HistoryRecorder: Sendable {
     private let store: HistoryStore
     private let tier = HistoryTier.tenSeconds
@@ -42,12 +40,8 @@ public final class HistoryRecorder: Sendable {
         record(Self.values(of: snapshot), at: snapshot.timestamp)
     }
 
-    /// The numbers, without the snapshot they came out of.
-    ///
-    /// Where the folding actually happens, and the seam the tests drive:
-    /// `SystemSnapshot` has a dozen fields and no public initialiser, so a test
-    /// that had to build one to prove a bucket closes correctly would be a test
-    /// about the wrong thing.
+    /// Where the folding happens, and the seam the tests drive: `SystemSnapshot`
+    /// has a dozen fields and no public initialiser.
     func record(_ values: [MetricSeries: Double], at timestamp: Date) {
         let batch = state.withLock { state -> [HistorySample]? in
             let bucket = tier.bucketStart(of: timestamp)
@@ -75,29 +69,22 @@ public final class HistoryRecorder: Sendable {
         }
     }
 
-    /// Throws away everything held in memory without writing it.
-    ///
     /// What the settings screen's clear needs: emptying the tables while the
-    /// recorder still holds the bucket it is filling and up to a minute of
-    /// pending rows would put part of the record straight back.
+    /// recorder holds a filling bucket and a minute of pending rows puts part of
+    /// the record straight back.
     public func discardPending() {
         state.withLock { state in
             state.open.removeAll(keepingCapacity: false)
             state.openBucket = nil
             state.pending.removeAll(keepingCapacity: false)
         }
-        // And wait for whatever is already on its way to the store. Clearing
-        // the memory alone leaves a batch handed to this queue a moment ago
-        // still in flight, and it would land *after* the delete — which is the
-        // one thing this method promises does not happen.
+        // And wait for what is already on its way: a batch handed to this
+        // queue a moment ago would land *after* the delete.
         writeQueue.sync {}
     }
 
-    /// Writes everything held in memory, including the bucket still filling,
-    /// on the calling thread.
-    ///
-    /// The alternative is losing up to a minute of history every time someone
-    /// logs out.
+    /// Everything in memory, the filling bucket included, on the calling
+    /// thread — otherwise a logout loses up to a minute of history.
     public func flushNow() throws {
         let batch = state.withLock { state -> [HistorySample] in
             if let openBucket = state.openBucket {
