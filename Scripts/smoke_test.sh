@@ -31,6 +31,13 @@ fail() {
 
 [[ -x "$BINARY" ]] || fail "no executable at $BINARY"
 
+# 0. The notice the bundled libraries' licence requires is in the bundle. It is
+#    checked here because nothing else would notice its absence: the settings
+#    sheet falls back to a short summary rather than an empty pane, so a build
+#    that dropped the resource would look fine and ship without the notice.
+[[ -f "$APP/Contents/Resources/NOTICE" ]] || fail "bundle carries no NOTICE"
+echo "ok: third-party notice bundled"
+
 # 1. A snapshot, quickly, with the metrics that matter in it.
 START=$(date +%s)
 SNAPSHOT=$("$BINARY" --selftest) || fail "--selftest exited non-zero"

@@ -109,9 +109,30 @@ only installs an update this repository actually signed.
 
 ## Source
 
-The source lives in a separate private repository. This one exists so that the
-update channel stays public and stable whatever happens to the source: an
-installed copy keeps updating even if the code never opens.
+The source lives here, MIT-licensed, in the same repository as the update
+channel — so an installed copy keeps updating whatever happens to the code, and
+there is one place to publish a release rather than two to keep in step.
 
 Bugs and requests are welcome in
 [Issues](https://github.com/olegklimakov/caliper/issues).
+
+## What it is built on
+
+Caliper stands on work other people gave away. [NOTICE](NOTICE) names every
+piece of it, with its copyright and its licence.
+
+Two of them ship inside the app: [GRDB.swift](https://github.com/groue/GRDB.swift)
+is the SQLite under the history store, and
+[Sparkle](https://github.com/sparkle-project/Sparkle) is the update mechanism.
+Both are MIT.
+
+The third is not in the app and is owed a mention anyway.
+[Stats](https://github.com/exelban/stats) is the open-source monitor most people
+reading this already have installed, and it is MIT too. Caliper shares no code
+with it and is an independent implementation, but it is read as a reference —
+chiefly for the SMC and IOHID sensor keys that every Apple SoC generation
+renames, which Stats has been accumulating since 2020, and for the failure modes
+its changelog has already paid for. If any of that ends up in a file here, that
+file will carry their copyright above ours and NOTICE will say what was taken:
+the MIT licence grants everything it grants on one condition, which is that the
+notice travels with the copy.

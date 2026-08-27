@@ -35,6 +35,7 @@ struct SettingsPane: View {
     @State private var loginError: String?
     @State private var confirming: Deletion?
     @State private var deleteError: String?
+    @State private var showingAcknowledgements = false
     /// Read on appear and after either delete, not on every render: it is a
     /// file-attribute call, and the only moments it can change are those.
     @State private var storeSize: UInt64 = 0
@@ -192,8 +193,31 @@ struct SettingsPane: View {
             }
 
             updates
+            about
         }
         .formStyle(.grouped)
+        .sheet(isPresented: $showingAcknowledgements) {
+            AcknowledgementsSheet { showingAcknowledgements = false }
+        }
+    }
+
+    // MARK: - About
+
+    /// Where the third-party notices are reachable from.
+    ///
+    /// Not decoration: GRDB is linked into the binary and Sparkle ships beside
+    /// it, both under a licence whose one condition is that its notice reaches
+    /// whoever holds the copy. A file in the repository does not reach the
+    /// person who downloaded a disk image; this does.
+    private var about: some View {
+        Section("About") {
+            Text(
+                "Caliper is open source under the MIT licence, and is built on GRDB.swift and Sparkle, which are too."
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            Button("Acknowledgements…") { showingAcknowledgements = true }
+        }
     }
 
     // MARK: - Updates
