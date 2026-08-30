@@ -6,33 +6,30 @@ import Darwin
 /// with the same call it uses for every other process and can show the number
 /// rather than claim it.
 struct SelfMetricsSampler {
-    private var previousCPUTime: UInt64?
-    private var previousDiskBytes: UInt64?
+    private var previous: ResourceUsage.Counters?
     private var window = RateWindow()
 
     mutating func sample(at instant: ContinuousClock.Instant) -> SelfMetrics? {
         guard let counters = ResourceUsage.counters(for: getpid()) else { return nil }
-        let disk = counters.bytesRead &+ counters.bytesWritten
-        defer {
-            previousCPUTime = counters.cpuTime
-            previousDiskBytes = disk
-        }
+        defer { previous = counters }
 
         // The window advances first: short-circuiting past it on the very first
         // call would cost an extra tick before any reading appears.
         let seconds = window.advance(to: instant)
-        guard let previousCPUTime, let seconds else { return nil }
+        guard let previous, let seconds else { return nil }
 
+        let disk = counters.bytesRead &+ counters.bytesWritten
+        let diskBefore = previous.bytesRead &+ previous.bytesWritten
         return SelfMetrics(
-            cpu: Double(counters.cpuTime.subtractingClamped(previousCPUTime)) / 1e9 / seconds,
+            cpu: Double(counters.cpuTime.subtractingClamped(previous.cpuTime)) / 1e9 / seconds,
             memoryFootprint: counters.physicalFootprint,
-            diskRate: Double(disk.subtractingClamped(previousDiskBytes ?? disk)) / seconds
+            diskRate: Double(disk.subtractingClamped(diskBefore)) / seconds,
+            power: Double(counters.energy.subtractingClamped(previous.energy)) / 1e9 / seconds
         )
     }
 
     mutating func resetBaseline() {
-        previousCPUTime = nil
-        previousDiskBytes = nil
+        previous = nil
         window.reset()
     }
 }

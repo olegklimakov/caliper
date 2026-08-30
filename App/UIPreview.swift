@@ -243,11 +243,17 @@ enum UIPreview {
                             name: entry.0,
                             cpu: entry.1 * (offset == 0 ? 1.1 : 0.9),
                             memoryFootprint: entry.2,
-                            diskRate: 0
+                            diskRate: 0,
+                            power: 0,
+                            wakeupsPerSecond: 0,
+                            performanceCycleShare: nil,
+                            qos: nil
                         )
                     },
                     topByMemory: [],
-                    topByDisk: []
+                    topByDisk: [],
+                    topByPower: [],
+                    unreadableCount: 0
                 )
             )
         }
