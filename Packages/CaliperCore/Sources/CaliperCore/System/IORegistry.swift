@@ -37,7 +37,6 @@ enum IORegistry {
     /// releasing each afterwards. Returns false when the registry changed
     /// mid-walk and the iteration is incomplete — the caller must not act on
     /// what it saw, or entries the walk never reached read as gone.
-    @discardableResult
     static func forEachChild(
         of entry: io_registry_entry_t,
         _ body: (io_registry_entry_t) -> Void
@@ -60,7 +59,6 @@ enum IORegistry {
         return IOIteratorIsValid(iterator) != 0
     }
 
-    /// The entry's IOKit class name.
     static func className(_ entry: io_registry_entry_t) -> String? {
         IOObjectCopyClass(entry)?.takeRetainedValue() as String?
     }

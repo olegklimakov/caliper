@@ -19,7 +19,11 @@ struct GPUProcessSampler {
             isAvailable = false
             return
         }
-        isAvailable = !(Self.readClients() ?? []).isEmpty
+        // One retry: a walk invalidated by launch-time registry churn is not
+        // "this Mac has no accelerator", and the probe's verdict lasts the
+        // whole session.
+        let probe = Self.readClients() ?? Self.readClients()
+        isAvailable = !(probe ?? []).isEmpty
     }
 
     mutating func sample() -> GPUSample? {
@@ -138,11 +142,16 @@ struct GPUTimeAccumulator {
     ) -> [pid_t: UInt64] {
         // A changed start time means the pid was reused; the predecessor's
         // state has to go before the retirement pass folds it into the
-        // newborn.
+        // newborn. nil is "could not read", not "different process": treating
+        // it as a new identity would let one refused call destroy a live
+        // pid's history and hand back a total that went *down* — the exact
+        // lie this type exists to rule out. A stored nil meeting a real start
+        // time is still reuse, because a process's readability is fixed at
+        // exec: the pid can only have changed hands.
         for pid in Set(sweep.map(\.pid)) {
             let start = identity(pid)
             if let known = totals[pid] {
-                if known.startTime != start {
+                if let start, known.startTime != start {
                     totals[pid] = Total(startTime: start, retired: 0)
                     clients = clients.filter { $0.value.pid != pid }
                 }
@@ -177,7 +186,10 @@ struct GPUTimeAccumulator {
             liveTime[client.pid, default: 0] &+= client.maxTime
         }
         totals = totals.filter { pid, total in
-            liveTime[pid] != nil || (isAlive(pid) && identity(pid) == total.startTime)
+            guard liveTime[pid] == nil else { return true }
+            guard isAlive(pid) else { return false }
+            let start = identity(pid)
+            return start == nil || start == total.startTime
         }
 
         var cumulative: [pid_t: UInt64] = [:]
