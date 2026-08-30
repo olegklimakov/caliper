@@ -38,6 +38,7 @@ public actor SamplingCoordinator {
     private let fanSampler = FanSampler()
     private let driveHealthSampler = DriveHealthSampler()
     private var processSampler = ProcessSampler()
+    private var gpuSampler = GPUProcessSampler()
     private var selfSampler = SelfMetricsSampler()
 
     private var latestCPU: CPUSample?
@@ -52,6 +53,8 @@ public actor SamplingCoordinator {
     private var latestSensors: SensorsSample?
     private var latestDriveHealth: DriveHealth?
     private var latestProcesses: ProcessesSample?
+    /// Holds an empty sweep too, for the same reason as `latestSensors`.
+    private var latestGPU: GPUSample?
     private var latestSelfMetrics: SelfMetrics?
 
     /// Base tick of the whole app. Everything slower is a multiple of this.
@@ -178,6 +181,12 @@ public actor SamplingCoordinator {
         {
             latestProcesses = processes
         }
+        if gpuSampler.isAvailable,
+            shouldSample(.gpu, hasValue: latestGPU != nil),
+            let gpu = gpuSampler.sample()
+        {
+            latestGPU = gpu
+        }
         if shouldSample(.selfMetrics, hasValue: latestSelfMetrics != nil),
             let metrics = selfSampler.sample(at: instant)
         {
@@ -204,8 +213,16 @@ public actor SamplingCoordinator {
             sensors: sensors(),
             driveHealth: latestDriveHealth,
             processes: latestProcesses,
+            gpu: gpu(),
             selfMetrics: latestSelfMetrics
         )
+    }
+
+    /// The GPU feature disappears rather than showing an empty shell — the
+    /// same rule as `sensors()`.
+    private func gpu() -> GPUSample? {
+        guard let latestGPU, !latestGPU.processes.isEmpty else { return nil }
+        return latestGPU
     }
 
     /// Neither temperatures nor fans gets `nil`, and the Sensors feature
@@ -227,6 +244,9 @@ public actor SamplingCoordinator {
         diskSampler.resetBaseline()
         processSampler.resetBaseline()
         selfSampler.resetBaseline()
+        // The GPU sampler is deliberately absent: its totals are cumulative,
+        // not rates, and clearing them on wake would forget every vanished
+        // client's time.
         lastTick = nil
     }
 

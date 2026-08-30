@@ -14,6 +14,8 @@ public enum MetricKind: String, Sendable, CaseIterable, Codable {
     /// Drive wear and SMART counters.
     case driveHealth
     case processes
+    /// GPU time per process, from the accelerator's user clients.
+    case gpu
     case selfMetrics
 }
 
@@ -55,6 +57,11 @@ public enum CadenceTable {
         case .volumes, .connection: (10, 30, 60)
         // A full pid sweep, one syscall per process.
         case .processes: (3, 10, 30)
+        // Measured on an M5 Pro: 1.14 ms a sweep, cheaper than the pid sweep.
+        // Nothing draws GPU until a surface asks for it, and nothing folds it
+        // into history, so off screen it runs at drive-health rarity — the
+        // closest this table comes to "never".
+        case .gpu: (3, 600, 600)
         // Measured on an M5 Pro: a full sweep costs 29 ms, and 25 of those are
         // the fourteen SoC die sensors at 1.8 ms each — the most expensive read
         // in the app by an order of magnitude, and worth two seconds only where

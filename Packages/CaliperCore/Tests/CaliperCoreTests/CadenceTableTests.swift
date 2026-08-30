@@ -36,6 +36,17 @@ import Testing
     #expect(CadenceTable.interval(for: .processes, demand: sensorsPanel) == 10)
 }
 
+/// "Never in the hidden rung" is not expressible in a divisor table, so the
+/// GPU sweep runs at drive-health rarity off screen — pinned so it cannot
+/// silently drift into a background cost.
+@Test func gpuRunsWithTheProcessSweepOnlyWhileDrawn() {
+    let gpuSurface = MetricDemand(isVisible: true, metrics: [.gpu])
+
+    #expect(CadenceTable.interval(for: .gpu, demand: gpuSurface) == 3)
+    #expect(CadenceTable.interval(for: .gpu, demand: .menuBar) == 600)
+    #expect(CadenceTable.interval(for: .gpu, demand: .hidden) == 600)
+}
+
 @Test func everyIntervalIsAWholeNumberOfBaseTicks() {
     let demands: [MetricDemand] = [.hidden, .menuBar, .everything]
     for kind in MetricKind.allCases {

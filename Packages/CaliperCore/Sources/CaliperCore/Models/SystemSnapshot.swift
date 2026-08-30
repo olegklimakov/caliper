@@ -21,6 +21,7 @@ public struct SystemSnapshot: Sendable, Codable, Equatable {
     /// sensor interfaces do not.
     public let driveHealth: DriveHealth?
     public let processes: ProcessesSample?
+    public let gpu: GPUSample?
     public let selfMetrics: SelfMetrics?
 
     /// Stable JSON used by `Caliper --selftest` and by accuracy checks against
