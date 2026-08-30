@@ -33,6 +33,38 @@ enum IORegistry {
         return body(parent)
     }
 
+    /// Calls `body` for every descendant of `entry` in the service plane,
+    /// releasing each afterwards. Returns false when the registry changed
+    /// mid-walk and the iteration is incomplete — the caller must not act on
+    /// what it saw, or entries the walk never reached read as gone.
+    @discardableResult
+    static func forEachChild(
+        of entry: io_registry_entry_t,
+        _ body: (io_registry_entry_t) -> Void
+    ) -> Bool {
+        var iterator: io_iterator_t = 0
+        guard
+            IORegistryEntryCreateIterator(
+                entry,
+                kIOServicePlane,
+                IOOptionBits(kIORegistryIterateRecursively),
+                &iterator
+            ) == KERN_SUCCESS
+        else { return false }
+        defer { IOObjectRelease(iterator) }
+
+        while case let child = IOIteratorNext(iterator), child != 0 {
+            body(child)
+            IOObjectRelease(child)
+        }
+        return IOIteratorIsValid(iterator) != 0
+    }
+
+    /// The entry's IOKit class name.
+    static func className(_ entry: io_registry_entry_t) -> String? {
+        IOObjectCopyClass(entry)?.takeRetainedValue() as String?
+    }
+
     static func entryID(_ entry: io_registry_entry_t) -> UInt64? {
         var id: UInt64 = 0
         return IORegistryEntryGetRegistryEntryID(entry, &id) == KERN_SUCCESS ? id : nil
@@ -58,5 +90,9 @@ enum IORegistry {
 
     static func dictionary(_ entry: io_registry_entry_t, _ key: String) -> [String: Any]? {
         property(entry, key) as? [String: Any]
+    }
+
+    static func dictionaries(_ entry: io_registry_entry_t, _ key: String) -> [[String: Any]]? {
+        property(entry, key) as? [[String: Any]]
     }
 }

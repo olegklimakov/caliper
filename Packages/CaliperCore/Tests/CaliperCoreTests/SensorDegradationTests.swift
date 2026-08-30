@@ -48,18 +48,14 @@ struct SensorAvailability {
         guard sampler.isAvailable else { return }
 
         _ = sampler.sample()
-        guard let start = ResourceUsage.counters(for: getpid()) else {
-            Issue.record("could not read this process's own footprint")
-            return
-        }
 
-        // A full sweep costs about 29 ms, so this is kept to a few seconds.
-        for _ in 0..<200 {
-            _ = sampler.sample()
+        // A full sweep costs about 29 ms, so each round is kept to a few
+        // seconds.
+        let growth = footprintGrowth(under: 2_000_000) {
+            for _ in 0..<200 {
+                _ = sampler.sample()
+            }
         }
-
-        guard let end = ResourceUsage.counters(for: getpid()) else { return }
-        let growth = Int64(end.physicalFootprint) - Int64(start.physicalFootprint)
         // Twenty-odd sensors two hundred times over: an unbalanced retain would
         // strand thousands of objects, well past this slack.
         #expect(growth < 2_000_000, "footprint grew by \(growth) bytes")
