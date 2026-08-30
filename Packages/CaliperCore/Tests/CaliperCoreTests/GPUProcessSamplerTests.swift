@@ -98,6 +98,40 @@ private func alwaysAlive(_ pid: pid_t) -> Bool { true }
     #expect(reborn[42] == 20)
 }
 
+@Test func aRefusedReadDoesNotResetALivePid() {
+    var accumulator = GPUTimeAccumulator()
+    _ = accumulator.fold([observation(1, pid: 42, time: 500)], identity: { _ in 100 }, isAlive: alwaysAlive)
+
+    // One refused rusage call is "could not read", not "different process";
+    // treating it as reuse would hand back a total that went down.
+    let flapped = accumulator.fold(
+        [observation(1, pid: 42, time: 600)],
+        identity: { _ in nil },
+        isAlive: alwaysAlive
+    )
+    #expect(flapped[42] == 600)
+
+    let recovered = accumulator.fold(
+        [observation(1, pid: 42, time: 700)],
+        identity: { _ in 100 },
+        isAlive: alwaysAlive
+    )
+    #expect(recovered[42] == 700)
+}
+
+@Test func aPidThatBecomesReadableHasChangedHands() {
+    var accumulator = GPUTimeAccumulator()
+    // Readability is fixed at exec, so a start time appearing where none was
+    // readable before means the pid was reused.
+    _ = accumulator.fold([observation(1, pid: 42, time: 400)], identity: { _ in nil }, isAlive: alwaysAlive)
+    let reborn = accumulator.fold(
+        [observation(7, pid: 42, time: 25)],
+        identity: { _ in 300 },
+        isAlive: alwaysAlive
+    )
+    #expect(reborn[42] == 25)
+}
+
 @Test func anUnreadablePidStillAccumulates() {
     var accumulator = GPUTimeAccumulator()
     // WindowServer: the kernel refuses its start time, so identity degrades
@@ -136,8 +170,15 @@ private func alwaysAlive(_ pid: pid_t) -> Bool { true }
             Issue.record("an available sampler should produce a sweep")
             return
         }
-        #expect(!first.processes.isEmpty)
-        #expect(first.processes == first.processes.sorted { $0.gpuTime > $1.gpuTime })
+        // A machine whose clients all read zero has nothing to rank; that is
+        // a pass, like a Mac with no sensors.
+        guard !first.processes.isEmpty else { return }
+        // Non-strict order: Swift's sort is not stable, so an exact tie may
+        // sit either way round.
+        #expect(
+            zip(first.processes, first.processes.dropFirst())
+                .allSatisfy { $0.gpuTime >= $1.gpuTime }
+        )
         #expect(first.processes.allSatisfy { !$0.name.isEmpty && $0.gpuTime > 0 })
 
         guard let second = sampler.sample() else {
@@ -164,14 +205,15 @@ private func alwaysAlive(_ pid: pid_t) -> Bool { true }
         // The pool per iteration is what the dispatch queue provides in
         // production; without it the bridged collections pile up until the
         // test ends and 200 sweeps read as a 3.5 MB "leak" that is not one.
-        let growth = footprintGrowth(under: 2_000_000) {
+        let budget: Int64 = 2_000_000
+        let growth = footprintGrowth(under: budget) {
             for _ in 0..<200 {
                 autoreleasepool {
                     _ = sampler.sample()
                 }
             }
         }
-        #expect(growth < 2_000_000, "footprint grew by \(growth) bytes")
+        #expect(growth < budget, "footprint grew by \(growth) bytes")
     }
 
     @Test func hidesGPUWhenTheSweepIsRefused() async {

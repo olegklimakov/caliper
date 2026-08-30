@@ -50,15 +50,15 @@ struct SensorAvailability {
         _ = sampler.sample()
 
         // A full sweep costs about 29 ms, so each round is kept to a few
-        // seconds.
-        let growth = footprintGrowth(under: 2_000_000) {
+        // seconds. Twenty-odd sensors two hundred times over: an unbalanced
+        // retain would strand thousands of objects, well past this slack.
+        let budget: Int64 = 2_000_000
+        let growth = footprintGrowth(under: budget) {
             for _ in 0..<200 {
                 _ = sampler.sample()
             }
         }
-        // Twenty-odd sensors two hundred times over: an unbalanced retain would
-        // strand thousands of objects, well past this slack.
-        #expect(growth < 2_000_000, "footprint grew by \(growth) bytes")
+        #expect(growth < budget, "footprint grew by \(growth) bytes")
     }
 
     /// PRD §6 asks for graceful degradation to be *proven*, not assumed: with
