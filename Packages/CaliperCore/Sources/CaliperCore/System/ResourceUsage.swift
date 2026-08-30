@@ -20,11 +20,9 @@ enum ResourceUsage {
         ticks * UInt64(timebase.numer) / UInt64(timebase.denom)
     }
 
-    /// CPU time per QoS tier, in nanoseconds.
-    ///
-    /// All-zero means the process does not report QoS accounting at all —
-    /// about one in nine does not — which is "no data", not "everything at
-    /// default QoS".
+    /// CPU time per QoS tier, in nanoseconds. All-zero means the process does
+    /// not report QoS accounting at all; `ProcessSample.qos` carries what that
+    /// implies.
     struct QoSTime {
         let userInteractive: UInt64
         let userInitiated: UInt64
@@ -52,23 +50,18 @@ enum ResourceUsage {
         /// started — the same counters Activity Monitor's Disk tab shows.
         let bytesRead: UInt64
         let bytesWritten: UInt64
-        /// Nanojoules the SoC's own accounting charges this process — the CPU
-        /// clusters' energy, not a measurement at the plug and not GPU or
-        /// display. A delta over an interval is a wattage anyone can check
-        /// against `powermetrics`.
+        /// Nanojoules the SoC's own accounting charges this process; what that
+        /// number does and does not count is documented on
+        /// `ProcessSample.power`.
         let energy: UInt64
         /// The share of `energy` spent on the performance clusters.
         let pEnergy: UInt64
         let cycles: UInt64
-        /// Cycles retired on the performance clusters. "p" is the kernel's own
-        /// designation; the cluster *names* vary by machine — this M5 Pro
-        /// calls its levels "Super" and "Performance", with no "Efficiency"
-        /// level at all — so nothing here says "E-core".
+        /// Cycles retired on the performance clusters.
         let pCycles: UInt64
         let instructions: UInt64
         let qosTime: QoSTime
-        /// Times the package was pulled out of idle for this process — what
-        /// drains a battery at low CPU.
+        /// Times the package was pulled out of idle for this process.
         let idleWakeups: UInt64
         let interruptWakeups: UInt64
         /// `ri_proc_start_abstime`, kept in raw mach absolute units: it is an

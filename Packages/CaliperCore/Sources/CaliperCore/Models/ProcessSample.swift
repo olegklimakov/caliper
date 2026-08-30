@@ -107,8 +107,7 @@ public struct ProcessesSample: Sendable, Codable, Equatable {
     /// Pids whose counters the kernel refused — other users' processes, about
     /// a quarter of the machine, plus the few that exited between the pid
     /// sweep and the read. They carry no numbers, so no list can rank them;
-    /// this count is the sweep saying "and this many I could not read"
-    /// instead of pretending they cost nothing.
+    /// the count says how many, because a zero would be a claim.
     public let unreadableCount: Int
 
     /// Public because other modules build sweeps, not only read them: the

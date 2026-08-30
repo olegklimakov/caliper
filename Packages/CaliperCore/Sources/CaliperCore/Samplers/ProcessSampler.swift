@@ -25,11 +25,12 @@ struct ProcessSampler {
 
         for index in 0..<count {
             let pid = pids[index]
-            guard pid > 0 else { continue }
+            guard pid > 0 else {
+                // pid 0 is kernel_task, refused like every root-owned pid.
+                unreadableCount += 1
+                continue
+            }
             guard let counters = ResourceUsage.counters(for: pid) else {
-                // Root-owned pids refuse the call — about a quarter of the
-                // machine — and a process that exited between the pid sweep
-                // and this read lands here too.
                 unreadableCount += 1
                 continue
             }
@@ -122,19 +123,19 @@ struct ProcessSampler {
         if counters.qosTime.total == 0 {
             qos = nil
         } else {
-            func share(_ bucket: KeyPath<ResourceUsage.QoSTime, UInt64>) -> Double {
+            func coreShare(_ bucket: KeyPath<ResourceUsage.QoSTime, UInt64>) -> Double {
                 let delta = counters.qosTime[keyPath: bucket]
                     .subtractingClamped(baseline.qosTime[keyPath: bucket])
                 return Double(delta) / 1e9 / seconds
             }
             qos = QoSBreakdown(
-                userInteractive: share(\.userInteractive),
-                userInitiated: share(\.userInitiated),
-                defaultTier: share(\.defaultTier),
-                legacy: share(\.legacy),
-                utility: share(\.utility),
-                background: share(\.background),
-                maintenance: share(\.maintenance)
+                userInteractive: coreShare(\.userInteractive),
+                userInitiated: coreShare(\.userInitiated),
+                defaultTier: coreShare(\.defaultTier),
+                legacy: coreShare(\.legacy),
+                utility: coreShare(\.utility),
+                background: coreShare(\.background),
+                maintenance: coreShare(\.maintenance)
             )
         }
 
