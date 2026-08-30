@@ -14,7 +14,17 @@ private func process(
     footprint: UInt64 = 0,
     disk: Double = 0
 ) -> ProcessSample {
-    ProcessSample(pid: 1, name: name, cpu: cpu, memoryFootprint: footprint, diskRate: disk)
+    ProcessSample(
+        pid: 1,
+        name: name,
+        cpu: cpu,
+        memoryFootprint: footprint,
+        diskRate: disk,
+        power: 0,
+        wakeupsPerSecond: 0,
+        performanceCycleShare: nil,
+        qos: nil
+    )
 }
 
 private func sweep(at date: Date, _ samples: [ProcessSample]) -> ProcessesSample {
@@ -22,7 +32,9 @@ private func sweep(at date: Date, _ samples: [ProcessSample]) -> ProcessesSample
         sampledAt: date,
         topByCPU: samples.sorted { $0.cpu > $1.cpu },
         topByMemory: samples.sorted { $0.memoryFootprint > $1.memoryFootprint },
-        topByDisk: samples.filter { $0.diskRate > 0 }
+        topByDisk: samples.filter { $0.diskRate > 0 },
+        topByPower: [],
+        unreadableCount: 0
     )
 }
 
