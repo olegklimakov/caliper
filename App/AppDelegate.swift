@@ -122,7 +122,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
             statusItemController?.setColoured(preferences.colouredIndicators)
             processRecorder?.setEnabled(preferences.recordsProcessHistory)
+            processRecorder?.setPinned(preferences.pinnedProcesses)
         }
+        processRecorder?.setPinned(preferences.pinnedProcesses)
         self.statusItemController = statusItemController
         self.panels = panels
 
@@ -141,6 +143,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // folded; a snapshot carries the newest one every tick.
                 if let processes = snapshot.processes {
                     processRecorder?.record(processes)
+                    // Recomputed from the bucket that just closed, so a name
+                    // that fell out of every ranking is asked for by name on
+                    // the next sweep rather than vanishing from the record.
+                    if let watching = processRecorder?.watching {
+                        coordinator.setWatching(watching)
+                    }
                 }
             }
         }

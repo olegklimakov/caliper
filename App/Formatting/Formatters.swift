@@ -98,6 +98,17 @@ enum PowerFormatter {
     }
 }
 
+/// Energy over a span, in the units a battery is talked about in. Joules below
+/// a watt-hour, because "0,00 Wh" for a background daemon says nothing about
+/// whether it drew a joule or three thousand.
+enum EnergyFormatter {
+    static func string(_ joules: Double) -> String {
+        joules < 3600
+            ? Decimals.string("%.0f J", joules)
+            : Decimals.string("%.1f Wh", joules / 3600)
+    }
+}
+
 enum DurationFormatter {
     /// "3 h 12 m", "48 m", "12 s" — the resolution a "running for" needs.
     static func brief(_ seconds: TimeInterval) -> String {

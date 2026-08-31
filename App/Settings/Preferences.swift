@@ -19,6 +19,7 @@ final class Preferences {
         static let coloured = "colouredIndicators"
         static let processHistory = "recordProcessHistory"
         static let processRetention = "processHistoryRetention"
+        static let pinnedProcesses = "pinnedProcesses"
     }
 
     /// Per module rather than one switch for the strip: a CPU sparkline earns
@@ -74,6 +75,36 @@ final class Preferences {
         }
     }
 
+    /// Names recorded every bucket whatever they rank — the only way a
+    /// process's history has no ambiguous gaps in it.
+    ///
+    /// Cheap but not free: a pinned name costs around 0.7 MB over a fortnight,
+    /// against the ~15 MB the rankings already take, so the list is bounded
+    /// rather than open.
+    private(set) var pinnedProcesses: Set<String> {
+        didSet {
+            defaults.set(Array(pinnedProcesses), forKey: Key.pinnedProcesses)
+            onChange?()
+        }
+    }
+
+    static let pinLimit = 10
+
+    /// Refuses rather than silently dropping the eleventh: the card has to be
+    /// able to say why nothing happened.
+    @discardableResult
+    func setPinned(_ isPinned: Bool, for name: String) -> Bool {
+        guard isPinned else {
+            pinnedProcesses.remove(name)
+            return true
+        }
+        guard pinnedProcesses.count < Self.pinLimit || pinnedProcesses.contains(name) else {
+            return false
+        }
+        pinnedProcesses.insert(name)
+        return true
+    }
+
     /// A direct callback rather than an observation loop: re-arming
     /// `withObservationTracking` leaves a window where an edit is lost.
     var onChange: (() -> Void)?
@@ -94,6 +125,7 @@ final class Preferences {
         processRetention =
             (defaults.string(forKey: Key.processRetention).flatMap(ProcessRetention.init(rawValue:)))
             ?? .week
+        pinnedProcesses = Set(defaults.stringArray(forKey: Key.pinnedProcesses) ?? [])
     }
 
     // MARK: - Launch at login

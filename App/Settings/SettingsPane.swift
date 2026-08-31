@@ -133,6 +133,20 @@ struct SettingsPane: View {
                 )
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+                if !preferences.pinnedProcesses.isEmpty {
+                    // Listed here as well as on the card: a pin is a standing
+                    // instruction to record something, and the place a user
+                    // looks for standing instructions is settings, not the
+                    // room where they set one months ago.
+                    ForEach(preferences.pinnedProcesses.sorted(), id: \.self) { name in
+                        LabeledContent(name) {
+                            Button("Stop") { preferences.setPinned(false, for: name) }
+                        }
+                    }
+                    Text(pinnedHint)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
                 Button("Delete process history…") { confirming = .processHistory }
                     .disabled(history == nil)
 
@@ -266,6 +280,20 @@ struct SettingsPane: View {
             )
             .opacity(preferences.menuBar[module].isEnabled ? 1 : 0.35)
         }
+    }
+
+    /// The price, because a pin is the one setting here that makes the file
+    /// bigger rather than smaller.
+    private var pinnedHint: String {
+        let names = preferences.pinnedProcesses.count
+        // 30.9 bytes a row measured, a row a bucket: a day of the fine tier
+        // plus a fortnight of the minute one. `StoreSizeTests` is where the
+        // number comes from.
+        let each = 0.7
+        let room = max(Preferences.pinLimit - names, 0)
+        return "Recorded in every bucket, whatever they rank. "
+            + Decimals.string("%.1f MB", Double(names) * each)
+            + " of the store at 14 days, and \(room) more can be pinned."
     }
 
     /// The ⌘-drag advice is true of separate items only: one item has no items
