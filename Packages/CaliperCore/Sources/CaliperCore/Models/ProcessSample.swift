@@ -88,6 +88,24 @@ public struct QoSBreakdown: Sendable, Codable, Equatable {
     }
 }
 
+/// A name the sweep saw, and where it was launched from.
+///
+/// All that is recorded about a process that never enters a top list. Cheap
+/// enough to keep for every readable pid — one row a name a day rather than
+/// one a bucket — and it is the only thing that can answer "this appeared on
+/// Tuesday at three in the morning", which a ranked list cannot: a program
+/// that wants to go unnoticed is deliberately too cheap to rank.
+public struct ProcessIdentity: Sendable, Codable, Equatable, Hashable {
+    public let name: String
+    /// nil when `proc_pidpath` refused and the name came from `proc_name`.
+    public let path: String?
+
+    public init(name: String, path: String?) {
+        self.name = name
+        self.path = path
+    }
+}
+
 /// The processes worth showing, which is never all of them.
 public struct ProcessesSample: Sendable, Codable, Equatable {
     /// When this sweep was taken.
@@ -97,6 +115,11 @@ public struct ProcessesSample: Sendable, Codable, Equatable {
     /// to thirty times when hidden. Anything averaging these has to tell a new
     /// one from the same one repeated.
     public let sampledAt: Date
+    /// Seconds the sweep covers — the window every rate here is over. Energy
+    /// is `power × interval`, which recovers the `ri_energy_nj` delta the
+    /// watts were divided out of; reconstructing it from arrival times would
+    /// guess at a gap the sampler already knows the width of.
+    public let interval: TimeInterval
     public let topByCPU: [ProcessSample]
     public let topByMemory: [ProcessSample]
     public let topByDisk: [ProcessSample]
@@ -104,6 +127,13 @@ public struct ProcessesSample: Sendable, Codable, Equatable {
     /// because CPU order is not power order: an efficiency-cluster process at
     /// 200 % CPU can draw less than a performance-cluster one at 80 %.
     public let topByPower: [ProcessSample]
+    /// Processes the recorder asked for by name, whatever they rank — pinned
+    /// ones and those it is holding on to after they fell out of a list. Per
+    /// pid, not per name: forty helpers called "Google Chrome Helper" are
+    /// forty readings that sum, and summing is the caller's to do.
+    public let watched: [ProcessSample]
+    /// Every name this sweep could read, deduped.
+    public let roster: [ProcessIdentity]
     /// Pids whose counters the kernel refused — other users' processes, about
     /// a quarter of the machine, plus the few that exited between the pid
     /// sweep and the read. They carry no numbers, so no list can rank them;
@@ -114,17 +144,23 @@ public struct ProcessesSample: Sendable, Codable, Equatable {
     /// preview harness and the history tests both do.
     public init(
         sampledAt: Date,
+        interval: TimeInterval,
         topByCPU: [ProcessSample],
         topByMemory: [ProcessSample],
         topByDisk: [ProcessSample],
         topByPower: [ProcessSample],
+        watched: [ProcessSample] = [],
+        roster: [ProcessIdentity] = [],
         unreadableCount: Int
     ) {
         self.sampledAt = sampledAt
+        self.interval = interval
         self.topByCPU = topByCPU
         self.topByMemory = topByMemory
         self.topByDisk = topByDisk
         self.topByPower = topByPower
+        self.watched = watched
+        self.roster = roster
         self.unreadableCount = unreadableCount
     }
 }

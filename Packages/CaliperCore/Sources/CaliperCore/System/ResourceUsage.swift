@@ -134,6 +134,17 @@ enum ResourceUsage {
         return "pid \(pid)"
     }
 
+    /// Name and path in one pass. `name(for:)` reads the path and throws it
+    /// away; the process sweep wants both for every pid it can read, and a
+    /// second `proc_pidpath` a pid is the one cost worth avoiding here.
+    static func identity(for pid: pid_t) -> (name: String, path: String?) {
+        let path = path(for: pid)
+        if let executable = path?.split(separator: "/").last {
+            return (String(executable), path)
+        }
+        return (name(for: pid), path)
+    }
+
     struct ShortInfo {
         let uid: uid_t
         let ppid: pid_t

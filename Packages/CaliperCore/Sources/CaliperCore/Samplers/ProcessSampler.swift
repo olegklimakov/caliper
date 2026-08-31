@@ -5,18 +5,32 @@ import Foundation
 ///
 /// This is the most expensive sampler in the app — one syscall per process, on
 /// a machine that routinely runs six hundred of them — so the pid buffer is
-/// kept between ticks, names are resolved only for the handful that make the
-/// lists, and the cadence table runs it in seconds rather than every tick.
+/// kept between ticks, a pid is named once for as long as it lives, and the
+/// cadence table runs the sweep in seconds rather than every tick.
 struct ProcessSampler {
     private var pids = PIDBuffer()
     private var previous: [pid_t: ResourceUsage.Counters] = [:]
+    private var identities: [pid_t: Identity] = [:]
     private var window = RateWindow()
 
-    /// How many processes each list keeps. Panels show a handful; asking for
-    /// more would only cost more name lookups.
+    /// How many processes each list keeps. Panels show a handful, and the
+    /// history's own depth is its business — what a bucket keeps is decided
+    /// over the whole bucket, not over whichever sweep was last.
     private let limit = 10
 
-    mutating func sample(at instant: ContinuousClock.Instant) -> ProcessesSample? {
+    /// A pid's name and path, and the start time that says it is still the
+    /// same process. Held between sweeps because neither can change while a
+    /// pid lives: identifying every pid once per lifetime is cheaper than
+    /// identifying the listed forty every second, which is what this replaced.
+    /// A build that spawns hundreds of short-lived pids pays for each of them
+    /// once.
+    private struct Identity {
+        let startTime: UInt64
+        let name: String
+        let path: String?
+    }
+
+    mutating func sample(at instant: ContinuousClock.Instant, watching: Set<String> = []) -> ProcessesSample? {
         guard let list = pids.read() else { return nil }
 
         var current: [pid_t: ResourceUsage.Counters] = [:]
@@ -39,6 +53,26 @@ struct ProcessSampler {
         defer { previous = current }
         guard let seconds = window.advance(to: instant) else { return nil }
 
+        // Identity before rates: the watch list is stated by name, so a pid
+        // has to be named before it can be told from the ones nobody asked
+        // for. Rebuilding the table rather than pruning it retires exited and
+        // reused pids in the same pass.
+        var live: [pid_t: Identity] = [:]
+        live.reserveCapacity(current.count)
+        var roster: [String: ProcessIdentity] = [:]
+        for (pid, counters) in current {
+            let identity: Identity
+            if let known = identities[pid], known.startTime == counters.startTime {
+                identity = known
+            } else {
+                let read = ResourceUsage.identity(for: pid)
+                identity = Identity(startTime: counters.startTime, name: read.name, path: read.path)
+            }
+            live[pid] = identity
+            roster[identity.name] = ProcessIdentity(name: identity.name, path: identity.path)
+        }
+        identities = live
+
         let usage = current.map { pid, counters in
             Self.usage(pid: pid, counters: counters, previous: previous[pid], seconds: seconds)
         }
@@ -55,18 +89,15 @@ struct ProcessSampler {
             .sorted { $0.power > $1.power }
             .prefix(limit)
 
-        // Names cost a syscall each, so only the listed processes are resolved,
-        // and a process on several lists only once.
-        var names: [pid_t: String] = [:]
-        for entry in byCPU + byMemory + byDisk + byPower where names[entry.pid] == nil {
-            names[entry.pid] = ResourceUsage.name(for: entry.pid)
-        }
+        let watched = watching.isEmpty
+            ? []
+            : usage.filter { watching.contains(live[$0.pid]?.name ?? "") }
 
         func samples(_ entries: some Sequence<Usage>) -> [ProcessSample] {
             entries.map { entry in
                 ProcessSample(
                     pid: entry.pid,
-                    name: names[entry.pid] ?? "pid \(entry.pid)",
+                    name: live[entry.pid]?.name ?? "pid \(entry.pid)",
                     cpu: entry.cpu,
                     memoryFootprint: entry.footprint,
                     diskRate: entry.diskRate,
@@ -80,10 +111,13 @@ struct ProcessSampler {
 
         return ProcessesSample(
             sampledAt: Date(),
+            interval: seconds,
             topByCPU: samples(byCPU),
             topByMemory: samples(byMemory),
             topByDisk: samples(byDisk),
             topByPower: samples(byPower),
+            watched: samples(watched),
+            roster: Array(roster.values),
             unreadableCount: unreadableCount
         )
     }
@@ -171,6 +205,8 @@ struct ProcessSampler {
         var diskRate: Double { readRate + writeRate }
     }
 
+    /// Names survive: a pid's identity does not change across a sleep, and the
+    /// start-time check catches the ones reused while the machine was out.
     mutating func resetBaseline() {
         previous = [:]
         window.reset()
