@@ -1106,3 +1106,47 @@ private func crowd(cpu: Double = 1.0) -> [ProcessSample] {
         #expect(days == 1)
     }
 }
+
+@Test func theRegistryIsWrittenFarLessOftenThanTheBuckets() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        let ghost = [ProcessIdentity(name: "ghost", path: nil)]
+        // Anchored to the real clock, not the fixture's 2023: the recorder
+        // measures both intervals from the moment it was made, which is the
+        // only sane thing for it to do in an app and makes a fixture in the
+        // past permanently not due.
+        let start = ProcessTier.thirtySeconds.bucketStart(of: Date())
+
+        // Four minutes of sweeps, no clean exit: rows land on the minute, and
+        // the registry — one statement a name against one a ranked row — has
+        // not been written at all.
+        for step in 0...8 {
+            recorder.record(
+                sweep(
+                    at: start.addingTimeInterval(Double(step) * 30),
+                    [process("Xcode", cpu: 1)],
+                    roster: ghost
+                )
+            )
+        }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(try store.processRowCount(tier: .thirtySeconds) > 0)
+        #expect(try store.internedNameCount() == 1)
+
+        // Past the registry's own interval it lands.
+        for step in 21...24 {
+            recorder.record(
+                sweep(
+                    at: start.addingTimeInterval(Double(step) * 30),
+                    [process("Xcode", cpu: 1)],
+                    roster: ghost
+                )
+            )
+        }
+        try await Task.sleep(for: .milliseconds(200))
+        let names = try await store.databaseQueue.read { db in
+            try String.fetchAll(db, sql: "SELECT name FROM process_names ORDER BY name")
+        }
+        #expect(names == ["Xcode", "ghost"])
+    }
+}
