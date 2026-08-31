@@ -4,6 +4,7 @@ import SwiftUI
 struct MemoryPanel: View {
     let metrics: LiveMetrics
     let openHistory: () -> Void
+    let openCard: (ProcessCardTarget) -> Void
     /// Non-nil when this panel is a room of the combined window.
     var onBack: (() -> Void)?
 
@@ -44,11 +45,12 @@ struct MemoryPanel: View {
                 VStack(alignment: .leading, spacing: 6) {
                     SectionLabel("Top consumers")
                     ForEach(processes.prefix(5), id: \.pid) { process in
-                        MetricRow(
-                            name: process.name,
+                        ProcessRowButton(
+                            process: process,
                             value: ByteFormatter.memory(process.memoryFootprint),
                             fraction: fraction(of: process.memoryFootprint, in: processes),
-                            colour: Color(Palette.memory)
+                            colour: Color(Palette.memory),
+                            openCard: openCard
                         )
                     }
                 }

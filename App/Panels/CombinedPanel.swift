@@ -10,6 +10,7 @@ struct CombinedPanel: View {
     /// this, and a module switched on there should appear here.
     let preferences: Preferences
     let openHistory: () -> Void
+    let openCard: (ProcessCardTarget) -> Void
     let openSettings: () -> Void
 
     /// State rather than a second popover: the window the user opened is the
@@ -22,6 +23,7 @@ struct CombinedPanel: View {
                 for: opened,
                 metrics: metrics,
                 openHistory: openHistory,
+                openCard: openCard,
                 onBack: { self.opened = nil }
             )
         } else {
@@ -191,28 +193,3 @@ private struct CombinedRow: View {
     }
 }
 
-/// A row that highlights under the pointer, the way a menu item does, and
-/// nowhere else takes the plain button's centring or its blue.
-private struct RowButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        Row(configuration: configuration)
-    }
-
-    /// A view of its own rather than `configuration.label` decorated in place:
-    /// SwiftUI installs `@State` storage on views and a `ButtonStyle` is not
-    /// one, so `onHover` writes into storage rebuilt on every render.
-    private struct Row: View {
-        let configuration: Configuration
-        @State private var isHovered = false
-
-        var body: some View {
-            configuration.label
-                .foregroundStyle(.primary)
-                .background(
-                    isHovered || configuration.isPressed
-                        ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear)
-                )
-                .onHover { isHovered = $0 }
-        }
-    }
-}

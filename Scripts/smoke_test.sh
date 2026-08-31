@@ -88,6 +88,12 @@ fi
 #    no crash report to explain it. Scripted here because it is a two-click bug
 #    that no unit test can reach.
 KUROKO=$(caliper_kuroko)
+# A kuroko that cannot run — an ended trial, a dead license — must read as
+# absent, not as "the panel did not open": its tap exits nonzero before
+# touching the app, and every failure after that would be the harness's own.
+if [[ -n "$KUROKO" ]] && ! "$KUROKO" apps >/dev/null 2>&1; then
+    KUROKO=""
+fi
 if [[ -n "$KUROKO" ]]; then
     "$KUROKO" tap com.olegklimakov.caliper --label "CPU" >/dev/null 2>&1 || true
     sleep 2

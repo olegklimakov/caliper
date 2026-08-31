@@ -47,6 +47,9 @@ final class PanelController: NSObject, NSPopoverDelegate {
     /// The history window is the app's to open, not the panel's.
     var onOpenHistory: (() -> Void)?
 
+    /// A top-list row opens its process's card in the history window.
+    var onOpenCard: ((ProcessCardTarget) -> Void)?
+
     /// With one item in the menu bar, a right-click is not the only way in.
     var onOpenSettings: (() -> Void)?
 
@@ -109,12 +112,18 @@ final class PanelController: NSObject, NSPopoverDelegate {
         case .module(let module):
             // The app opens the window: a SwiftUI view inside a popover can
             // only reach a scene, and there is no scene graph any more.
-            PanelFactory.view(for: module, metrics: metrics, openHistory: openHistory)
+            PanelFactory.view(
+                for: module,
+                metrics: metrics,
+                openHistory: openHistory,
+                openCard: openCard
+            )
         case .combined:
             CombinedPanel(
                 metrics: metrics,
                 preferences: preferences,
                 openHistory: openHistory,
+                openCard: openCard,
                 openSettings: { [weak self] in
                     self?.close()
                     self?.onOpenSettings?()
@@ -127,6 +136,13 @@ final class PanelController: NSObject, NSPopoverDelegate {
         { [weak self] in
             self?.close()
             self?.onOpenHistory?()
+        }
+    }
+
+    private var openCard: (ProcessCardTarget) -> Void {
+        { [weak self] target in
+            self?.close()
+            self?.onOpenCard?(target)
         }
     }
 

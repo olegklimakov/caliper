@@ -4,6 +4,7 @@ import SwiftUI
 struct CPUPanel: View {
     let metrics: LiveMetrics
     let openHistory: () -> Void
+    let openCard: (ProcessCardTarget) -> Void
     /// Non-nil when this panel is a room of the combined window.
     var onBack: (() -> Void)?
 
@@ -39,12 +40,13 @@ struct CPUPanel: View {
                 VStack(alignment: .leading, spacing: 6) {
                     SectionLabel("Top processes")
                     ForEach(processes.prefix(5), id: \.pid) { process in
-                        MetricRow(
-                            name: process.name,
+                        ProcessRowButton(
+                            process: process,
                             value: PercentFormatter.string(process.cpu, decimals: 1),
                             // Against one core, the unit the value is in.
                             fraction: min(1, process.cpu),
-                            colour: Color(Palette.cpu)
+                            colour: Color(Palette.cpu),
+                            openCard: openCard
                         )
                     }
                 }

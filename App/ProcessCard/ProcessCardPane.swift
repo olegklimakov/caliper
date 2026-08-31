@@ -2,6 +2,30 @@ import CaliperCore
 import CaliperHistory
 import SwiftUI
 
+/// Owns one card's model for exactly as long as the room is on screen: the
+/// probe starts on appear and stops on disappear, which is what bounds its
+/// cost to "a card is open".
+struct ProcessCardRoom: View {
+    let target: ProcessCardTarget
+    let reader: HistoryReader?
+    let onBack: () -> Void
+
+    @State private var model: ProcessCardModel
+
+    init(target: ProcessCardTarget, reader: HistoryReader?, onBack: @escaping () -> Void) {
+        self.target = target
+        self.reader = reader
+        self.onBack = onBack
+        _model = State(initialValue: ProcessCardModel(target: target, reader: reader))
+    }
+
+    var body: some View {
+        ProcessCardPane(model: model, onBack: onBack)
+            .onAppear { model.start() }
+            .onDisappear { model.stop() }
+    }
+}
+
 /// One process's room in the history window — the app, not the pid.
 struct ProcessCardPane: View {
     @Bindable var model: ProcessCardModel
@@ -90,7 +114,7 @@ struct ProcessCardPane: View {
                         Text(identifier)
                     }
                     if case .live = model.presence, let reading = model.reading {
-                        Text("· \(reading.members.count) processes")
+                        Text("· \(reading.members.count) \(reading.members.count == 1 ? "process" : "processes")")
                             .monospacedDigit()
                     }
                 }
@@ -205,7 +229,9 @@ struct ProcessCardPane: View {
     }
 
     private func qosStat(_ reading: ProcessCardReading) -> some View {
-        CardStat(label: "QoS time", value: reading.qos == nil ? "—" : "") {
+        // "—" for no data *and* for an idle interval: a nonzero lifetime with
+        // zero deltas leaves nothing to apportion either.
+        CardStat(label: "QoS time", value: qosSlices(reading.qos)?.isEmpty == false ? "" : "—") {
             if let slices = qosSlices(reading.qos), !slices.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     GeometryReader { geometry in

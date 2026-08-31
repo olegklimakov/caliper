@@ -50,10 +50,20 @@ struct DashboardView: View {
                     metrics: metrics,
                     history: history,
                     processRetention: preferences.processRetention,
-                    recordsProcesses: preferences.recordsProcessHistory
+                    recordsProcesses: preferences.recordsProcessHistory,
+                    openCard: { navigation.section = .process($0) }
                 )
             case .module(let module):
                 DashboardPane(metrics: metrics, history: history, module: module)
+            case .process(let target):
+                // `.id(target)` gives each target its own room — and its own
+                // model, whose probe stops when the room disappears.
+                ProcessCardRoom(
+                    target: target,
+                    reader: history,
+                    onBack: { navigation.section = navigation.returnSection }
+                )
+                .id(target)
             case .settings:
                 SettingsPane(
                     preferences: preferences,
@@ -127,6 +137,10 @@ enum DashboardSection: Hashable {
 
     case settings
 
+    /// One process's room, reached from a top-list row rather than from the
+    /// sidebar — the list simply shows no selection while a card is open.
+    case process(ProcessCardTarget)
+
     /// Settings is not in it — it is pinned under the list.
     static let listed: [DashboardSection] = [.overview] + MenuBarModule.allCases.map(DashboardSection.module)
 
@@ -135,6 +149,7 @@ enum DashboardSection: Hashable {
         case .overview: "Overview"
         case .module(let module): module.title
         case .settings: "Settings"
+        case .process(let target): target.name
         }
     }
 }

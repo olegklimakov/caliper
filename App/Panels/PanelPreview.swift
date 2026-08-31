@@ -66,6 +66,7 @@ enum PanelPreview {
                 metrics: metrics,
                 preferences: preferences,
                 openHistory: {},
+                openCard: { _ in },
                 openSettings: {}
             )
             .background(Color(nsColor: .windowBackgroundColor))
@@ -88,6 +89,7 @@ enum PanelPreview {
                 for: module,
                 metrics: metrics,
                 openHistory: {},
+                openCard: { _ in },
                 onBack: {}
             )
             .background(Color(nsColor: .windowBackgroundColor))
@@ -125,7 +127,7 @@ enum PanelPreview {
     ) -> some View {
         // A popover's material cannot be captured off-screen, so the preview
         // stands in the window background colour of the appearance under test.
-        PanelFactory.view(for: module, metrics: metrics, openHistory: {})
+        PanelFactory.view(for: module, metrics: metrics, openHistory: {}, openCard: { _ in })
             .background(Color(nsColor: .windowBackgroundColor))
             .environment(\.colorScheme, appearance.name == .darkAqua ? .dark : .light)
     }

@@ -37,17 +37,23 @@ struct OverviewPane: View {
     private let processRetention: ProcessRetention
     /// Whether the process history is being written at all.
     private let recordsProcesses: Bool
+    /// A consumer row opens its process's card. The store keys consumers by
+    /// name alone, so the card may open on a process that no longer runs —
+    /// which is a valid card.
+    private let openCard: (ProcessCardTarget) -> Void
 
     init(
         metrics: LiveMetrics,
         history: HistoryReader?,
         processRetention: ProcessRetention,
-        recordsProcesses: Bool
+        recordsProcesses: Bool,
+        openCard: @escaping (ProcessCardTarget) -> Void
     ) {
         self.metrics = metrics
         self.history = history
         self.processRetention = processRetention
         self.recordsProcesses = recordsProcesses
+        self.openCard = openCard
         self.preloaded = nil
     }
 
@@ -57,6 +63,7 @@ struct OverviewPane: View {
         // Never used: the preview's bucket is handed in already read.
         self.processRetention = .week
         self.recordsProcesses = true
+        self.openCard = { _ in }
         self.preloaded = preloaded
         _cursor = State(initialValue: cursor)
     }
@@ -243,16 +250,24 @@ struct OverviewPane: View {
                 .foregroundStyle(.tertiary)
 
             ForEach(usage.prefix(Self.shownConsumers), id: \.name) { usage in
-                HStack(spacing: 8) {
-                    Text(usage.name)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer(minLength: 0)
-                    Text(value(usage))
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
+                Button {
+                    openCard(.name(usage.name))
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(usage.name)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer(minLength: 0)
+                        Text(value(usage))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                        Text("\u{203A}")
+                            .foregroundStyle(.tertiary)
+                    }
+                    .font(.system(size: 11))
+                    .contentShape(Rectangle())
                 }
-                .font(.system(size: 11))
+                .buttonStyle(RowButtonStyle())
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -1,3 +1,4 @@
+import CaliperCore
 import SwiftUI
 
 /// The pieces every panel is built from, matching the components in
@@ -210,6 +211,57 @@ struct PanelFooter: View {
             }
             .buttonStyle(.plain)
         }
+    }
+}
+
+/// A row that highlights under the pointer, the way a menu item does, and
+/// nowhere else takes the plain button's centring or its blue.
+struct RowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Row(configuration: configuration)
+    }
+
+    /// A view of its own rather than `configuration.label` decorated in place:
+    /// SwiftUI installs `@State` storage on views and a `ButtonStyle` is not
+    /// one, so `onHover` writes into storage rebuilt on every render.
+    private struct Row: View {
+        let configuration: Configuration
+        @State private var isHovered = false
+
+        var body: some View {
+            configuration.label
+                .foregroundStyle(.primary)
+                .background(
+                    isHovered || configuration.isPressed
+                        ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear)
+                )
+                .onHover { isHovered = $0 }
+        }
+    }
+}
+
+/// A top-list row that opens a process card: the metric row, the chevron the
+/// combined rows point with, and the hover highlight.
+struct ProcessRowButton: View {
+    let process: ProcessSample
+    let value: String
+    let fraction: Double?
+    let colour: Color
+    let openCard: (ProcessCardTarget) -> Void
+
+    var body: some View {
+        Button {
+            openCard(.pid(process.pid, name: process.name))
+        } label: {
+            HStack(spacing: 4) {
+                MetricRow(name: process.name, value: value, fraction: fraction, colour: colour)
+                Text("\u{203A}")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.tertiary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(RowButtonStyle())
     }
 }
 

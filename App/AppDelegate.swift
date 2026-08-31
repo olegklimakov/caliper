@@ -112,6 +112,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panels.onOpenHistory = { [weak dashboard] in
             dashboard?.show(.overview)
         }
+        panels.onOpenCard = { [weak dashboard] target in
+            dashboard?.show(.process(target))
+        }
         preferences.onChange = { [weak statusItemController, preferences, processRecorder] in
             statusItemController?.setLayout(
                 preferences.menuBar,
@@ -140,6 +143,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     processRecorder?.record(processes)
                 }
             }
+        }
+
+        // Hidden, like --preview-ui: lets the footprint harness measure the
+        // card-open state without driving the UI, which would need
+        // Accessibility permission.
+        let arguments = CommandLine.arguments
+        if let flag = arguments.firstIndex(of: "--open-card"), arguments.indices.contains(flag + 1) {
+            dashboard.show(.process(.name(arguments[flag + 1])))
         }
     }
 
