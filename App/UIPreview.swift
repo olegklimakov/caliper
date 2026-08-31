@@ -235,14 +235,16 @@ enum UIPreview {
         // The two rankings deliberately disagree — a browser holds gigabytes
         // at no CPU, a compiler the other way round. Ranking alike would show
         // two identical columns and prove nothing.
-        let load: [(String, Double, UInt64)] = [
-            ("Xcode", 3.4, 1_100_000_000),
-            ("swift-frontend", 2.1, 620_000_000),
-            ("com.apple.WebKit.WebContent", 0.7, 4_300_000_000),
-            ("Brave Browser Helper (Renderer)", 0.2, 2_600_000_000),
-            ("kernel_task", 0.4, 180_000_000),
-            ("WindowServer", 0.3, 410_000_000),
-            ("Telegram", 0.1, 830_000_000),
+        // Watts are their own column because they are their own order: the
+        // WebContent process draws more than the compiler above it on CPU.
+        let load: [(String, Double, UInt64, Double)] = [
+            ("Xcode", 3.4, 1_100_000_000, 2.1),
+            ("swift-frontend", 2.1, 620_000_000, 1.6),
+            ("com.apple.WebKit.WebContent", 0.7, 4_300_000_000, 1.9),
+            ("Brave Browser Helper (Renderer)", 0.2, 2_600_000_000, 0.4),
+            ("kernel_task", 0.4, 180_000_000, 0.2),
+            ("WindowServer", 0.3, 410_000_000, 0.5),
+            ("Telegram", 0.1, 830_000_000, 0.1),
         ]
         // Two sweeps in one bucket, so the stored numbers are a mean of more
         // than one reading.
@@ -250,6 +252,7 @@ enum UIPreview {
             recorder.record(
                 ProcessesSample(
                     sampledAt: cursor.addingTimeInterval(offset),
+                    interval: 15,
                     topByCPU: load.enumerated().map { index, entry in
                         ProcessSample(
                             pid: Int32(index + 1),
@@ -257,7 +260,7 @@ enum UIPreview {
                             cpu: entry.1 * (offset == 0 ? 1.1 : 0.9),
                             memoryFootprint: entry.2,
                             diskRate: 0,
-                            power: 0,
+                            power: entry.3,
                             wakeupsPerSecond: 0,
                             performanceCycleShare: nil,
                             qos: nil
@@ -266,6 +269,7 @@ enum UIPreview {
                     topByMemory: [],
                     topByDisk: [],
                     topByPower: [],
+                    roster: load.map { ProcessIdentity(name: $0.0, path: nil) },
                     unreadableCount: 0
                 )
             )
@@ -290,13 +294,25 @@ enum UIPreview {
                         bucketStart: end.addingTimeInterval(Double(minute - 1_440) * 60),
                         cpu: 0.05 + load,
                         footprint: UInt64(1.4e9 + load * 8e8),
-                        diskRate: load * 2e5
+                        diskRate: load * 2e5,
+                        energy: (0.4 + load) * 60,
+                        keep: .ranked
                     )
                 )
             }
         }
         let history = ProcessNameHistory(tier: .minute, points: points)
+        // Summed from the same points, so the caption and the strip agree.
+        let energy = ProcessEnergy(
+            joules: points.reduce(0) { $0 + $1.energy },
+            buckets: points.count,
+            tier: .minute
+        )
 
+        // Pinned on the live card and not on the dead one, so one render of the
+        // pair shows both states of the control and both captions each of the
+        // strip and the energy line can carry.
+        previewPreferences.setPinned(live, for: "Google Chrome")
         let family = ProcessFamilyKey.bundle(
             identifier: "com.google.Chrome",
             appURL: URL(fileURLWithPath: "/Applications/Google Chrome.app", isDirectory: true)
@@ -308,7 +324,9 @@ enum UIPreview {
                 reading: nil,
                 presence: .exited(lastSeen: end.addingTimeInterval(-600)),
                 history: history,
-                historyEnd: end
+                energy: energy,
+                historyEnd: end,
+                preferences: previewPreferences
             )
         }
 
@@ -367,7 +385,9 @@ enum UIPreview {
             reading: reading,
             presence: .live,
             history: history,
-            historyEnd: end
+            energy: energy,
+            historyEnd: end,
+            preferences: previewPreferences
         )
     }
 

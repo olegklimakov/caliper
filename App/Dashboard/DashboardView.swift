@@ -61,6 +61,7 @@ struct DashboardView: View {
                 ProcessCardRoom(
                     target: target,
                     reader: history,
+                    preferences: preferences,
                     onBack: { navigation.section = navigation.returnSection }
                 )
                 .id(target)

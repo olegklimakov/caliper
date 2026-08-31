@@ -12,11 +12,18 @@ struct ProcessCardRoom: View {
 
     @State private var model: ProcessCardModel
 
-    init(target: ProcessCardTarget, reader: HistoryReader?, onBack: @escaping () -> Void) {
+    init(
+        target: ProcessCardTarget,
+        reader: HistoryReader?,
+        preferences: Preferences,
+        onBack: @escaping () -> Void
+    ) {
         self.target = target
         self.reader = reader
         self.onBack = onBack
-        _model = State(initialValue: ProcessCardModel(target: target, reader: reader))
+        _model = State(
+            initialValue: ProcessCardModel(target: target, reader: reader, preferences: preferences)
+        )
     }
 
     var body: some View {
@@ -350,6 +357,8 @@ struct ProcessCardPane: View {
             HStack {
                 SectionLabel("History · CPU · \(model.target.name)")
                 Spacer()
+                pinButton
+                    .padding(.trailing, 6)
                 // Not a segmented `Picker`: `ImageRenderer` draws those as a
                 // placeholder, which would leave the card's only control
                 // unverifiable by the preview harness — the dashboard's range
@@ -364,9 +373,14 @@ struct ProcessCardPane: View {
             if let history = model.history, !history.points.isEmpty {
                 HistoryStrip(history: history, end: model.historyEnd, span: model.span)
                     .frame(height: 56)
-                Text("Bars where \(model.target.name) ranked in the stored top ten — a gap means unranked, not idle.")
+                Text(stripCaption)
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
+                if let energy = model.energy, energy.buckets > 0 {
+                    Text(energyCaption(energy))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
             } else {
                 Text("No recorded buckets in this span.")
                     .font(.system(size: 11))
@@ -375,6 +389,49 @@ struct ProcessCardPane: View {
             }
         }
         .dashboardCard()
+    }
+
+    /// The pin is stated as what it does to the record, not as a bookmark:
+    /// what it buys is a strip whose gaps mean something.
+    private var pinButton: some View {
+        Button {
+            model.togglePin()
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: model.isPinned ? "pin.fill" : "pin")
+                Text(model.isPinned ? "Recording every bucket" : "Record every bucket")
+            }
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(model.isPinned ? Color.accentColor : Color.secondary)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!model.canPin)
+        .help(
+            model.canPin
+                ? "Records this process in every bucket, whatever it ranks."
+                : "Already recording \(Preferences.pinLimit) processes in every bucket."
+        )
+    }
+
+    private var stripCaption: String {
+        model.isPinned
+            ? "Every bucket since \(model.target.name) was pinned — a gap there is time it was not running."
+            : "Bars where \(model.target.name) ranked in the stored top ten — a gap means unranked, not idle."
+    }
+
+    /// A total the reader can trust the shape of: for an unpinned process the
+    /// unranked buckets contributed nothing, so the number is a floor and has
+    /// to be read as one.
+    private func energyCaption(_ energy: ProcessEnergy) -> String {
+        // The span reads as the button that chose it, not as a duration: "over
+        // the last 24 h 0 m" is a sentence nobody says.
+        let span = model.span <= 3600 ? "hour" : "24 hours"
+        guard !model.isPinned, energy.coveredSeconds < model.span * 0.99 else {
+            return "\(EnergyFormatter.string(energy.joules)) over the last \(span)."
+        }
+        return "At least \(EnergyFormatter.string(energy.joules)) over the last \(span)"
+            + " — from the \(DurationFormatter.brief(energy.coveredSeconds)) it was recorded for."
     }
 
     private func spanButton(_ title: String, span: TimeInterval) -> some View {

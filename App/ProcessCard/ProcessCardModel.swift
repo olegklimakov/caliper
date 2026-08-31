@@ -38,6 +38,9 @@ final class ProcessCardModel {
     private(set) var reading: ProcessCardReading?
     private(set) var presence: Presence = .warming
     private(set) var history: ProcessNameHistory?
+    /// What the process drew over the span on screen. A floor while it is
+    /// unpinned — see `ProcessEnergy`.
+    private(set) var energy: ProcessEnergy?
     /// The strip's right edge: bars are placed against the moment the history
     /// was asked, so buckets missing at the leading edge read as the gaps
     /// they are.
@@ -48,12 +51,14 @@ final class ProcessCardModel {
     }
 
     private let reader: HistoryReader?
+    private let preferences: Preferences?
     private var probeTask: Task<Void, Never>?
     private var historyTask: Task<Void, Never>?
 
-    init(target: ProcessCardTarget, reader: HistoryReader?) {
+    init(target: ProcessCardTarget, reader: HistoryReader?, preferences: Preferences?) {
         self.target = target
         self.reader = reader
+        self.preferences = preferences
         switch target {
         case .pid(let pid, let name):
             family = ProcessFamilyKey.resolve(pid: pid) ?? .resolve(executableName: name)
@@ -70,15 +75,34 @@ final class ProcessCardModel {
         reading: ProcessCardReading?,
         presence: Presence,
         history: ProcessNameHistory?,
-        historyEnd: Date = Date()
+        energy: ProcessEnergy? = nil,
+        historyEnd: Date = Date(),
+        preferences: Preferences? = nil
     ) {
         self.target = target
         self.family = family
         self.reading = reading
         self.presence = presence
         self.history = history
+        self.energy = energy
         self.historyEnd = historyEnd
+        self.preferences = preferences
         reader = nil
+    }
+
+    /// Whether every bucket of this name is recorded from here on, rather than
+    /// only the ones it ranks in.
+    var isPinned: Bool {
+        preferences?.pinnedProcesses.contains(target.name) ?? false
+    }
+
+    var canPin: Bool {
+        guard let preferences else { return false }
+        return isPinned || preferences.pinnedProcesses.count < Preferences.pinLimit
+    }
+
+    func togglePin() {
+        preferences?.setPinned(!isPinned, for: target.name)
     }
 
     var displayName: String { family.displayName }
@@ -170,8 +194,10 @@ final class ProcessCardModel {
         let asked = Date()
         historyTask = Task { [weak self] in
             let history = try? await reader.processHistory(name: name, span: span, now: asked)
+            let energy = try? await reader.processEnergy(name: name, span: span, now: asked)
             guard !Task.isCancelled else { return }
             self?.history = history
+            self?.energy = energy
             self?.historyEnd = asked
         }
     }
