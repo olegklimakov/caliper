@@ -44,6 +44,7 @@ public final class ProcessHistoryRecorder: Sendable {
         var pending: [ProcessRow] = []
         var appearances: [String: ProcessAppearanceRow] = [:]
         var lastFlush = Date()
+        var lastRegistryFlush = Date()
     }
 
     public init(store: HistoryStore, isEnabled: Bool) {
@@ -125,12 +126,23 @@ public final class ProcessHistoryRecorder: Sendable {
                 Self.note(processes.roster, at: processes.sampledAt, in: &state)
             }
 
-            guard processes.sampledAt.timeIntervalSince(state.lastFlush) >= flushInterval,
-                !state.pending.isEmpty || !state.appearances.isEmpty
-            else { return nil }
+            let registryIsDue =
+                processes.sampledAt.timeIntervalSince(state.lastRegistryFlush)
+                >= ProcessTier.registryFlushInterval
+            let rowsAreDue =
+                processes.sampledAt.timeIntervalSince(state.lastFlush) >= flushInterval
 
-            state.lastFlush = processes.sampledAt
-            return Self.takeBatch(&state)
+            guard rowsAreDue || registryIsDue else { return nil }
+            var batch = Batch(rows: [], appearances: [])
+            if rowsAreDue, !state.pending.isEmpty {
+                state.lastFlush = processes.sampledAt
+                batch.rows = Self.takeRows(&state)
+            }
+            if registryIsDue, !state.appearances.isEmpty {
+                state.lastRegistryFlush = processes.sampledAt
+                batch.appearances = Self.takeAppearances(&state)
+            }
+            return batch.rows.isEmpty && batch.appearances.isEmpty ? nil : batch
         }
 
         guard let batch else { return }
@@ -151,23 +163,26 @@ public final class ProcessHistoryRecorder: Sendable {
                 state.openBucket = nil
             }
             state.lastFlush = Date()
-            return Self.takeBatch(&state)
+            state.lastRegistryFlush = state.lastFlush
+            return Batch(rows: Self.takeRows(&state), appearances: Self.takeAppearances(&state))
         }
         try store.write(processes: batch.rows, tier: tier)
         try store.write(appearances: batch.appearances)
     }
 
     private struct Batch {
-        let rows: [ProcessRow]
-        let appearances: [ProcessAppearanceRow]
+        var rows: [ProcessRow]
+        var appearances: [ProcessAppearanceRow]
     }
 
-    private static func takeBatch(_ state: inout State) -> Batch {
-        defer {
-            state.pending.removeAll(keepingCapacity: true)
-            state.appearances.removeAll(keepingCapacity: true)
-        }
-        return Batch(rows: state.pending, appearances: Array(state.appearances.values))
+    private static func takeRows(_ state: inout State) -> [ProcessRow] {
+        defer { state.pending.removeAll(keepingCapacity: true) }
+        return state.pending
+    }
+
+    private static func takeAppearances(_ state: inout State) -> [ProcessAppearanceRow] {
+        defer { state.appearances.removeAll(keepingCapacity: true) }
+        return Array(state.appearances.values)
     }
 
     /// Sums each name's pids over one sweep, then folds one reading per name.

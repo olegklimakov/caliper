@@ -19,6 +19,14 @@ public enum ProcessTier: String, Sendable, CaseIterable, Codable {
     /// reports an empty bucket for a moment that was recorded.
     public static let flushInterval: TimeInterval = 60
 
+    /// The registry writes on its own, rarer schedule. It is one statement per
+    /// *name* rather than per ranked row — six hundred of them against twenty —
+    /// and at the tier's own rate that write alone moved the steady-state CPU
+    /// from 0.85 % to 0.97 %, against a 1 % budget. Ten minutes puts it back
+    /// and costs only the precision of "last seen", which `flushNow` makes
+    /// exact on a clean exit anyway.
+    static let registryFlushInterval: TimeInterval = 600
+
     public var seconds: Int {
         switch self {
         case .thirtySeconds: 30
