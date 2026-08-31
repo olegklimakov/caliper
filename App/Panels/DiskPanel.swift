@@ -4,6 +4,7 @@ import SwiftUI
 struct DiskPanel: View {
     let metrics: LiveMetrics
     let openHistory: () -> Void
+    let openCard: (ProcessCardTarget) -> Void
     /// Non-nil when this panel is a room of the combined window.
     var onBack: (() -> Void)?
 
@@ -63,11 +64,12 @@ struct DiskPanel: View {
                 VStack(alignment: .leading, spacing: 6) {
                     SectionLabel("Most active")
                     ForEach(processes.prefix(4), id: \.pid) { process in
-                        MetricRow(
-                            name: process.name,
+                        ProcessRowButton(
+                            process: process,
                             value: RateFormatter.panel(process.diskRate),
                             fraction: activityFraction(of: process.diskRate),
-                            colour: Color(Palette.disk)
+                            colour: Color(Palette.disk),
+                            openCard: openCard
                         )
                     }
                 }

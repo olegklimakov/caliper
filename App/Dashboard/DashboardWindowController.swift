@@ -9,7 +9,14 @@ import SwiftUI
 @MainActor
 @Observable
 final class DashboardNavigation {
-    var section: DashboardSection = .overview
+    var section: DashboardSection = .overview {
+        didSet {
+            if case .process = section {} else { returnSection = section }
+        }
+    }
+
+    /// Where ‹ goes from a card: the last room that was not one.
+    private(set) var returnSection: DashboardSection = .overview
 }
 
 /// The history window, owned by the app rather than by a scene graph: SwiftUI
@@ -118,6 +125,13 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         onVisibilityChange(false)
         activation.release(.dashboard)
+        // A closed window keeps its view tree, so a card's `onDisappear` — the
+        // probe's stop — would never fire. Leaving the card room is what fires
+        // it, and reopening on a live pane instead of a stale card is also the
+        // less surprising return.
+        if case .process = navigation.section {
+            navigation.section = navigation.returnSection
+        }
     }
 
     /// ⌘M and ⌘H leave a window open and invisible, which `willClose` never

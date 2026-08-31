@@ -95,6 +95,11 @@ final class ProcessCardModel {
 
     func start() {
         guard probeTask == nil else { return }
+        startProbe()
+        loadHistory()
+    }
+
+    private func startProbe() {
         let family = family
         probeTask = Task.detached(priority: .userInitiated) { [weak self] in
             var probe = ProcessProbe(family: family)
@@ -104,7 +109,6 @@ final class ProcessCardModel {
                 try? await Task.sleep(for: .seconds(1))
             }
         }
-        loadHistory()
     }
 
     func stop() {
@@ -136,7 +140,26 @@ final class ProcessCardModel {
             }
         } else {
             presence = .live
+            upgradeFamilyIfNeeded(from: new)
         }
+    }
+
+    /// A card opened on a bare name starts as an executable family — the
+    /// overview's consumer rows carry names only. The first live member says
+    /// which app that name belongs to, and the bundle family is the better
+    /// card: the icon, the identifier, and the helpers the name alone cannot
+    /// see. The probe restarts because it classifies against the family it
+    /// was born with.
+    private func upgradeFamilyIfNeeded(from new: ProcessCardReading) {
+        guard case .executable = family,
+            let pid = new.members.first?.pid,
+            let resolved = ProcessFamilyKey.resolve(pid: pid),
+            case .bundle = resolved
+        else { return }
+        family = resolved
+        resolveIcon()
+        probeTask?.cancel()
+        startProbe()
     }
 
     private func loadHistory() {

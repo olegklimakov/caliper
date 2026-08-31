@@ -12,16 +12,22 @@ enum PanelFactory {
         for module: MenuBarModule,
         metrics: LiveMetrics,
         openHistory: @escaping () -> Void,
+        openCard: @escaping (ProcessCardTarget) -> Void,
         /// Non-nil when the panel is a room of the combined window rather than
         /// a popover of its own.
         onBack: (() -> Void)? = nil
     ) -> some View {
         switch module {
-        case .cpu: CPUPanel(metrics: metrics, openHistory: openHistory, onBack: onBack)
-        case .memory: MemoryPanel(metrics: metrics, openHistory: openHistory, onBack: onBack)
-        case .network: NetworkPanel(metrics: metrics, openHistory: openHistory, onBack: onBack)
-        case .disk: DiskPanel(metrics: metrics, openHistory: openHistory, onBack: onBack)
-        case .temperature: SensorsPanel(metrics: metrics, openHistory: openHistory, onBack: onBack)
+        case .cpu:
+            CPUPanel(metrics: metrics, openHistory: openHistory, openCard: openCard, onBack: onBack)
+        case .memory:
+            MemoryPanel(metrics: metrics, openHistory: openHistory, openCard: openCard, onBack: onBack)
+        case .network:
+            NetworkPanel(metrics: metrics, openHistory: openHistory, onBack: onBack)
+        case .disk:
+            DiskPanel(metrics: metrics, openHistory: openHistory, openCard: openCard, onBack: onBack)
+        case .temperature:
+            SensorsPanel(metrics: metrics, openHistory: openHistory, onBack: onBack)
         }
     }
 }
