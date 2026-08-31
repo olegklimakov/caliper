@@ -38,6 +38,10 @@ final class ProcessCardModel {
     private(set) var reading: ProcessCardReading?
     private(set) var presence: Presence = .warming
     private(set) var history: ProcessNameHistory?
+    /// The strip's right edge: bars are placed against the moment the history
+    /// was asked, so buckets missing at the leading edge read as the gaps
+    /// they are.
+    private(set) var historyEnd = Date()
     private(set) var icon: NSImage?
     var span: TimeInterval = 24 * 3600 {
         didSet { loadHistory() }
@@ -65,13 +69,15 @@ final class ProcessCardModel {
         family: ProcessFamilyKey,
         reading: ProcessCardReading?,
         presence: Presence,
-        history: ProcessNameHistory?
+        history: ProcessNameHistory?,
+        historyEnd: Date = Date()
     ) {
         self.target = target
         self.family = family
         self.reading = reading
         self.presence = presence
         self.history = history
+        self.historyEnd = historyEnd
         reader = nil
     }
 
@@ -138,10 +144,12 @@ final class ProcessCardModel {
         historyTask?.cancel()
         let name = target.name
         let span = span
+        let asked = Date()
         historyTask = Task { [weak self] in
-            let history = try? await reader.processHistory(name: name, span: span)
+            let history = try? await reader.processHistory(name: name, span: span, now: asked)
             guard !Task.isCancelled else { return }
             self?.history = history
+            self?.historyEnd = asked
         }
     }
 

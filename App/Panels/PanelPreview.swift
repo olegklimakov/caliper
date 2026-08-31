@@ -97,6 +97,11 @@ enum PanelPreview {
         return renderer.nsImage
     }
 
+    @MainActor
+    static func renderProcessCard(model: ProcessCardModel, appearance: NSAppearance) -> NSImage? {
+        render(ProcessCardPane(model: model, onBack: {}), appearance: appearance, height: 640)
+    }
+
     private static func render(
         _ pane: some View,
         appearance: NSAppearance,

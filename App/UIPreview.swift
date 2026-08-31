@@ -100,6 +100,19 @@ enum UIPreview {
                             background: nil
                         )
                     }
+                    for (state, model) in [
+                        ("live", previewProcessCard(live: true)),
+                        ("dead", previewProcessCard(live: false)),
+                    ] {
+                        if let card = PanelPreview.renderProcessCard(model: model, appearance: theme) {
+                            write(
+                                card,
+                                to: url.appendingPathComponent("process-card-\(state)-\(appearance).png"),
+                                scale: 1,
+                                background: nil
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -259,6 +272,103 @@ enum UIPreview {
         }
         guard (try? recorder.flushNow()) != nil else { return nil }
         return try? await reader.consumers(at: cursor, retention: .week)
+    }
+
+    /// The card in both fates, built from literals: a live family shaped like
+    /// a browser — one root, helpers doing the work — and the same identity
+    /// after it exited, when the strip is all that remains.
+    @MainActor
+    private static func previewProcessCard(live: Bool) -> ProcessCardModel {
+        let end = Date(timeIntervalSince1970: 1_788_180_000)
+        var points: [ProcessNamePoint] = []
+        for (range, peak) in [(60..<95, 0.55), (400..<480, 1.9), (1_200..<1_265, 0.7)] {
+            for minute in range {
+                let phase = Double(minute - range.lowerBound) / Double(range.count)
+                let load = peak * exp(-pow((phase - 0.5) * 3.2, 2))
+                points.append(
+                    ProcessNamePoint(
+                        bucketStart: end.addingTimeInterval(Double(minute - 1_440) * 60),
+                        cpu: 0.05 + load,
+                        footprint: UInt64(1.4e9 + load * 8e8),
+                        diskRate: load * 2e5
+                    )
+                )
+            }
+        }
+        let history = ProcessNameHistory(tier: .minute, points: points)
+
+        let family = ProcessFamilyKey.bundle(
+            identifier: "com.google.Chrome",
+            appURL: URL(fileURLWithPath: "/Applications/Google Chrome.app", isDirectory: true)
+        )
+        guard live else {
+            return ProcessCardModel(
+                preloaded: .name("Google Chrome"),
+                family: family,
+                reading: nil,
+                presence: .exited(lastSeen: end.addingTimeInterval(-600)),
+                history: history,
+                historyEnd: end
+            )
+        }
+
+        func member(
+            _ pid: pid_t,
+            _ name: String,
+            cpu: Double,
+            footprint: Double,
+            share: Double,
+            gpu: Double,
+            isRoot: Bool = false
+        ) -> ProcessCardReading.Member {
+            ProcessCardReading.Member(
+                pid: pid,
+                name: name,
+                startTime: UInt64(pid) * 1_000,
+                cpu: cpu,
+                footprint: UInt64(footprint),
+                lifetimeMaxFootprint: UInt64(footprint * 1.7),
+                readRate: cpu * 3.5e6,
+                writeRate: cpu * 1e6,
+                power: cpu * 5.4,
+                wakeupsPerSecond: cpu * 216,
+                performanceCycleShare: share,
+                qos: QoSBreakdown(
+                    userInteractive: cpu * 0.35,
+                    userInitiated: cpu * 0.05,
+                    defaultTier: cpu * 0.3,
+                    legacy: cpu * 0.04,
+                    utility: cpu * 0.15,
+                    background: cpu * 0.1,
+                    maintenance: cpu * 0.01
+                ),
+                gpuTime: gpu,
+                isRoot: isRoot,
+                isOwnUser: true,
+                runningFor: 3 * 3600 + 12 * 60
+            )
+        }
+
+        let reading = ProcessCardReading(
+            sampledAt: end,
+            members: [
+                member(84_112, "Google Chrome Helper (Renderer)", cpu: 0.184, footprint: 6.4e8, share: 0.74, gpu: 310),
+                member(3_871, "Google Chrome Helper (GPU)", cpu: 0.091, footprint: 5.1e8, share: 0.66, gpu: 4_022),
+                member(3_862, "Google Chrome", cpu: 0.045, footprint: 4.1e8, share: 0.71, gpu: 28, isRoot: true),
+                member(88_214, "Google Chrome Helper (Renderer)", cpu: 0.018, footprint: 2.1e8, share: 0.52, gpu: 4),
+                member(3_869, "Google Chrome Helper", cpu: 0.004, footprint: 1.3e8, share: 0.31, gpu: 0),
+            ],
+            performanceCycleShare: 0.72,
+            gpuIsAvailable: true
+        )
+        return ProcessCardModel(
+            preloaded: .pid(3_862, name: "Google Chrome"),
+            family: family,
+            reading: reading,
+            presence: .live,
+            history: history,
+            historyEnd: end
+        )
     }
 
     /// A defaults store of its own, so rendering the combined window cannot
