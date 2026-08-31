@@ -87,3 +87,33 @@ enum TemperatureFormatter {
         "\(Int(celsius.rounded()))°"
     }
 }
+
+/// Watts from the SoC's own accounting. Idle processes sit in the milliwatt
+/// range, where "0,00 W" would erase the very number the card exists to show.
+enum PowerFormatter {
+    static func string(_ watts: Double) -> String {
+        watts < 0.0995 && watts > 0
+            ? Decimals.string("%.0f mW", watts * 1000)
+            : Decimals.string("%.2f W", watts)
+    }
+}
+
+enum DurationFormatter {
+    /// "3 h 12 m", "48 m", "12 s" — the resolution a "running for" needs.
+    static func brief(_ seconds: TimeInterval) -> String {
+        let total = Int(seconds)
+        if total < 60 { return "\(total) s" }
+        let minutes = total / 60
+        if minutes < 60 { return "\(minutes) m" }
+        return "\(minutes / 60) h \(minutes % 60) m"
+    }
+
+    /// "1:12:44" — cumulative GPU seconds, the shape Activity Monitor uses.
+    static func clock(_ seconds: TimeInterval) -> String {
+        let total = Int(seconds)
+        if total < 3600 {
+            return String(format: "%d:%02d", total / 60, total % 60)
+        }
+        return String(format: "%d:%02d:%02d", total / 3600, (total / 60) % 60, total % 60)
+    }
+}
