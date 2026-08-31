@@ -166,6 +166,54 @@ public enum HistoryDatabase {
                 )
             }
         }
+        // Energy rather than mean watts: it is the only one of the four that
+        // adds up, so a rollup sums it and a card can total a week of it.
+        // Millijoules because SQLite varints the value — an idle daemon's
+        // bucket stays two bytes where joules would round it away entirely.
+        migrator.registerMigration("process energy and inventory") { db in
+            for tier in ProcessTier.allCases {
+                try db.execute(
+                    sql: """
+                        ALTER TABLE \(tier.tableName)
+                        ADD COLUMN energy_mj INTEGER NOT NULL DEFAULT 0
+                        """
+                )
+                // Why the row is here. The rollup re-ranks, so without a
+                // recorded reason a pinned row is evicted the moment thirty
+                // seconds folds into a minute — a strip continuous for an hour
+                // and a comb for a day.
+                try db.execute(
+                    sql: """
+                        ALTER TABLE \(tier.tableName)
+                        ADD COLUMN keep INTEGER NOT NULL DEFAULT 0
+                        """
+                )
+            }
+            // One row a name, and one a name a day with an hour per bit. Which
+            // makes it affordable for *every* name rather than the ranked
+            // twenty: ~600 names cost around 6 KB a day here, against the
+            // ~180 MB a fortnight recording them all in the tiers would.
+            try db.execute(
+                sql: """
+                    CREATE TABLE process_inventory (
+                        name_id INTEGER PRIMARY KEY REFERENCES process_names(id),
+                        first_seen INTEGER NOT NULL,
+                        last_seen INTEGER NOT NULL,
+                        path TEXT
+                    ) WITHOUT ROWID
+                    """
+            )
+            try db.execute(
+                sql: """
+                    CREATE TABLE process_presence (
+                        name_id INTEGER NOT NULL REFERENCES process_names(id),
+                        day INTEGER NOT NULL,
+                        hours INTEGER NOT NULL,
+                        PRIMARY KEY (name_id, day)
+                    ) WITHOUT ROWID
+                    """
+            )
+        }
         return migrator
     }
 }

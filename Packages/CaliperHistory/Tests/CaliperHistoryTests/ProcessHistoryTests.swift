@@ -8,32 +8,56 @@ import Testing
 /// A thirty-second boundary, so two buckets roll into exactly one minute.
 private let bucketStart = Date(timeIntervalSince1970: 1_700_000_040)
 
+/// A distinct pid per name, derived so it is the same on every run.
+///
+/// The recorder counts a pid once however many lists it appears in and sums the
+/// pids that share a name; fixtures that gave every process pid 1 would
+/// exercise neither rule.
+private func pid(for name: String) -> pid_t {
+    var hash: UInt32 = 2_166_136_261
+    for byte in name.utf8 {
+        hash = (hash ^ UInt32(byte)) &* 16_777_619
+    }
+    return pid_t(hash % 1_000_000) + 1
+}
+
 private func process(
     _ name: String,
+    pid: pid_t? = nil,
     cpu: Double = 0,
     footprint: UInt64 = 0,
-    disk: Double = 0
+    disk: Double = 0,
+    power: Double = 0
 ) -> ProcessSample {
     ProcessSample(
-        pid: 1,
+        pid: pid ?? CaliperHistoryTests.pid(for: name),
         name: name,
         cpu: cpu,
         memoryFootprint: footprint,
         diskRate: disk,
-        power: 0,
+        power: power,
         wakeupsPerSecond: 0,
         performanceCycleShare: nil,
         qos: nil
     )
 }
 
-private func sweep(at date: Date, _ samples: [ProcessSample]) -> ProcessesSample {
+private func sweep(
+    at date: Date,
+    _ samples: [ProcessSample],
+    interval: TimeInterval = 1,
+    watched: [ProcessSample] = [],
+    roster: [ProcessIdentity] = []
+) -> ProcessesSample {
     ProcessesSample(
         sampledAt: date,
+        interval: interval,
         topByCPU: samples.sorted { $0.cpu > $1.cpu },
         topByMemory: samples.sorted { $0.memoryFootprint > $1.memoryFootprint },
         topByDisk: samples.filter { $0.diskRate > 0 },
-        topByPower: [],
+        topByPower: samples.filter { $0.power > 0 }.sorted { $0.power > $1.power },
+        watched: watched,
+        roster: roster,
         unreadableCount: 0
     )
 }
@@ -166,7 +190,7 @@ private let megabyte: UInt64 = 1_048_576
                 timestamp: bucketStart.addingTimeInterval(Double(index * 30)),
                 cpuPermille: 100,
                 footprintMB: 64,
-                diskKBps: 0,
+                diskKBps: 0, energyMJ: 0, keep: .ranked,
                 count: 1
             )
         }
@@ -182,11 +206,11 @@ private let megabyte: UInt64 = 1_048_576
         // Quitting and relaunching inside one bucket: two partial readings of
         // the same thirty seconds, which have to land as one row.
         try store.write(
-            processes: [ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 200, footprintMB: 100, diskKBps: 0, count: 1)],
+            processes: [ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 200, footprintMB: 100, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)],
             tier: .thirtySeconds
         )
         try store.write(
-            processes: [ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 600, footprintMB: 400, diskKBps: 0, count: 3)],
+            processes: [ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 600, footprintMB: 400, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 3)],
             tier: .thirtySeconds
         )
 
@@ -203,9 +227,9 @@ private let megabyte: UInt64 = 1_048_576
     try await withStore { store in
         try store.write(
             processes: [
-                ProcessRow(name: "quiet", timestamp: bucketStart, cpuPermille: 10, footprintMB: 1, diskKBps: 0, count: 1),
-                ProcessRow(name: "busy", timestamp: bucketStart, cpuPermille: 900, footprintMB: 1, diskKBps: 0, count: 1),
-                ProcessRow(name: "middling", timestamp: bucketStart, cpuPermille: 300, footprintMB: 1, diskKBps: 0, count: 1),
+                ProcessRow(name: "quiet", timestamp: bucketStart, cpuPermille: 10, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1),
+                ProcessRow(name: "busy", timestamp: bucketStart, cpuPermille: 900, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1),
+                ProcessRow(name: "middling", timestamp: bucketStart, cpuPermille: 300, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1),
             ],
             tier: .thirtySeconds
         )
@@ -228,7 +252,7 @@ private let megabyte: UInt64 = 1_048_576
 @Test func aCursorAnywhereInABucketFindsIt() async throws {
     try await withStore { store in
         try store.write(
-            processes: [ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, count: 1)],
+            processes: [ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)],
             tier: .thirtySeconds
         )
         // Twenty-nine seconds in is still the same bucket.
@@ -241,11 +265,11 @@ private let megabyte: UInt64 = 1_048_576
 @Test func deletingProcessHistoryLeavesNeitherRowsNorNames() async throws {
     try await withStore { store in
         try store.write(
-            processes: [ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, count: 1)],
+            processes: [ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)],
             tier: .thirtySeconds
         )
         try store.write(
-            processes: [ProcessRow(name: "Safari", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, count: 1)],
+            processes: [ProcessRow(name: "Safari", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)],
             tier: .minute
         )
 
@@ -267,8 +291,8 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
     // First half-minute: `alpha` is busy, `beta` is not there at all.
     try store.write(
             processes:         [
-            ProcessRow(name: "alpha", timestamp: bucketStart, cpuPermille: 800, footprintMB: 10, diskKBps: 0, count: 3),
-            ProcessRow(name: "gamma", timestamp: bucketStart, cpuPermille: 100, footprintMB: 20, diskKBps: 0, count: 3),
+            ProcessRow(name: "alpha", timestamp: bucketStart, cpuPermille: 800, footprintMB: 10, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 3),
+            ProcessRow(name: "gamma", timestamp: bucketStart, cpuPermille: 100, footprintMB: 20, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 3),
         ],
         tier: .thirtySeconds
     )
@@ -277,10 +301,10 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
             processes:         [
             ProcessRow(
                 name: "beta", timestamp: bucketStart.addingTimeInterval(30),
-                cpuPermille: 400, footprintMB: 30, diskKBps: 0, count: 3),
+                cpuPermille: 400, footprintMB: 30, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 3),
             ProcessRow(
                 name: "gamma", timestamp: bucketStart.addingTimeInterval(30),
-                cpuPermille: 300, footprintMB: 20, diskKBps: 0, count: 3),
+                cpuPermille: 300, footprintMB: 20, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 3),
         ],
         tier: .thirtySeconds
     )
@@ -328,11 +352,11 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
 @Test func processRetentionDropsRowsPastEachHorizon() async throws {
     try await withStore { store in
         try store.write(
-            processes: [ProcessRow(name: "alpha", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, count: 1)],
+            processes: [ProcessRow(name: "alpha", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)],
             tier: .thirtySeconds
         )
         try store.write(
-            processes: [ProcessRow(name: "alpha", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, count: 1)],
+            processes: [ProcessRow(name: "alpha", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)],
             tier: .minute
         )
 
@@ -351,7 +375,7 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
 @Test func theSettingIsWhatTheCoarseTierKeeps() async throws {
     try await withStore { store in
         try store.write(
-            processes: [ProcessRow(name: "alpha", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, count: 1)],
+            processes: [ProcessRow(name: "alpha", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)],
             tier: .minute
         )
         // The bug this guards against: clamping every tier to its own default
@@ -380,7 +404,7 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
 @Test func theFineTierIsCappedAtItsOwnDayHoweverLongTheSettingSays() async throws {
     try await withStore { store in
         try store.write(
-            processes: [ProcessRow(name: "alpha", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, count: 1)],
+            processes: [ProcessRow(name: "alpha", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)],
             tier: .thirtySeconds
         )
         // A fortnight chosen in settings does not buy a fortnight of
@@ -398,7 +422,7 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
         let now = bucketStart.addingTimeInterval(2 * 24 * 3600)
         try store.write(
             processes: [
-                ProcessRow(name: "gone", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, count: 1)
+                ProcessRow(name: "gone", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
             ],
             tier: .thirtySeconds
         )
@@ -407,7 +431,7 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
             processes: [
                 ProcessRow(
                     name: "stays", timestamp: now.addingTimeInterval(-60),
-                    cpuPermille: 100, footprintMB: 1, diskKBps: 0, count: 1)
+                    cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
             ],
             tier: .thirtySeconds
         )
@@ -470,7 +494,7 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
     #expect(try store.rowCount(tier: .tenSeconds) == 1)
     try store.write(
         processes: [
-            ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, count: 1)
+            ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
         ],
         tier: .thirtySeconds
     )
@@ -484,7 +508,7 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
         // busier processes push it out.
         try store.write(
             processes: [
-                ProcessRow(name: "quiet", timestamp: bucketStart, cpuPermille: 10, footprintMB: 1, diskKBps: 0, count: 3)
+                ProcessRow(name: "quiet", timestamp: bucketStart, cpuPermille: 10, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 3)
             ],
             tier: .thirtySeconds
         )
@@ -500,7 +524,7 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
                     timestamp: bucketStart.addingTimeInterval(30),
                     cpuPermille: 1000 + index,
                     footprintMB: 100 + index,
-                    diskKBps: 0,
+                    diskKBps: 0, energyMJ: 0, keep: .ranked,
                     count: 3
                 )
             },
@@ -529,7 +553,7 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
     try await withStore { store in
         try store.write(
             processes: [
-                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, count: 1)
+                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
             ],
             tier: .thirtySeconds
         )
@@ -556,7 +580,7 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
     try await withStore { store in
         try store.write(
             processes: [
-                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, count: 1)
+                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
             ],
             tier: .thirtySeconds
         )
@@ -577,7 +601,7 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
     try await withStore { store in
         try store.write(
             processes: [
-                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, count: 1)
+                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
             ],
             tier: .thirtySeconds
         )
@@ -607,7 +631,7 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
     try await withStore { store in
         try store.write(
             processes: [
-                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, count: 1)
+                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
             ],
             tier: .thirtySeconds
         )
@@ -632,7 +656,7 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
     try await withStore { store in
         try store.write(
             processes: [
-                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, count: 1)
+                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
             ],
             tier: .thirtySeconds
         )
@@ -658,9 +682,9 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
         // bridge it — a missing bucket means "not in the top ten", not idle.
         try store.write(
             processes: [
-                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 800, footprintMB: 100, diskKBps: 5, count: 1),
-                ProcessRow(name: "Xcode", timestamp: bucketStart.addingTimeInterval(90), cpuPermille: 400, footprintMB: 120, diskKBps: 0, count: 1),
-                ProcessRow(name: "Safari", timestamp: bucketStart.addingTimeInterval(30), cpuPermille: 900, footprintMB: 50, diskKBps: 0, count: 1),
+                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 800, footprintMB: 100, diskKBps: 5, energyMJ: 0, keep: .ranked, count: 1),
+                ProcessRow(name: "Xcode", timestamp: bucketStart.addingTimeInterval(90), cpuPermille: 400, footprintMB: 120, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1),
+                ProcessRow(name: "Safari", timestamp: bucketStart.addingTimeInterval(30), cpuPermille: 900, footprintMB: 50, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1),
             ],
             tier: .thirtySeconds
         )
@@ -690,7 +714,7 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
     try await withStore { store in
         try store.write(
             processes: [
-                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 500, footprintMB: 10, diskKBps: 0, count: 1)
+                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 500, footprintMB: 10, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
             ],
             tier: .minute
         )
@@ -703,5 +727,382 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
         let day = try await reader.processHistory(name: "Xcode", span: 24 * 3600, now: now)
         #expect(day.tier == .minute)
         #expect(day.points.count == 1)
+    }
+}
+
+// MARK: - Energy
+
+@Test func energyIsTheWattsIntegratedOverTheSweepsOwnWindow() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        // Two sweeps fifteen seconds apart: 2 W for fifteen seconds twice is
+        // 60 J, which no average of watts would produce.
+        for offset in [0.0, 15.0] {
+            recorder.record(
+                sweep(
+                    at: bucketStart.addingTimeInterval(offset),
+                    [process("ollama", cpu: 1.0, power: 2.0)],
+                    interval: 15
+                )
+            )
+        }
+        try recorder.flushNow()
+
+        let usage = try #require(
+            try await store.consumers(at: bucketStart, tier: .thirtySeconds).consumers.first
+        )
+        #expect(abs(usage.energy - 60) < 0.5)
+    }
+}
+
+@Test func aSpanOfEnergyIsASumAndSaysHowMuchOfTheSpanItCoversFor() async throws {
+    try await withStore { store in
+        // Ten buckets of a twenty-bucket span, 30 J each.
+        let rows = (0..<10).map { index in
+            ProcessRow(
+                name: "ollama",
+                timestamp: bucketStart.addingTimeInterval(Double(index * 30)),
+                cpuPermille: 100,
+                footprintMB: 1,
+                diskKBps: 0,
+                energyMJ: 30_000,
+                keep: .ranked,
+                count: 1
+            )
+        }
+        try store.write(processes: rows, tier: .thirtySeconds)
+
+        let end = bucketStart.addingTimeInterval(600)
+        let energy = try await store.databaseQueue.read { db in
+            try HistoryStore.fetchEnergy(
+                name: "ollama", tier: .thirtySeconds, from: bucketStart, to: end, in: db
+            )
+        }
+        #expect(abs(energy.joules - 300) < 0.5)
+        #expect(energy.buckets == 10)
+        // Half the span, which is what stops the total being read as the whole
+        // of what the process drew.
+        #expect(energy.coveredSeconds == 300)
+    }
+}
+
+// MARK: - One name, several pids
+
+@Test func pidsSharingANameSumRatherThanTheFirstOneWinning() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        // A browser's helpers: one name, three processes, a third of a core
+        // each. Reporting 0.3 for "Chrome Helper" is the bug this pins.
+        recorder.record(
+            sweep(
+                at: bucketStart,
+                (1...3).map { index in
+                    process("Google Chrome Helper", pid: pid_t(index), cpu: 0.3, footprint: megabyte)
+                }
+            )
+        )
+        try recorder.flushNow()
+
+        let usage = try #require(
+            try await store.consumers(at: bucketStart, tier: .thirtySeconds).consumers.first
+        )
+        #expect(abs(usage.cpu - 0.9) < 0.001)
+        #expect(usage.footprint == 3 * megabyte)
+    }
+}
+
+@Test func aPidInTwoListsIsCountedOnceEvenWhenItsNameHasOtherPids() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        // Both pids are in the CPU list and the memory list, so a fold that
+        // deduped by name would report 0.4 and one that deduped by nothing
+        // would report 1.6.
+        recorder.record(
+            sweep(
+                at: bucketStart,
+                [
+                    process("helper", pid: 1, cpu: 0.4, footprint: megabyte),
+                    process("helper", pid: 2, cpu: 0.4, footprint: megabyte),
+                ]
+            )
+        )
+        try recorder.flushNow()
+
+        let usage = try #require(
+            try await store.consumers(at: bucketStart, tier: .thirtySeconds).consumers.first
+        )
+        #expect(abs(usage.cpu - 0.8) < 0.001)
+    }
+}
+
+// MARK: - Stickiness and pins
+
+/// Eleven processes, so the twelfth name in a sweep ranks nowhere.
+private func crowd(cpu: Double = 1.0) -> [ProcessSample] {
+    (0..<11).map { index in
+        process("busy\(index)", cpu: cpu + Double(index), footprint: UInt64(index + 1) * megabyte)
+    }
+}
+
+@Test func aNameThatFallsOutOfEveryRankingIsHeldForTheStickyWindow() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        let faller = process("faller", cpu: 40, footprint: 400 * megabyte)
+
+        // Bucket one: it ranks.
+        recorder.record(sweep(at: bucketStart, crowd() + [faller]))
+        // Bucket two closes bucket one. It has dropped out of every list and
+        // arrives only because the sweep was asked for it by name.
+        recorder.record(
+            sweep(
+                at: bucketStart.addingTimeInterval(30),
+                crowd(),
+                watched: [process("faller", cpu: 0.01)]
+            )
+        )
+        #expect(recorder.watching.contains("faller"))
+        try recorder.flushNow()
+
+        let history = try await store.databaseQueue.read { db in
+            try HistoryStore.fetchProcessHistory(
+                name: "faller",
+                tier: .thirtySeconds,
+                from: bucketStart,
+                to: bucketStart.addingTimeInterval(120),
+                in: db
+            )
+        }
+        #expect(history.points.map(\.keep) == [.ranked, .sticky])
+    }
+}
+
+@Test func theStickyWindowLetsGoOnceItHasRunOut() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        recorder.record(sweep(at: bucketStart, crowd() + [process("faller", cpu: 40)]))
+
+        // Past the window, and still supplied by name: the sweep is generous
+        // for a tick after the recorder stops asking, and the bucket must not
+        // keep it anyway.
+        let late = bucketStart.addingTimeInterval(ProcessTier.stickiness + 30)
+        recorder.record(sweep(at: late, crowd(), watched: [process("faller", cpu: 0.01)]))
+        recorder.record(sweep(at: late.addingTimeInterval(30), crowd()))
+        try recorder.flushNow()
+
+        #expect(!recorder.watching.contains("faller"))
+        let history = try await store.databaseQueue.read { db in
+            try HistoryStore.fetchProcessHistory(
+                name: "faller",
+                tier: .thirtySeconds,
+                from: bucketStart,
+                to: late.addingTimeInterval(120),
+                in: db
+            )
+        }
+        #expect(history.points.map(\.keep) == [.ranked])
+    }
+}
+
+@Test func aPinnedNameIsRecordedThoughItRanksNowhere() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        recorder.setPinned(["ollama"])
+        #expect(recorder.watching == ["ollama"])
+
+        recorder.record(
+            sweep(at: bucketStart, crowd(), watched: [process("ollama", cpu: 0.01, power: 3)])
+        )
+        try recorder.flushNow()
+
+        let history = try await store.databaseQueue.read { db in
+            try HistoryStore.fetchProcessHistory(
+                name: "ollama",
+                tier: .thirtySeconds,
+                from: bucketStart,
+                to: bucketStart.addingTimeInterval(60),
+                in: db
+            )
+        }
+        #expect(history.points.map(\.keep) == [.pinned])
+    }
+}
+
+@Test func aPinnedRowSurvivesTheRollupThatReRanks() async throws {
+    try await withStore { store in
+        // Twelve names in each of two thirty-second buckets. The two quiet ones
+        // rank nowhere over the minute; only the reason they were written tells
+        // them apart.
+        var rows: [ProcessRow] = []
+        for bucket in 0..<2 {
+            let timestamp = bucketStart.addingTimeInterval(Double(bucket * 30))
+            for index in 0..<10 {
+                rows.append(
+                    ProcessRow(
+                        name: "busy\(index)",
+                        timestamp: timestamp,
+                        cpuPermille: 1000 + index,
+                        footprintMB: 100 + index,
+                        diskKBps: 0,
+                        energyMJ: 1000 + index,
+                        keep: .ranked,
+                        count: 1
+                    )
+                )
+            }
+            for (name, keep) in [("pinned", ProcessKeepReason.pinned), ("passing", .ranked)] {
+                rows.append(
+                    ProcessRow(
+                        name: name,
+                        timestamp: timestamp,
+                        cpuPermille: 1,
+                        footprintMB: 1,
+                        diskKBps: 0,
+                        energyMJ: 1,
+                        keep: keep,
+                        count: 1
+                    )
+                )
+            }
+        }
+        try store.write(processes: rows, tier: .thirtySeconds)
+        try await Downsampler(store: store).compact(now: bucketStart.addingTimeInterval(3600))
+
+        let names = try await store.consumers(at: bucketStart, tier: .minute).consumers.map(\.name)
+        #expect(names.contains("pinned"))
+        #expect(!names.contains("passing"))
+    }
+}
+
+// MARK: - The registry
+
+@Test func everyNameIsRegisteredWithTheHourItWasSeenIn() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        // 03:00 UTC on a Tuesday, which is the question the registry exists to
+        // answer: something appeared in the night that ranks nowhere by day.
+        let night = Date(timeIntervalSince1970: 1_700_017_200)
+        recorder.record(
+            sweep(
+                at: night,
+                [],
+                roster: [ProcessIdentity(name: "ghost", path: "/tmp/ghost")]
+            )
+        )
+        try recorder.flushNow()
+
+        let appearance = try await store.databaseQueue.read { db in
+            try HistoryStore.fetchAppearance(name: "ghost", in: db)
+        }
+        let found = try #require(appearance)
+        #expect(found.path == "/tmp/ghost")
+        #expect(found.firstSeen == night)
+        #expect(found.lastSeen == night)
+
+        let hours = try await store.databaseQueue.read { db in
+            try Int.fetchOne(
+                db,
+                sql: """
+                    SELECT hours FROM process_presence
+                    JOIN process_names ON process_names.id = process_presence.name_id
+                    WHERE name = ? AND day = ?
+                    """,
+                arguments: ["ghost", Int(night.timeIntervalSince1970) / 86400]
+            )
+        }
+        #expect(hours == 1 << 3)
+    }
+}
+
+@Test func aNameSeenAcrossTwoDaysGetsARowForEach() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        let ghost = [ProcessIdentity(name: "ghost", path: nil)]
+        // 23:30 and 00:30: one name, two days, and the mask must not carry the
+        // first day's bit into the second.
+        let before = Date(timeIntervalSince1970: 1_700_005_800)
+        recorder.record(sweep(at: before, [], roster: ghost))
+        recorder.record(sweep(at: before.addingTimeInterval(3600), [], roster: ghost))
+        try recorder.flushNow()
+
+        let rows = try await store.databaseQueue.read { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT day, hours FROM process_presence
+                    JOIN process_names ON process_names.id = process_presence.name_id
+                    WHERE name = ? ORDER BY day
+                    """,
+                arguments: ["ghost"]
+            )
+            .map { (day: $0["day"] as Int, hours: $0["hours"] as Int) }
+        }
+        #expect(rows.count == 2)
+        #expect(rows.first?.hours == 1 << 23)
+        #expect(rows.last?.hours == 1 << 0)
+    }
+}
+
+@Test func deletingTheProcessHistoryTakesTheRegistryWithIt() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        recorder.record(
+            sweep(at: bucketStart, [process("Xcode", cpu: 1)], roster: [ProcessIdentity(name: "ghost", path: nil)])
+        )
+        try recorder.flushNow()
+
+        try await store.deleteProcessHistory()
+
+        let remaining = try await store.databaseQueue.read { db in
+            try Int.fetchOne(db, sql: "SELECT count(*) FROM process_inventory") ?? 0
+                + (try Int.fetchOne(db, sql: "SELECT count(*) FROM process_presence") ?? 0)
+        }
+        #expect(remaining == 0)
+    }
+}
+
+@Test func theRegistryForgetsAsFarBackAsTheRetentionSays() async throws {
+    try await withStore { store in
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let old = now.addingTimeInterval(-30 * 24 * 3600)
+        func seen(_ name: String, at moments: [Date]) -> ProcessAppearanceRow {
+            let identity = ProcessIdentity(name: name, path: nil)
+            var row = ProcessAppearanceRow(identity: identity, at: moments[0])
+            for moment in moments {
+                row.observe(
+                    identity: identity,
+                    at: moment,
+                    day: ProcessAppearanceRow.day(of: moment),
+                    hour: ProcessAppearanceRow.hourBit(of: moment)
+                )
+            }
+            return row
+        }
+        try store.write(
+            appearances: [seen("long-runner", at: [old, now]), seen("gone", at: [old])]
+        )
+
+        try await Downsampler(store: store).compact(
+            now: now,
+            processRetention: ProcessRetention.week.seconds
+        )
+
+        // The name last seen a month ago is gone entirely.
+        let gone = try await store.databaseQueue.read { db in
+            try HistoryStore.fetchAppearance(name: "gone", in: db)
+        }
+        #expect(gone == nil)
+
+        // The one still running keeps its row, but not a first sighting older
+        // than the week the user asked to keep.
+        let survivor = try #require(
+            try await store.databaseQueue.read { db in
+                try HistoryStore.fetchAppearance(name: "long-runner", in: db)
+            }
+        )
+        #expect(survivor.firstSeen == now.addingTimeInterval(-7 * 24 * 3600))
+        let days = try await store.databaseQueue.read { db in
+            try Int.fetchOne(db, sql: "SELECT count(*) FROM process_presence") ?? 0
+        }
+        #expect(days == 1)
     }
 }
