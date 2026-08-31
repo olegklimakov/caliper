@@ -23,6 +23,11 @@ public actor SamplingCoordinator {
     /// latching the *higher* demand for the life of the process.
     private let demand: Mutex<MetricDemand>
 
+    /// Names the process sweep must report whatever they rank. A lock for the
+    /// reason `demand` uses one, and because the recorder recomputes it every
+    /// bucket from the other side of the app.
+    private let watching = Mutex<Set<String>>([])
+
     private var tickCount: UInt64 = 0
     private var lastTick: ContinuousClock.Instant?
     private var timer: DispatchSourceTimer?
@@ -97,6 +102,10 @@ public actor SamplingCoordinator {
     /// next tick reads whatever is here when it runs.
     public nonisolated func setDemand(_ demand: MetricDemand) {
         self.demand.withLock { $0 = demand }
+    }
+
+    public nonisolated func setWatching(_ names: Set<String>) {
+        watching.withLock { $0 = names }
     }
 
     // MARK: - Output
@@ -177,7 +186,7 @@ public actor SamplingCoordinator {
             latestDriveHealth = driveHealthSampler.sample()
         }
         if shouldSample(.processes, hasValue: latestProcesses != nil),
-            let processes = processSampler.sample(at: instant)
+            let processes = processSampler.sample(at: instant, watching: watching.withLock { $0 })
         {
             latestProcesses = processes
         }
