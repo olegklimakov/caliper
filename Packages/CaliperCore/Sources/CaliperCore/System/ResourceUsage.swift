@@ -107,19 +107,22 @@ enum ResourceUsage {
         )
     }
 
+    /// The executable's full path, or nil for another user's processes.
+    static func path(for pid: pid_t) -> String? {
+        // `PROC_PIDPATHINFO_MAXSIZE` is a macro Swift does not import.
+        var pathBuffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
+        let pathLength = proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count))
+        guard pathLength > 0 else { return nil }
+        return CString.string(pathBuffer, length: Int(pathLength))
+    }
+
     /// `proc_pidpath` gives the real executable name where `proc_name`
     /// truncates at sixteen characters, but the path is unreadable for another
     /// user's processes — and a runaway root process is the one worth seeing, so
     /// a truncated name beats dropping it.
     static func name(for pid: pid_t) -> String {
-        // `PROC_PIDPATHINFO_MAXSIZE` is a macro Swift does not import.
-        var pathBuffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
-        let pathLength = proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count))
-        if pathLength > 0 {
-            let path = CString.string(pathBuffer, length: Int(pathLength))
-            if let executable = path.split(separator: "/").last {
-                return String(executable)
-            }
+        if let executable = path(for: pid)?.split(separator: "/").last {
+            return String(executable)
         }
 
         var nameBuffer = [CChar](repeating: 0, count: Int(MAXCOMLEN) * 2 + 1)
@@ -129,5 +132,24 @@ enum ResourceUsage {
         }
 
         return "pid \(pid)"
+    }
+
+    struct ShortInfo {
+        let uid: uid_t
+        let ppid: pid_t
+    }
+
+    static func shortInfo(for pid: pid_t) -> ShortInfo? {
+        var info = proc_bsdshortinfo()
+        let size = Int32(MemoryLayout<proc_bsdshortinfo>.size)
+        guard proc_pidinfo(pid, PROC_PIDT_SHORTBSDINFO, 0, &info, size) == size else { return nil }
+        return ShortInfo(uid: info.pbsi_uid, ppid: pid_t(info.pbsi_ppid))
+    }
+
+    /// Seconds of *awake* time since the given `mach_absolute_time` reading:
+    /// the clock does not tick during sleep, so a span across one undercounts.
+    /// Honest as "running for", wrong as a start date.
+    static func elapsedSeconds(sinceMachAbsolute start: UInt64) -> Double {
+        Double(nanoseconds(fromTicks: mach_absolute_time().subtractingClamped(start))) / 1e9
     }
 }

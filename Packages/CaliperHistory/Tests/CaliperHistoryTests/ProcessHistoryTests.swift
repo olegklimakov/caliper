@@ -649,3 +649,59 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
         #expect(stopped.isEmpty)
     }
 }
+
+// MARK: - One name across a span (the card's strip)
+
+@Test func aNameSeriesKeepsItsGaps() async throws {
+    try await withStore { store in
+        // Buckets one and four only: the strip must hand the hole back, not
+        // bridge it — a missing bucket means "not in the top ten", not idle.
+        try store.write(
+            processes: [
+                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 800, footprintMB: 100, diskKBps: 5, count: 1),
+                ProcessRow(name: "Xcode", timestamp: bucketStart.addingTimeInterval(90), cpuPermille: 400, footprintMB: 120, diskKBps: 0, count: 1),
+                ProcessRow(name: "Safari", timestamp: bucketStart.addingTimeInterval(30), cpuPermille: 900, footprintMB: 50, diskKBps: 0, count: 1),
+            ],
+            tier: .thirtySeconds
+        )
+
+        let reader = HistoryReader(store: store)
+        let now = bucketStart.addingTimeInterval(120)
+        let history = try await reader.processHistory(name: "Xcode", span: 3600, now: now)
+
+        #expect(history.tier == .thirtySeconds)
+        #expect(history.points.count == 2)
+        #expect(history.points.map(\.bucketStart) == [bucketStart, bucketStart.addingTimeInterval(90)])
+        #expect(history.points.first?.cpu == 0.8)
+        #expect(history.points.first?.footprint == 100 * megabyte)
+        #expect(history.points.first?.diskRate == 5120.0)
+    }
+}
+
+@Test func anUnknownNameIsAnEmptyHistoryNotAnError() async throws {
+    try await withStore { store in
+        let reader = HistoryReader(store: store)
+        let history = try await reader.processHistory(name: "never-ran", span: 3600)
+        #expect(history.points.isEmpty)
+    }
+}
+
+@Test func theStripsTierFollowsItsSpan() async throws {
+    try await withStore { store in
+        try store.write(
+            processes: [
+                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 500, footprintMB: 10, diskKBps: 0, count: 1)
+            ],
+            tier: .minute
+        )
+        let reader = HistoryReader(store: store)
+        let now = bucketStart.addingTimeInterval(600)
+
+        let hour = try await reader.processHistory(name: "Xcode", span: 3600, now: now)
+        #expect(hour.tier == .thirtySeconds)
+
+        let day = try await reader.processHistory(name: "Xcode", span: 24 * 3600, now: now)
+        #expect(day.tier == .minute)
+        #expect(day.points.count == 1)
+    }
+}

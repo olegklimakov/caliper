@@ -202,6 +202,52 @@ public struct HistoryStore: Sendable {
         )
     }
 
+    /// One name across a span, for the card's strip.
+    static func fetchProcessHistory(
+        name: String,
+        tier: ProcessTier,
+        from start: Date,
+        to end: Date,
+        in db: Database
+    ) throws -> ProcessNameHistory {
+        guard
+            let id = try Int64.fetchOne(
+                db,
+                sql: "SELECT id FROM process_names WHERE name = ?",
+                arguments: [name]
+            )
+        else { return ProcessNameHistory(tier: tier, points: []) }
+
+        // `name_id` is the second column of the primary key, so this is a
+        // range scan over the span's rows — at most ~57 600 for a day of the
+        // fine tier, milliseconds for one card. An index on (name_id,
+        // timestamp) would seek instead, and tax every write for it;
+        // deliberately not built until something reads names hot.
+        let rows = try Row.fetchAll(
+            db,
+            sql: """
+                SELECT timestamp, cpu_permille, footprint_mb, disk_kbps
+                FROM \(tier.tableName)
+                WHERE timestamp BETWEEN ? AND ? AND name_id = ?
+                ORDER BY timestamp
+                """,
+            arguments: [
+                Int(start.timeIntervalSince1970), Int(end.timeIntervalSince1970), id,
+            ]
+        )
+        return ProcessNameHistory(
+            tier: tier,
+            points: rows.map { row in
+                ProcessNamePoint(
+                    bucketStart: Date(timeIntervalSince1970: TimeInterval(row["timestamp"] as Int)),
+                    cpu: Double(row["cpu_permille"] as Int) / 1000,
+                    footprint: UInt64(row["footprint_mb"] as Int) * 1_048_576,
+                    diskRate: Double(row["disk_kbps"] as Int) * 1024
+                )
+            }
+        )
+    }
+
     /// The settings button behind "a behavioural record you can take back".
     func deleteProcessHistory() async throws {
         try await queue.write { db in

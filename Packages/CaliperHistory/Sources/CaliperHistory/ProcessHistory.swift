@@ -135,6 +135,36 @@ public struct ProcessBucket: Sendable, Equatable {
     public var end: Date { start.addingTimeInterval(TimeInterval(tier.seconds)) }
 }
 
+/// One name's row in one bucket — a point of the card's history strip.
+public struct ProcessNamePoint: Sendable, Equatable {
+    public let bucketStart: Date
+    public let cpu: Double
+    /// Peak bytes over the bucket, the same accounting as `ProcessUsage`.
+    public let footprint: UInt64
+    public let diskRate: Double
+
+    public init(bucketStart: Date, cpu: Double, footprint: UInt64, diskRate: Double) {
+        self.bucketStart = bucketStart
+        self.cpu = cpu
+        self.footprint = footprint
+        self.diskRate = diskRate
+    }
+}
+
+/// One name across a span — the sanctioned series form: sparse, so the gaps
+/// stay real. Only the top ten per bucket are stored, and a bucket with no
+/// point means "not in the top ten then", not "idle" — which is why this is
+/// drawn as bars with holes and never as a line.
+public struct ProcessNameHistory: Sendable, Equatable {
+    public let tier: ProcessTier
+    public let points: [ProcessNamePoint]
+
+    public init(tier: ProcessTier, points: [ProcessNamePoint]) {
+        self.tier = tier
+        self.points = points
+    }
+}
+
 /// One process over one bucket, in the scaled integers the tables hold: SQLite
 /// varint-encodes a small integer to one or two bytes where a `DOUBLE` always
 /// costs eight, and none of the three values needs three significant digits.
