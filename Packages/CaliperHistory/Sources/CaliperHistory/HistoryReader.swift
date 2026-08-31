@@ -48,6 +48,23 @@ public struct HistoryReader: Sendable {
         return try await store.consumers(at: moment, tier: tier, now: now, isRecording: isRecording)
     }
 
+    /// One name's buckets over the last `span` — the card's history strip.
+    /// Sparse by design; an unknown name is an empty history, not an error.
+    public func processHistory(
+        name: String,
+        span: TimeInterval,
+        now: Date = Date()
+    ) async throws -> ProcessNameHistory {
+        // The fine tier keeps a day at most; anything finer-grained than an
+        // hour of it reads better at thirty seconds, everything longer at a
+        // minute.
+        let tier: ProcessTier = span <= 3600 ? .thirtySeconds : .minute
+        let start = now.addingTimeInterval(-span)
+        return try await store.databaseQueue.read { db in
+            try HistoryStore.fetchProcessHistory(name: name, tier: tier, from: start, to: now, in: db)
+        }
+    }
+
     /// Removes every stored process row and every interned name. Off the
     /// caller's thread: two table-wide deletes and a vacuum, from a settings
     /// window.

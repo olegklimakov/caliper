@@ -8,7 +8,7 @@ import Foundation
 /// kept between ticks, names are resolved only for the handful that make the
 /// lists, and the cadence table runs it in seconds rather than every tick.
 struct ProcessSampler {
-    private var pids: [pid_t] = []
+    private var pids = PIDBuffer()
     private var previous: [pid_t: ResourceUsage.Counters] = [:]
     private var window = RateWindow()
 
@@ -17,14 +17,13 @@ struct ProcessSampler {
     private let limit = 10
 
     mutating func sample(at instant: ContinuousClock.Instant) -> ProcessesSample? {
-        guard let count = readPIDs() else { return nil }
+        guard let list = pids.read() else { return nil }
 
         var current: [pid_t: ResourceUsage.Counters] = [:]
-        current.reserveCapacity(count)
+        current.reserveCapacity(list.count)
         var unreadableCount = 0
 
-        for index in 0..<count {
-            let pid = pids[index]
+        for pid in list {
             guard pid > 0 else {
                 // pid 0 is kernel_task, refused like every root-owned pid.
                 unreadableCount += 1
@@ -110,8 +109,6 @@ struct ProcessSampler {
             baseline = counters
         }
 
-        let disk = counters.bytesRead &+ counters.bytesWritten
-        let diskBefore = baseline.bytesRead &+ baseline.bytesWritten
         let cyclesDelta = counters.cycles.subtractingClamped(baseline.cycles)
         // The two cycle counters are read non-atomically by the kernel, so the
         // performance share is clamped to the total it is a share of.
@@ -143,10 +140,13 @@ struct ProcessSampler {
             pid: pid,
             cpu: Double(counters.cpuTime.subtractingClamped(baseline.cpuTime)) / 1e9 / seconds,
             footprint: counters.physicalFootprint,
-            diskRate: Double(disk.subtractingClamped(diskBefore)) / seconds,
+            readRate: Double(counters.bytesRead.subtractingClamped(baseline.bytesRead)) / seconds,
+            writeRate: Double(counters.bytesWritten.subtractingClamped(baseline.bytesWritten)) / seconds,
             power: Double(counters.energy.subtractingClamped(baseline.energy)) / 1e9 / seconds,
             wakeupsPerSecond: Double(wakeups) / seconds,
             performanceCycleShare: cyclesDelta == 0 ? nil : Double(pCyclesDelta) / Double(cyclesDelta),
+            cyclesDelta: cyclesDelta,
+            pCyclesDelta: pCyclesDelta,
             qos: qos
         )
     }
@@ -155,34 +155,24 @@ struct ProcessSampler {
         let pid: pid_t
         let cpu: Double
         let footprint: UInt64
-        let diskRate: Double
+        let readRate: Double
+        let writeRate: Double
         let power: Double
         let wakeupsPerSecond: Double
         let performanceCycleShare: Double?
+        /// Raw cycle deltas, kept so a family total can divide summed p-cycles
+        /// by summed cycles rather than average the members' shares — cores
+        /// retire cycles at different rates, and an average would weight them
+        /// as equals.
+        let cyclesDelta: UInt64
+        let pCyclesDelta: UInt64
         let qos: QoSBreakdown?
+
+        var diskRate: Double { readRate + writeRate }
     }
 
     mutating func resetBaseline() {
         previous = [:]
         window.reset()
-    }
-
-    /// Fills the reused pid buffer and returns how many entries are valid.
-    private mutating func readPIDs() -> Int? {
-        let count = proc_listallpids(nil, 0)
-        guard count > 0 else { return nil }
-
-        // Headroom so a process spawned between the two calls does not force a
-        // reallocation on the next tick.
-        if pids.count < Int(count) {
-            pids = [pid_t](repeating: 0, count: Int(count) + 64)
-        }
-
-        let bytes = Int32(pids.count * MemoryLayout<pid_t>.size)
-        let written = pids.withUnsafeMutableBufferPointer { buffer in
-            proc_listallpids(buffer.baseAddress, bytes)
-        }
-        guard written > 0 else { return nil }
-        return Int(written)
     }
 }
