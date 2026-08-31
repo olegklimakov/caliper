@@ -65,6 +65,47 @@ public struct HistoryReader: Sendable {
         }
     }
 
+    /// Joules one name drew over the last `span`.
+    ///
+    /// The same tier rule as the strip, and the same caveat with teeth: for an
+    /// unpinned process this is the energy of the buckets it *ranked* in, which
+    /// is a floor. `ProcessEnergy.coveredSeconds` against the span is what says
+    /// how much of a floor.
+    public func processEnergy(
+        name: String,
+        span: TimeInterval,
+        now: Date = Date()
+    ) async throws -> ProcessEnergy {
+        let tier: ProcessTier = span <= 3600 ? .thirtySeconds : .minute
+        let start = now.addingTimeInterval(-span)
+        return try await store.databaseQueue.read { db in
+            try HistoryStore.fetchEnergy(name: name, tier: tier, from: start, to: now, in: db)
+        }
+    }
+
+    /// What drew the most energy over the last `span`, heaviest first — the
+    /// battery question, which CPU order does not answer: an efficiency-cluster
+    /// process at 200 % costs less than a performance-cluster one at 80 %.
+    public func topByEnergy(
+        span: TimeInterval,
+        limit: Int = ProcessTier.topCount,
+        now: Date = Date()
+    ) async throws -> [(name: String, joules: Double)] {
+        let tier: ProcessTier = span <= 3600 ? .thirtySeconds : .minute
+        let start = now.addingTimeInterval(-span)
+        return try await store.databaseQueue.read { db in
+            try HistoryStore.fetchTopByEnergy(tier: tier, from: start, to: now, limit: limit, in: db)
+        }
+    }
+
+    /// When a name was first and last seen, for every name the machine has
+    /// run — not only the ones that ranked. `nil` means never recorded.
+    public func appearance(name: String) async throws -> ProcessAppearance? {
+        try await store.databaseQueue.read { db in
+            try HistoryStore.fetchAppearance(name: name, in: db)
+        }
+    }
+
     /// Removes every stored process row and every interned name. Off the
     /// caller's thread: two table-wide deletes and a vacuum, from a settings
     /// window.

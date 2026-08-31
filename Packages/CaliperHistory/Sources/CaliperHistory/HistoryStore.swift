@@ -84,8 +84,9 @@ public struct HistoryStore: Sendable {
                 try db.execute(
                     sql: """
                         INSERT INTO \(tier.tableName)
-                            (timestamp, name_id, cpu_permille, footprint_mb, disk_kbps, count)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                            (timestamp, name_id, cpu_permille, footprint_mb, disk_kbps,
+                             energy_mj, keep, count)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT (timestamp, name_id) DO UPDATE SET \(Self.processMergeClause)
                         """,
                     arguments: [
@@ -94,6 +95,8 @@ public struct HistoryStore: Sendable {
                         row.cpuPermille,
                         row.footprintMB,
                         row.diskKBps,
+                        row.energyMJ,
+                        row.keep.rawValue,
                         row.count,
                     ]
                 )
@@ -102,15 +105,61 @@ public struct HistoryStore: Sendable {
     }
 
     /// The same rule as `mergeClause`, for the same reason. Footprint is a
-    /// peak, so it widens rather than being re-weighted.
+    /// peak, so it widens rather than being re-weighted; energy is a total, so
+    /// it adds; and the strongest reason for keeping the row wins, or a merge
+    /// would demote a pinned bucket to a ranked one.
     static let processMergeClause = """
         cpu_permille = (cpu_permille * count + excluded.cpu_permille * excluded.count)
                        / (count + excluded.count),
         footprint_mb = max(footprint_mb, excluded.footprint_mb),
         disk_kbps = (disk_kbps * count + excluded.disk_kbps * excluded.count)
                     / (count + excluded.count),
+        energy_mj = energy_mj + excluded.energy_mj,
+        keep = max(keep, excluded.keep),
         count = count + excluded.count
         """
+
+    /// Writes the registry: one row a name, one a name a day.
+    ///
+    /// Every readable name, not the ranked twenty — which is affordable
+    /// precisely because it is not per bucket, and is the only record that can
+    /// answer for a program too cheap to ever rank.
+    func write(appearances rows: [ProcessAppearanceRow]) throws {
+        guard !rows.isEmpty else { return }
+
+        try queue.write { db in
+            for row in rows {
+                let id = try Self.intern(row.name, in: db)
+                try db.execute(
+                    sql: """
+                        INSERT INTO process_inventory (name_id, first_seen, last_seen, path)
+                        VALUES (?, ?, ?, ?)
+                        ON CONFLICT (name_id) DO UPDATE SET
+                            first_seen = min(first_seen, excluded.first_seen),
+                            last_seen = max(last_seen, excluded.last_seen),
+                            path = coalesce(process_inventory.path, excluded.path)
+                        """,
+                    arguments: [
+                        id,
+                        Int(row.firstSeen.timeIntervalSince1970),
+                        Int(row.lastSeen.timeIntervalSince1970),
+                        row.path,
+                    ]
+                )
+                for (day, hours) in row.hours {
+                    try db.execute(
+                        sql: """
+                            INSERT INTO process_presence (name_id, day, hours)
+                            VALUES (?, ?, ?)
+                            ON CONFLICT (name_id, day) DO UPDATE SET
+                                hours = hours | excluded.hours
+                            """,
+                        arguments: [id, day, hours]
+                    )
+                }
+            }
+        }
+    }
 
     private static func intern(_ name: String, in db: Database) throws -> Int64 {
         try db.execute(
@@ -180,7 +229,7 @@ public struct HistoryStore: Sendable {
         let rows = try Row.fetchAll(
             db,
             sql: """
-                SELECT name, cpu_permille, footprint_mb, disk_kbps
+                SELECT name, cpu_permille, footprint_mb, disk_kbps, energy_mj
                 FROM \(tier.tableName)
                 JOIN process_names ON process_names.id = \(tier.tableName).name_id
                 WHERE timestamp = ?
@@ -196,7 +245,8 @@ public struct HistoryStore: Sendable {
                     name: row["name"],
                     cpu: Double(row["cpu_permille"] as Int) / 1000,
                     footprint: UInt64(row["footprint_mb"] as Int) * 1_048_576,
-                    diskRate: Double(row["disk_kbps"] as Int) * 1024
+                    diskRate: Double(row["disk_kbps"] as Int) * 1024,
+                    energy: Double(row["energy_mj"] as Int) / 1000
                 )
             }
         )
@@ -226,7 +276,7 @@ public struct HistoryStore: Sendable {
         let rows = try Row.fetchAll(
             db,
             sql: """
-                SELECT timestamp, cpu_permille, footprint_mb, disk_kbps
+                SELECT timestamp, cpu_permille, footprint_mb, disk_kbps, energy_mj, keep
                 FROM \(tier.tableName)
                 WHERE timestamp BETWEEN ? AND ? AND name_id = ?
                 ORDER BY timestamp
@@ -242,10 +292,94 @@ public struct HistoryStore: Sendable {
                     bucketStart: Date(timeIntervalSince1970: TimeInterval(row["timestamp"] as Int)),
                     cpu: Double(row["cpu_permille"] as Int) / 1000,
                     footprint: UInt64(row["footprint_mb"] as Int) * 1_048_576,
-                    diskRate: Double(row["disk_kbps"] as Int) * 1024
+                    diskRate: Double(row["disk_kbps"] as Int) * 1024,
+                    energy: Double(row["energy_mj"] as Int) / 1000,
+                    keep: ProcessKeepReason(rawValue: row["keep"] as Int) ?? .ranked
                 )
             }
         )
+    }
+
+    /// Joules one name drew over a span, and how much of the span is covered.
+    ///
+    /// A total rather than a series: "how much energy did this cost me today"
+    /// is a sum, and the only reason it can be asked at all is that energy is
+    /// stored as energy rather than as the watts it was read from.
+    static func fetchEnergy(
+        name: String,
+        tier: ProcessTier,
+        from start: Date,
+        to end: Date,
+        in db: Database
+    ) throws -> ProcessEnergy {
+        guard
+            let id = try Int64.fetchOne(
+                db,
+                sql: "SELECT id FROM process_names WHERE name = ?",
+                arguments: [name]
+            ),
+            let row = try Row.fetchOne(
+                db,
+                sql: """
+                    SELECT sum(energy_mj) AS energy_mj, count(*) AS buckets
+                    FROM \(tier.tableName)
+                    WHERE timestamp BETWEEN ? AND ? AND name_id = ?
+                    """,
+                arguments: [Int(start.timeIntervalSince1970), Int(end.timeIntervalSince1970), id]
+            )
+        else { return ProcessEnergy(joules: 0, buckets: 0, tier: tier) }
+
+        return ProcessEnergy(
+            joules: Double(row["energy_mj"] as Int? ?? 0) / 1000,
+            buckets: row["buckets"] as Int,
+            tier: tier
+        )
+    }
+
+    /// The names that drew the most energy over a span.
+    static func fetchTopByEnergy(
+        tier: ProcessTier,
+        from start: Date,
+        to end: Date,
+        limit: Int,
+        in db: Database
+    ) throws -> [(name: String, joules: Double)] {
+        try Row.fetchAll(
+            db,
+            sql: """
+                SELECT name, sum(energy_mj) AS energy_mj
+                FROM \(tier.tableName)
+                JOIN process_names ON process_names.id = \(tier.tableName).name_id
+                WHERE timestamp BETWEEN ? AND ?
+                GROUP BY name_id
+                ORDER BY energy_mj DESC
+                LIMIT ?
+                """,
+            arguments: [Int(start.timeIntervalSince1970), Int(end.timeIntervalSince1970), limit]
+        )
+        .map { (name: $0["name"], joules: Double($0["energy_mj"] as Int) / 1000) }
+    }
+
+    /// One name's registry entry, or nil for a name never recorded.
+    static func fetchAppearance(name: String, in db: Database) throws -> ProcessAppearance? {
+        try Row.fetchOne(
+            db,
+            sql: """
+                SELECT name, path, first_seen, last_seen
+                FROM process_inventory
+                JOIN process_names ON process_names.id = process_inventory.name_id
+                WHERE name = ?
+                """,
+            arguments: [name]
+        )
+        .map { row in
+            ProcessAppearance(
+                name: row["name"],
+                path: row["path"],
+                firstSeen: Date(timeIntervalSince1970: TimeInterval(row["first_seen"] as Int)),
+                lastSeen: Date(timeIntervalSince1970: TimeInterval(row["last_seen"] as Int))
+            )
+        }
     }
 
     /// The settings button behind "a behavioural record you can take back".
@@ -275,10 +409,7 @@ public struct HistoryStore: Sendable {
         for tier in HistoryTier.allCases {
             try db.execute(sql: "DELETE FROM \(tier.tableName)")
         }
-        for tier in ProcessTier.allCases {
-            try db.execute(sql: "DELETE FROM \(tier.tableName)")
-        }
-        try db.execute(sql: "DELETE FROM process_names")
+        try Self.deleteProcessTables(in: db)
     }
 
     /// Rewrites the file at the size its remaining contents need.
@@ -298,12 +429,21 @@ public struct HistoryStore: Sendable {
 
     /// Shared by the blocking and the async callers, so there is one delete.
     static func deleteProcessHistory(in db: Database) throws {
+        try deleteProcessTables(in: db)
+        // Or the file stays the size of the record just deleted.
+        try db.execute(sql: "PRAGMA incremental_vacuum(4096)")
+    }
+
+    /// Every table the process record lives in. The registry is part of it:
+    /// "a behavioural record you can take back" is a lie if the list of every
+    /// program the machine has run survives the button.
+    private static func deleteProcessTables(in db: Database) throws {
         for tier in ProcessTier.allCases {
             try db.execute(sql: "DELETE FROM \(tier.tableName)")
         }
+        try db.execute(sql: "DELETE FROM process_presence")
+        try db.execute(sql: "DELETE FROM process_inventory")
         try db.execute(sql: "DELETE FROM process_names")
-        // Or the file stays the size of the record just deleted.
-        try db.execute(sql: "PRAGMA incremental_vacuum(4096)")
     }
 
     func processRowCount(tier: ProcessTier) throws -> Int {

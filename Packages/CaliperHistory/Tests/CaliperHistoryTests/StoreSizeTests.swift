@@ -73,14 +73,20 @@ private func megabytesReported(by store: HistoryStore) -> Double {
 /// which a day of the thirty-second tier is ~2.3 MB. The same claim about bytes,
 /// measured the same way — and the reason the values are scaled integers and the
 /// names are interned rather than repeated 2880 times a day.
+///
+/// Energy is populated at the magnitudes a real bucket holds: it is varint-coded
+/// like the rest, so a fixture of zeroes would measure a column that is not
+/// there.
 @Test func aDayOfProcessBucketsStaysUnderTheBudget() async throws {
     try await withStoreOnDisk { store in
         // A full day of the finest process tier, each bucket holding the top ten
         // by CPU unioned with the top ten by footprint.
         let start = Date(timeIntervalSince1970: 1_700_000_000)
         let bucketsPerDay = 24 * 3600 / ProcessTier.thirtySeconds.seconds
-        // Real names, at the length the store actually has to carry.
-        let names = (0..<20).map { "com.apple.WebKit.WebContent.Instance\($0)" }
+        // Real names, at the length the store actually has to carry. Twenty-two
+        // of them: ten by CPU unioned with ten by footprint and ten by energy
+        // is around twenty, and the sticky window holds a couple more.
+        let names = (0..<22).map { "com.apple.WebKit.WebContent.Instance\($0)" }
 
         var rows: [ProcessRow] = []
         rows.reserveCapacity(bucketsPerDay * names.count)
@@ -94,6 +100,9 @@ private func megabytesReported(by store: HistoryStore) -> Double {
                         cpuPermille: (bucket + index) % 4000,
                         footprintMB: (bucket + index) % 8192,
                         diskKBps: (bucket + index) % 512,
+                        // Thirty seconds at nought to three watts.
+                        energyMJ: (bucket + index) % 90_000,
+                        keep: index < 2 ? .pinned : .ranked,
                         count: 3
                     )
                 )
@@ -103,7 +112,7 @@ private func megabytesReported(by store: HistoryStore) -> Double {
 
         let written = try store.processRowCount(tier: .thirtySeconds)
         #expect(written == bucketsPerDay * names.count)
-        // Twenty names for 57 600 rows — the whole point of interning them.
+        // Twenty-two names for 63 360 rows — the whole point of interning them.
         #expect(try store.internedNameCount() == names.count)
 
         let megabytes = try megabytesOnDisk(of: store)
@@ -135,7 +144,7 @@ private func megabytesReported(by store: HistoryStore) -> Double {
         try store.write(samples, tier: .tenSeconds)
         try store.write(
             processes: [
-                ProcessRow(name: "Xcode", timestamp: start, cpuPermille: 100, footprintMB: 1, diskKBps: 0, count: 1)
+                ProcessRow(name: "Xcode", timestamp: start, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
             ],
             tier: .thirtySeconds
         )

@@ -49,6 +49,7 @@ public struct Downsampler: Sendable {
             for tier in ProcessTier.allCases {
                 try deleteExpiredProcesses(tier, retention: processRetention, now: now, in: db)
             }
+            try deleteExpiredRegistry(retention: processRetention, now: now, in: db)
             try collectProcessNames(in: db)
             // Hand back a bounded number of the pages those deletes freed.
             // Incremental rather than a full `VACUUM`, which would rewrite the
@@ -161,7 +162,8 @@ public struct Downsampler: Sendable {
         // A delete rather than `DO UPDATE` because this rollup re-ranks: a
         // process that falls out of the top ten has to leave the bucket, and an
         // update can overwrite rows but never remove one. One transaction, so
-        // the window is never observed empty.
+        // the window is never observed empty. Re-ranking is also why `keep`
+        // exists — a pinned row ranks nowhere and would be re-evicted here.
         try db.execute(
             sql: "DELETE FROM \(target.tableName) WHERE timestamp >= ? AND timestamp < ?",
             arguments: [settled, cutoff]
@@ -170,8 +172,10 @@ public struct Downsampler: Sendable {
         try db.execute(
             sql: """
                 INSERT INTO \(target.tableName)
-                    (timestamp, name_id, cpu_permille, footprint_mb, disk_kbps, count)
-                SELECT timestamp, name_id, cpu_permille, footprint_mb, disk_kbps, count
+                    (timestamp, name_id, cpu_permille, footprint_mb, disk_kbps,
+                     energy_mj, keep, count)
+                SELECT timestamp, name_id, cpu_permille, footprint_mb, disk_kbps,
+                       energy_mj, keep, count
                 FROM (
                     SELECT
                         timestamp / :width * :width AS timestamp,
@@ -179,6 +183,8 @@ public struct Downsampler: Sendable {
                         sum(cpu_permille * count) / sum(count) AS cpu_permille,
                         max(footprint_mb) AS footprint_mb,
                         sum(disk_kbps * count) / sum(count) AS disk_kbps,
+                        sum(energy_mj) AS energy_mj,
+                        max(keep) AS keep,
                         sum(count) AS count,
                         row_number() OVER (
                             PARTITION BY timestamp / :width * :width
@@ -187,12 +193,17 @@ public struct Downsampler: Sendable {
                         row_number() OVER (
                             PARTITION BY timestamp / :width * :width
                             ORDER BY max(footprint_mb) DESC
-                        ) AS memory_rank
+                        ) AS memory_rank,
+                        row_number() OVER (
+                            PARTITION BY timestamp / :width * :width
+                            ORDER BY sum(energy_mj) DESC
+                        ) AS energy_rank
                     FROM \(source.tableName)
                     WHERE timestamp < :cutoff
                     GROUP BY timestamp / :width * :width, name_id
                 )
                 WHERE cpu_rank <= :limit OR memory_rank <= :limit
+                    OR energy_rank <= :limit OR keep > 0
                 ON CONFLICT (timestamp, name_id) DO NOTHING
                 """,
             arguments: ["width": target.seconds, "cutoff": cutoff, "limit": ProcessTier.topCount]
@@ -214,11 +225,39 @@ public struct Downsampler: Sendable {
         )
     }
 
+    /// The registry ages out on the user's whole choice rather than per tier:
+    /// it has no tiers, and "first seen" is a claim about the window that is
+    /// kept, not about the machine's whole life.
+    private func deleteExpiredRegistry(
+        retention: TimeInterval,
+        now: Date,
+        in db: Database
+    ) throws {
+        let horizon = Int(now.addingTimeInterval(-max(retention, 0)).timeIntervalSince1970)
+        try db.execute(
+            sql: "DELETE FROM process_presence WHERE day < ?",
+            arguments: [horizon / 86400]
+        )
+        try db.execute(
+            sql: "DELETE FROM process_inventory WHERE last_seen < ?",
+            arguments: [horizon]
+        )
+        // And a surviving row's `first_seen` is dragged forward with the
+        // horizon. Without this one timestamp a name outlives the retention it
+        // was recorded under — "first run on 12 June" is still a fact about the
+        // user months after they asked for a week.
+        try db.execute(
+            sql: "UPDATE process_inventory SET first_seen = ? WHERE first_seen < ?",
+            arguments: [horizon, horizon]
+        )
+    }
+
     /// Without this the name table grows forever: retention deletes the rows,
     /// but the interned name outlives them.
     private func collectProcessNames(in db: Database) throws {
-        let referenced = ProcessTier.allCases
-            .map { "SELECT name_id FROM \($0.tableName)" }
+        let referenced =
+            (ProcessTier.allCases.map { "SELECT name_id FROM \($0.tableName)" }
+            + ["SELECT name_id FROM process_inventory", "SELECT name_id FROM process_presence"])
             .joined(separator: " UNION ")
         try db.execute(sql: "DELETE FROM process_names WHERE id NOT IN (\(referenced))")
     }

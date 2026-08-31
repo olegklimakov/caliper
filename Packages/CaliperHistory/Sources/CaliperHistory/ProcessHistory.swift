@@ -1,3 +1,4 @@
+import CaliperCore
 import Foundation
 
 /// How coarse a stored bucket of process usage is.
@@ -48,9 +49,26 @@ public enum ProcessTier: String, Sendable, CaseIterable, Codable {
         }
     }
 
-    /// Per ranking: ten by CPU unioned with ten by footprint. Written once
-    /// because the recorder and the rollup have to produce the same shape.
+    /// Per ranking: ten by CPU, ten by footprint, ten by energy, unioned.
+    /// Written once because the recorder and the rollup have to produce the
+    /// same shape.
     public static let topCount = 10
+
+    /// How long a name that has fallen out of every ranking keeps being
+    /// recorded. Rank churn is what makes a strip a comb: a process drops to
+    /// eleventh for one bucket and leaves a hole that reads as "unknown".
+    ///
+    /// Five minutes rather than ten because the difference was measured on a
+    /// working machine, not reasoned about: at ten the sticky rows were 47 % of
+    /// the bucket and it held 29.7 names, at five they are 31 % and it holds
+    /// 22.0 — for the same ten buckets of dropout cover, which is far more than
+    /// churn needs. The tail is names that ranked once and then idled.
+    public static let stickiness: TimeInterval = 300
+
+    /// The most names a bucket carries beyond its rankings — the sticky ones
+    /// and the pins together. Churn is unbounded in principle; the width of a
+    /// bucket is not allowed to be.
+    public static let watchLimit = 40
 
     /// How wide a bucket is, as a readout writes it.
     public var label: String {
@@ -95,12 +113,17 @@ public struct ProcessUsage: Sendable, Equatable {
     public let footprint: UInt64
     /// Mean bytes per second moved to and from storage.
     public let diskRate: Double
+    /// Joules over the bucket, from the SoC's own per-process accounting —
+    /// the one quantity here that sums rather than averages, which is what
+    /// makes "this app drew 34 Wh today" a question with an answer.
+    public let energy: Double
 
-    public init(name: String, cpu: Double, footprint: UInt64, diskRate: Double) {
+    public init(name: String, cpu: Double, footprint: UInt64, diskRate: Double, energy: Double) {
         self.name = name
         self.cpu = cpu
         self.footprint = footprint
         self.diskRate = diskRate
+        self.energy = energy
     }
 }
 
@@ -142,12 +165,27 @@ public struct ProcessNamePoint: Sendable, Equatable {
     /// Peak bytes over the bucket, the same accounting as `ProcessUsage`.
     public let footprint: UInt64
     public let diskRate: Double
+    /// Joules over the bucket, the same accounting as `ProcessUsage`.
+    public let energy: Double
+    /// Why this bucket was recorded, which decides what a *neighbouring* gap
+    /// means: beside a pinned point it is "the process was not running", beside
+    /// a ranked one only "it did not rank".
+    public let keep: ProcessKeepReason
 
-    public init(bucketStart: Date, cpu: Double, footprint: UInt64, diskRate: Double) {
+    public init(
+        bucketStart: Date,
+        cpu: Double,
+        footprint: UInt64,
+        diskRate: Double,
+        energy: Double,
+        keep: ProcessKeepReason
+    ) {
         self.bucketStart = bucketStart
         self.cpu = cpu
         self.footprint = footprint
         self.diskRate = diskRate
+        self.energy = energy
+        self.keep = keep
     }
 }
 
@@ -174,9 +212,103 @@ struct ProcessRow: Sendable, Equatable {
     let cpuPermille: Int
     let footprintMB: Int
     let diskKBps: Int
+    /// Millijoules over the bucket. Summed on merge and on rollup where the
+    /// others are re-weighted or maxed, because it is a total.
+    let energyMJ: Int
+    /// A `var` because the fold decides the reason after ranking the rows it
+    /// has already built.
+    var keep: ProcessKeepReason
     /// How many sweeps the means are over, for the reason `Aggregate` carries
     /// one.
     let count: Int
+}
+
+/// Why a row was written, in the order the rollup resolves ties: a pin is a
+/// promise that every bucket is there, and outranks a coincidence of rank.
+public enum ProcessKeepReason: Int, Sendable, Comparable, Codable {
+    case ranked = 0
+    case sticky = 1
+    case pinned = 2
+
+    public static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
+}
+
+/// What one name drew over a span.
+public struct ProcessEnergy: Sendable, Equatable {
+    public let joules: Double
+    /// How many buckets carried a row. An unpinned process contributes nothing
+    /// for the buckets it did not rank in, so the total is a floor rather than
+    /// a measurement of the whole span — and a readout that does not say which
+    /// it is has invented a number.
+    public let buckets: Int
+    public let tier: ProcessTier
+
+    public init(joules: Double, buckets: Int, tier: ProcessTier) {
+        self.joules = joules
+        self.buckets = buckets
+        self.tier = tier
+    }
+
+    public var wattHours: Double { joules / 3600 }
+
+    /// Seconds the total actually accounts for.
+    public var coveredSeconds: TimeInterval { Double(buckets * tier.seconds) }
+}
+
+/// One name's registry entry as the recorder accumulates it between flushes.
+///
+/// Days and hours are UTC: the mask is storage, and a readout that wants local
+/// time converts. Storing it local would rewrite history twice a year.
+struct ProcessAppearanceRow: Sendable, Equatable {
+    let name: String
+    var path: String?
+    var firstSeen: Date
+    var lastSeen: Date
+    /// Day since the epoch to a bit per hour of that day.
+    var hours: [Int: Int]
+
+    init(identity: ProcessIdentity, at moment: Date) {
+        name = identity.name
+        path = identity.path
+        firstSeen = moment
+        lastSeen = moment
+        hours = [:]
+    }
+
+    static func day(of moment: Date) -> Int {
+        Int(moment.timeIntervalSince1970) / 86400
+    }
+
+    static func hourBit(of moment: Date) -> Int {
+        1 << (Int(moment.timeIntervalSince1970) % 86400 / 3600)
+    }
+
+    mutating func observe(identity: ProcessIdentity, at moment: Date, day: Int, hour: Int) {
+        // A pid whose path was refused this time may be readable the next.
+        path = path ?? identity.path
+        firstSeen = Swift.min(firstSeen, moment)
+        lastSeen = Swift.max(lastSeen, moment)
+        hours[day, default: 0] |= hour
+    }
+}
+
+/// A name the machine has run, and when it was first and last seen.
+///
+/// Both bounded by the retention the user chose: "first seen on Tuesday" means
+/// first seen inside what is kept, and a readout has to say so.
+public struct ProcessAppearance: Sendable, Equatable {
+    public let name: String
+    /// nil when the path was never readable — see `ProcessIdentity.path`.
+    public let path: String?
+    public let firstSeen: Date
+    public let lastSeen: Date
+
+    public init(name: String, path: String?, firstSeen: Date, lastSeen: Date) {
+        self.name = name
+        self.path = path
+        self.firstSeen = firstSeen
+        self.lastSeen = lastSeen
+    }
 }
 
 /// How long the process history is kept. Deliberately short options: a
