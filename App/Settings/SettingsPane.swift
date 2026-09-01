@@ -286,13 +286,9 @@ struct SettingsPane: View {
     /// bigger rather than smaller.
     private var pinnedHint: String {
         let names = preferences.pinnedProcesses.count
-        // 30.9 bytes a row measured, a row a bucket: a day of the fine tier
-        // plus a fortnight of the minute one. `StoreSizeTests` is where the
-        // number comes from.
-        let each = 0.7
         let room = max(Preferences.pinLimit - names, 0)
         return "Recorded in every bucket, whatever they rank. "
-            + Decimals.string("%.1f MB", Double(names) * each)
+            + Decimals.string("%.1f MB", Double(names) * Preferences.megabytesPerPin)
             + " of the store at 14 days, and \(room) more can be pinned."
     }
 

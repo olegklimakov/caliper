@@ -78,9 +78,8 @@ final class Preferences {
     /// Names recorded every bucket whatever they rank — the only way a
     /// process's history has no ambiguous gaps in it.
     ///
-    /// Cheap but not free: a pinned name costs around 0.7 MB over a fortnight,
-    /// against the ~15 MB the rankings already take, so the list is bounded
-    /// rather than open.
+    /// Cheap but not free — see `megabytesPerPin` — against the ~15 MB the
+    /// rankings already take, so the list is bounded rather than open.
     private(set) var pinnedProcesses: Set<String> {
         didSet {
             defaults.set(Array(pinnedProcesses), forKey: Key.pinnedProcesses)
@@ -90,19 +89,24 @@ final class Preferences {
 
     static let pinLimit = 10
 
-    /// Refuses rather than silently dropping the eleventh: the card has to be
-    /// able to say why nothing happened.
-    @discardableResult
-    func setPinned(_ isPinned: Bool, for name: String) -> Bool {
+    /// What one pin costs the store over a fortnight: 30.9 bytes a row
+    /// measured by `StoreSizeTests`, a row a bucket, a day of the fine tier
+    /// plus fourteen of the minute one.
+    static let megabytesPerPin = 0.7
+
+    /// The eleventh is refused rather than silently dropped. Callers ask
+    /// `hasRoomForAPin` first, so this is the backstop and not the message.
+    func setPinned(_ isPinned: Bool, for name: String) {
         guard isPinned else {
             pinnedProcesses.remove(name)
-            return true
+            return
         }
-        guard pinnedProcesses.count < Self.pinLimit || pinnedProcesses.contains(name) else {
-            return false
-        }
+        guard hasRoomForAPin || pinnedProcesses.contains(name) else { return }
         pinnedProcesses.insert(name)
-        return true
+    }
+
+    var hasRoomForAPin: Bool {
+        pinnedProcesses.count < Self.pinLimit
     }
 
     /// A direct callback rather than an observation loop: re-arming

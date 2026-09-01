@@ -32,6 +32,11 @@ public final class ProcessHistoryRecorder: Sendable {
         /// Names that ranked recently, and the bucket they last ranked in.
         /// What keeps a strip from being a comb; see `ProcessTier.stickiness`.
         var sticky: [String: Date] = [:]
+        /// `sticky` and `pinned` resolved into what the sweep is asked for.
+        /// Held rather than derived because the app reads it every tick and a
+        /// sort of the sticky table a second is a sort a second for an answer
+        /// that only changes when a bucket closes.
+        var watchList: Set<String> = []
         /// A snapshot carries the newest process sample rather than one taken
         /// on its own tick, so the same sweep arrives every second — up to
         /// thirty times when hidden — and folding it each time weights it
@@ -47,9 +52,9 @@ public final class ProcessHistoryRecorder: Sendable {
         var lastRegistryFlush = Date()
     }
 
-    public init(store: HistoryStore, isEnabled: Bool) {
+    public init(store: HistoryStore, isEnabled: Bool, pinned: Set<String> = []) {
         self.store = store
-        state = Mutex(State(isEnabled: isEnabled))
+        state = Mutex(State(isEnabled: isEnabled, pinned: pinned, watchList: pinned))
     }
 
     /// Turns recording on or off, dropping whatever was accumulating when it
@@ -66,25 +71,28 @@ public final class ProcessHistoryRecorder: Sendable {
     /// Names recorded every bucket whatever they rank — the way to earn a
     /// strip with no ambiguous gaps in it.
     public func setPinned(_ names: Set<String>) {
-        state.withLock { $0.pinned = names }
+        state.withLock { state in
+            state.pinned = names
+            Self.refreshWatchList(&state)
+        }
     }
 
     /// What the sweep has to report by name for the next bucket to be
     /// complete: the pins, plus the names still inside their sticky window.
-    ///
+    public var watching: Set<String> {
+        state.withLock { $0.isEnabled ? $0.watchList : [] }
+    }
+
     /// Capped, most recently ranked first. Rank churn is unbounded in
     /// principle — a machine thrashing could put a hundred names through the
     /// top ten inside one window — and a bucket's width is not allowed to
     /// follow it.
-    public var watching: Set<String> {
-        state.withLock { state in
-            guard state.isEnabled else { return [] }
-            let recent = state.sticky
-                .sorted { $0.value > $1.value }
-                .prefix(max(ProcessTier.watchLimit - state.pinned.count, 0))
-                .map(\.key)
-            return state.pinned.union(recent)
-        }
+    private static func refreshWatchList(_ state: inout State) {
+        let recent = state.sticky
+            .sorted { $0.value > $1.value }
+            .prefix(max(ProcessTier.watchLimit - state.pinned.count, 0))
+            .map(\.key)
+        state.watchList = state.pinned.union(recent)
     }
 
     /// What the delete button needs: emptying the tables while the recorder
@@ -103,6 +111,7 @@ public final class ProcessHistoryRecorder: Sendable {
         state.lastSweep = nil
         state.rosterBucket = nil
         state.sticky.removeAll(keepingCapacity: false)
+        state.watchList = state.pinned
         state.pending.removeAll(keepingCapacity: false)
         state.appearances.removeAll(keepingCapacity: false)
     }
@@ -123,7 +132,7 @@ public final class ProcessHistoryRecorder: Sendable {
             Self.fold(processes, into: &state)
             if state.rosterBucket != bucket {
                 state.rosterBucket = bucket
-                Self.note(processes.roster, at: processes.sampledAt, in: &state)
+                Self.register(processes.roster, at: processes.sampledAt, in: &state)
             }
 
             let registryIsDue =
@@ -204,8 +213,12 @@ public final class ProcessHistoryRecorder: Sendable {
         }
     }
 
-    /// Folds one sweep's roster into the per-name record.
-    private static func note(_ roster: [ProcessIdentity], at moment: Date, in state: inout State) {
+    /// Folds one sweep's roster into the registry rows waiting to be written.
+    private static func register(
+        _ roster: [ProcessIdentity],
+        at moment: Date,
+        in state: inout State
+    ) {
         let day = ProcessAppearanceRow.day(of: moment)
         let hour = ProcessAppearanceRow.hourBit(of: moment)
         for identity in roster {
@@ -264,6 +277,7 @@ public final class ProcessHistoryRecorder: Sendable {
             state.sticky[name] = start
         }
         state.sticky = state.sticky.filter { $0.value >= held }
+        refreshWatchList(&state)
 
         for index in rows.indices {
             rows[index].keep = reasons[rows[index].name] ?? .ranked

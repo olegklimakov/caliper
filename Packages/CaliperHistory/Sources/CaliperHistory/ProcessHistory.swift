@@ -99,6 +99,15 @@ public enum ProcessTier: String, Sendable, CaseIterable, Codable {
         }
     }
 
+    /// The tier a span of history is read at. One home for the threshold: the
+    /// strip, its energy total and the caption naming the span all have to
+    /// agree, and three copies of `3600` are three chances not to.
+    public static func forSpan(_ span: TimeInterval) -> ProcessTier {
+        // The fine tier keeps a day at most; anything shorter than an hour of
+        // it reads better at thirty seconds, everything longer at a minute.
+        span <= 3600 ? .thirtySeconds : .minute
+    }
+
     /// The tier that still holds a moment, or `nil`. Not the question
     /// `HistoryStore.tier(forRange:)` answers — a chart picks a tier by pixel
     /// budget, this asks only which tier has not yet dropped the bucket.
@@ -233,7 +242,7 @@ struct ProcessRow: Sendable, Equatable {
 
 /// Why a row was written, in the order the rollup resolves ties: a pin is a
 /// promise that every bucket is there, and outranks a coincidence of rank.
-public enum ProcessKeepReason: Int, Sendable, Comparable, Codable {
+public enum ProcessKeepReason: Int, Sendable, Comparable {
     case ranked = 0
     case sticky = 1
     case pinned = 2
@@ -256,8 +265,6 @@ public struct ProcessEnergy: Sendable, Equatable {
         self.buckets = buckets
         self.tier = tier
     }
-
-    public var wattHours: Double { joules / 3600 }
 
     /// Seconds the total actually accounts for.
     public var coveredSeconds: TimeInterval { Double(buckets * tier.seconds) }

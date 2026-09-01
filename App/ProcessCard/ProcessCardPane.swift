@@ -373,7 +373,7 @@ struct ProcessCardPane: View {
             if let history = model.history, !history.points.isEmpty {
                 HistoryStrip(history: history, end: model.historyEnd, span: model.span)
                     .frame(height: 56)
-                Text(stripCaption)
+                Text(stripCaption(history))
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
                 if let energy = model.energy, energy.buckets > 0 {
@@ -414,20 +414,34 @@ struct ProcessCardPane: View {
         )
     }
 
-    private var stripCaption: String {
-        model.isPinned
-            ? "Every bucket since \(model.target.name) was pinned — a gap there is time it was not running."
-            : "Bars where \(model.target.name) ranked in the stored top ten — a gap means unranked, not idle."
+    /// Read off the bars, not off the pin. Whether a process is pinned *now*
+    /// says nothing about the buckets already drawn: pin one this minute and
+    /// the strip is still a day of ranked bars, whose gaps mean "did not rank".
+    /// Each stored bucket carries the reason it was kept, which is the only
+    /// thing that can caption the ones beside it.
+    private func stripCaption(_ history: ProcessNameHistory) -> String {
+        let name = model.target.name
+        let pinned = history.points.filter { $0.keep == .pinned }
+        guard let earliest = pinned.first?.bucketStart else {
+            return "Bars where \(name) ranked in the stored top ten — a gap means unranked, not idle."
+        }
+        guard pinned.count < history.points.count else {
+            return "Every bucket of \(name) is recorded — a gap is time it was not running."
+        }
+        let since = earliest.formatted(date: .omitted, time: .shortened)
+        return "Every bucket since \(since), when \(name) was pinned — a gap after that is time it"
+            + " was not running. Before it, only where it ranked."
     }
 
-    /// A total the reader can trust the shape of: for an unpinned process the
-    /// unranked buckets contributed nothing, so the number is a floor and has
-    /// to be read as one.
+    /// A total the reader can trust the shape of: the unrecorded buckets
+    /// contributed nothing, so unless the span is covered the number is a floor
+    /// and has to be read as one. Coverage decides that, not the pin — a
+    /// process pinned a minute ago has a day of holes behind it.
     private func energyCaption(_ energy: ProcessEnergy) -> String {
         // The span reads as the button that chose it, not as a duration: "over
         // the last 24 h 0 m" is a sentence nobody says.
         let span = model.span <= 3600 ? "hour" : "24 hours"
-        guard !model.isPinned, energy.coveredSeconds < model.span * 0.99 else {
+        guard energy.coveredSeconds < model.span * 0.99 else {
             return "\(EnergyFormatter.string(energy.joules)) over the last \(span)."
         }
         return "At least \(EnergyFormatter.string(energy.joules)) over the last \(span)"

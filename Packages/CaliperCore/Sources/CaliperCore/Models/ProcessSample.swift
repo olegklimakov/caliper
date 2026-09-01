@@ -149,8 +149,8 @@ public struct ProcessesSample: Sendable, Codable, Equatable {
         topByMemory: [ProcessSample],
         topByDisk: [ProcessSample],
         topByPower: [ProcessSample],
-        watched: [ProcessSample] = [],
-        roster: [ProcessIdentity] = [],
+        watched: [ProcessSample],
+        roster: [ProcessIdentity],
         unreadableCount: Int
     ) {
         self.sampledAt = sampledAt
@@ -162,6 +162,46 @@ public struct ProcessesSample: Sendable, Codable, Equatable {
         self.watched = watched
         self.roster = roster
         self.unreadableCount = unreadableCount
+    }
+
+    /// The roster is counted rather than listed. `--selftest` prints this
+    /// struct as JSON, and a diagnostic that dumps the name and full
+    /// executable path of every process on the machine is a different document
+    /// from a snapshot of what it is costing.
+    ///
+    /// Which makes decoding lossy: nothing decodes a snapshot — the JSON exists
+    /// to be read by a person and grepped by the smoke test — and a roster
+    /// that came back empty is the honest reading of a form that never carried
+    /// it.
+    private enum CodingKeys: String, CodingKey {
+        case sampledAt, interval, topByCPU, topByMemory, topByDisk, topByPower
+        case watched, rosterCount, unreadableCount
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(sampledAt, forKey: .sampledAt)
+        try container.encode(interval, forKey: .interval)
+        try container.encode(topByCPU, forKey: .topByCPU)
+        try container.encode(topByMemory, forKey: .topByMemory)
+        try container.encode(topByDisk, forKey: .topByDisk)
+        try container.encode(topByPower, forKey: .topByPower)
+        try container.encode(watched, forKey: .watched)
+        try container.encode(roster.count, forKey: .rosterCount)
+        try container.encode(unreadableCount, forKey: .unreadableCount)
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sampledAt = try container.decode(Date.self, forKey: .sampledAt)
+        interval = try container.decode(TimeInterval.self, forKey: .interval)
+        topByCPU = try container.decode([ProcessSample].self, forKey: .topByCPU)
+        topByMemory = try container.decode([ProcessSample].self, forKey: .topByMemory)
+        topByDisk = try container.decode([ProcessSample].self, forKey: .topByDisk)
+        topByPower = try container.decode([ProcessSample].self, forKey: .topByPower)
+        watched = try container.decode([ProcessSample].self, forKey: .watched)
+        roster = []
+        unreadableCount = try container.decode(Int.self, forKey: .unreadableCount)
     }
 }
 

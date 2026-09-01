@@ -42,7 +42,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             recorder = HistoryRecorder(store: store)
             processRecorder = ProcessHistoryRecorder(
                 store: store,
-                isEnabled: preferences.recordsProcessHistory
+                isEnabled: preferences.recordsProcessHistory,
+                pinned: preferences.pinnedProcesses
             )
             downsampler = Downsampler(store: store)
         } else {
@@ -124,7 +125,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             processRecorder?.setEnabled(preferences.recordsProcessHistory)
             processRecorder?.setPinned(preferences.pinnedProcesses)
         }
-        processRecorder?.setPinned(preferences.pinnedProcesses)
         self.statusItemController = statusItemController
         self.panels = panels
 
@@ -135,6 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updates = Task { [coordinator, metrics, statusItemController, recorder, processRecorder] in
             let snapshots = await coordinator.snapshots()
             await coordinator.start()
+            var watching: Set<String> = []
             for await snapshot in snapshots {
                 metrics.update(with: snapshot)
                 statusItemController.snapshotDidChange()
@@ -143,11 +144,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // folded; a snapshot carries the newest one every tick.
                 if let processes = snapshot.processes {
                     processRecorder?.record(processes)
-                    // Recomputed from the bucket that just closed, so a name
-                    // that fell out of every ranking is asked for by name on
-                    // the next sweep rather than vanishing from the record.
-                    if let watching = processRecorder?.watching {
-                        coordinator.setWatching(watching)
+                    // The recorder answers with what it wants named on the next
+                    // sweep — its pins, and the names it is still holding after
+                    // they fell out of every ranking. The set only changes when
+                    // a bucket closes, so pushing an unchanged one is a lock
+                    // the coordinator does not need to take.
+                    if let wanted = processRecorder?.watching, wanted != watching {
+                        watching = wanted
+                        coordinator.setWatching(wanted)
                     }
                 }
             }
