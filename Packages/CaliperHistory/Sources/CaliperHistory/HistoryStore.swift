@@ -336,30 +336,6 @@ public struct HistoryStore: Sendable {
         )
     }
 
-    /// The names that drew the most energy over a span.
-    static func fetchTopByEnergy(
-        tier: ProcessTier,
-        from start: Date,
-        to end: Date,
-        limit: Int,
-        in db: Database
-    ) throws -> [(name: String, joules: Double)] {
-        try Row.fetchAll(
-            db,
-            sql: """
-                SELECT name, sum(energy_mj) AS energy_mj
-                FROM \(tier.tableName)
-                JOIN process_names ON process_names.id = \(tier.tableName).name_id
-                WHERE timestamp BETWEEN ? AND ?
-                GROUP BY name_id
-                ORDER BY energy_mj DESC
-                LIMIT ?
-                """,
-            arguments: [Int(start.timeIntervalSince1970), Int(end.timeIntervalSince1970), limit]
-        )
-        .map { (name: $0["name"], joules: Double($0["energy_mj"] as Int) / 1000) }
-    }
-
     /// One name's registry entry, or nil for a name never recorded.
     static func fetchAppearance(name: String, in db: Database) throws -> ProcessAppearance? {
         try Row.fetchOne(

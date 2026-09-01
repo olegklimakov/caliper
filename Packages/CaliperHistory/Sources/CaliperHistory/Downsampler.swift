@@ -194,6 +194,10 @@ public struct Downsampler: Sendable {
                             PARTITION BY timestamp / :width * :width
                             ORDER BY max(footprint_mb) DESC
                         ) AS memory_rank,
+                        -- Ranked among the rows that drew any: most of the
+                        -- machine draws none, and a rank over a tie of zeroes
+                        -- keeps ten arbitrary rows. The same rule the recorder
+                        -- applies when it closes a bucket.
                         row_number() OVER (
                             PARTITION BY timestamp / :width * :width
                             ORDER BY sum(energy_mj) DESC
@@ -203,7 +207,7 @@ public struct Downsampler: Sendable {
                     GROUP BY timestamp / :width * :width, name_id
                 )
                 WHERE cpu_rank <= :limit OR memory_rank <= :limit
-                    OR energy_rank <= :limit OR keep > 0
+                    OR (energy_rank <= :limit AND energy_mj > 0) OR keep > 0
                 ON CONFLICT (timestamp, name_id) DO NOTHING
                 """,
             arguments: ["width": target.seconds, "cutoff": cutoff, "limit": ProcessTier.topCount]

@@ -190,7 +190,9 @@ private let megabyte: UInt64 = 1_048_576
                 timestamp: bucketStart.addingTimeInterval(Double(index * 30)),
                 cpuPermille: 100,
                 footprintMB: 64,
-                diskKBps: 0, energyMJ: 0, keep: .ranked,
+                diskKBps: 0,
+                energyMJ: 0,
+                keep: .ranked,
                 count: 1
             )
         }
@@ -206,11 +208,33 @@ private let megabyte: UInt64 = 1_048_576
         // Quitting and relaunching inside one bucket: two partial readings of
         // the same thirty seconds, which have to land as one row.
         try store.write(
-            processes: [ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 200, footprintMB: 100, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)],
+            processes: [
+                ProcessRow(
+                    name: "Xcode",
+                    timestamp: bucketStart,
+                    cpuPermille: 200,
+                    footprintMB: 100,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                )
+            ],
             tier: .thirtySeconds
         )
         try store.write(
-            processes: [ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 600, footprintMB: 400, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 3)],
+            processes: [
+                ProcessRow(
+                    name: "Xcode",
+                    timestamp: bucketStart,
+                    cpuPermille: 600,
+                    footprintMB: 400,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 3,
+                )
+            ],
             tier: .thirtySeconds
         )
 
@@ -227,9 +251,36 @@ private let megabyte: UInt64 = 1_048_576
     try await withStore { store in
         try store.write(
             processes: [
-                ProcessRow(name: "quiet", timestamp: bucketStart, cpuPermille: 10, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1),
-                ProcessRow(name: "busy", timestamp: bucketStart, cpuPermille: 900, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1),
-                ProcessRow(name: "middling", timestamp: bucketStart, cpuPermille: 300, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1),
+                ProcessRow(
+                    name: "quiet",
+                    timestamp: bucketStart,
+                    cpuPermille: 10,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                ),
+                ProcessRow(
+                    name: "busy",
+                    timestamp: bucketStart,
+                    cpuPermille: 900,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                ),
+                ProcessRow(
+                    name: "middling",
+                    timestamp: bucketStart,
+                    cpuPermille: 300,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                ),
             ],
             tier: .thirtySeconds
         )
@@ -252,7 +303,18 @@ private let megabyte: UInt64 = 1_048_576
 @Test func aCursorAnywhereInABucketFindsIt() async throws {
     try await withStore { store in
         try store.write(
-            processes: [ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)],
+            processes: [
+                ProcessRow(
+                    name: "Xcode",
+                    timestamp: bucketStart,
+                    cpuPermille: 100,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                )
+            ],
             tier: .thirtySeconds
         )
         // Twenty-nine seconds in is still the same bucket.
@@ -265,11 +327,33 @@ private let megabyte: UInt64 = 1_048_576
 @Test func deletingProcessHistoryLeavesNeitherRowsNorNames() async throws {
     try await withStore { store in
         try store.write(
-            processes: [ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)],
+            processes: [
+                ProcessRow(
+                    name: "Xcode",
+                    timestamp: bucketStart,
+                    cpuPermille: 100,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                )
+            ],
             tier: .thirtySeconds
         )
         try store.write(
-            processes: [ProcessRow(name: "Safari", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)],
+            processes: [
+                ProcessRow(
+                    name: "Safari",
+                    timestamp: bucketStart,
+                    cpuPermille: 100,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                )
+            ],
             tier: .minute
         )
 
@@ -291,8 +375,26 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
     // First half-minute: `alpha` is busy, `beta` is not there at all.
     try store.write(
             processes:         [
-            ProcessRow(name: "alpha", timestamp: bucketStart, cpuPermille: 800, footprintMB: 10, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 3),
-            ProcessRow(name: "gamma", timestamp: bucketStart, cpuPermille: 100, footprintMB: 20, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 3),
+            ProcessRow(
+                name: "alpha",
+                timestamp: bucketStart,
+                cpuPermille: 800,
+                footprintMB: 10,
+                diskKBps: 0,
+                energyMJ: 0,
+                keep: .ranked,
+                count: 3,
+            ),
+            ProcessRow(
+                name: "gamma",
+                timestamp: bucketStart,
+                cpuPermille: 100,
+                footprintMB: 20,
+                diskKBps: 0,
+                energyMJ: 0,
+                keep: .ranked,
+                count: 3,
+            ),
         ],
         tier: .thirtySeconds
     )
@@ -352,11 +454,33 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
 @Test func processRetentionDropsRowsPastEachHorizon() async throws {
     try await withStore { store in
         try store.write(
-            processes: [ProcessRow(name: "alpha", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)],
+            processes: [
+                ProcessRow(
+                    name: "alpha",
+                    timestamp: bucketStart,
+                    cpuPermille: 100,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                )
+            ],
             tier: .thirtySeconds
         )
         try store.write(
-            processes: [ProcessRow(name: "alpha", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)],
+            processes: [
+                ProcessRow(
+                    name: "alpha",
+                    timestamp: bucketStart,
+                    cpuPermille: 100,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                )
+            ],
             tier: .minute
         )
 
@@ -375,7 +499,18 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
 @Test func theSettingIsWhatTheCoarseTierKeeps() async throws {
     try await withStore { store in
         try store.write(
-            processes: [ProcessRow(name: "alpha", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)],
+            processes: [
+                ProcessRow(
+                    name: "alpha",
+                    timestamp: bucketStart,
+                    cpuPermille: 100,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                )
+            ],
             tier: .minute
         )
         // The bug this guards against: clamping every tier to its own default
@@ -404,7 +539,18 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
 @Test func theFineTierIsCappedAtItsOwnDayHoweverLongTheSettingSays() async throws {
     try await withStore { store in
         try store.write(
-            processes: [ProcessRow(name: "alpha", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)],
+            processes: [
+                ProcessRow(
+                    name: "alpha",
+                    timestamp: bucketStart,
+                    cpuPermille: 100,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                )
+            ],
             tier: .thirtySeconds
         )
         // A fortnight chosen in settings does not buy a fortnight of
@@ -422,7 +568,16 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
         let now = bucketStart.addingTimeInterval(2 * 24 * 3600)
         try store.write(
             processes: [
-                ProcessRow(name: "gone", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
+                ProcessRow(
+                    name: "gone",
+                    timestamp: bucketStart,
+                    cpuPermille: 100,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                )
             ],
             tier: .thirtySeconds
         )
@@ -494,7 +649,16 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
     #expect(try store.rowCount(tier: .tenSeconds) == 1)
     try store.write(
         processes: [
-            ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
+            ProcessRow(
+                name: "Xcode",
+                timestamp: bucketStart,
+                cpuPermille: 100,
+                footprintMB: 1,
+                diskKBps: 0,
+                energyMJ: 0,
+                keep: .ranked,
+                count: 1,
+            )
         ],
         tier: .thirtySeconds
     )
@@ -508,7 +672,16 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
         // busier processes push it out.
         try store.write(
             processes: [
-                ProcessRow(name: "quiet", timestamp: bucketStart, cpuPermille: 10, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 3)
+                ProcessRow(
+                    name: "quiet",
+                    timestamp: bucketStart,
+                    cpuPermille: 10,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 3,
+                )
             ],
             tier: .thirtySeconds
         )
@@ -524,7 +697,9 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
                     timestamp: bucketStart.addingTimeInterval(30),
                     cpuPermille: 1000 + index,
                     footprintMB: 100 + index,
-                    diskKBps: 0, energyMJ: 0, keep: .ranked,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
                     count: 3
                 )
             },
@@ -553,7 +728,16 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
     try await withStore { store in
         try store.write(
             processes: [
-                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
+                ProcessRow(
+                    name: "Xcode",
+                    timestamp: bucketStart,
+                    cpuPermille: 400,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                )
             ],
             tier: .thirtySeconds
         )
@@ -580,7 +764,16 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
     try await withStore { store in
         try store.write(
             processes: [
-                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
+                ProcessRow(
+                    name: "Xcode",
+                    timestamp: bucketStart,
+                    cpuPermille: 400,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                )
             ],
             tier: .thirtySeconds
         )
@@ -601,7 +794,16 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
     try await withStore { store in
         try store.write(
             processes: [
-                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
+                ProcessRow(
+                    name: "Xcode",
+                    timestamp: bucketStart,
+                    cpuPermille: 400,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                )
             ],
             tier: .thirtySeconds
         )
@@ -631,7 +833,16 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
     try await withStore { store in
         try store.write(
             processes: [
-                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
+                ProcessRow(
+                    name: "Xcode",
+                    timestamp: bucketStart,
+                    cpuPermille: 400,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                )
             ],
             tier: .thirtySeconds
         )
@@ -656,7 +867,16 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
     try await withStore { store in
         try store.write(
             processes: [
-                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 400, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
+                ProcessRow(
+                    name: "Xcode",
+                    timestamp: bucketStart,
+                    cpuPermille: 400,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                )
             ],
             tier: .thirtySeconds
         )
@@ -682,9 +902,36 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
         // bridge it — a missing bucket means "not in the top ten", not idle.
         try store.write(
             processes: [
-                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 800, footprintMB: 100, diskKBps: 5, energyMJ: 0, keep: .ranked, count: 1),
-                ProcessRow(name: "Xcode", timestamp: bucketStart.addingTimeInterval(90), cpuPermille: 400, footprintMB: 120, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1),
-                ProcessRow(name: "Safari", timestamp: bucketStart.addingTimeInterval(30), cpuPermille: 900, footprintMB: 50, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1),
+                ProcessRow(
+                    name: "Xcode",
+                    timestamp: bucketStart,
+                    cpuPermille: 800,
+                    footprintMB: 100,
+                    diskKBps: 5,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                ),
+                ProcessRow(
+                    name: "Xcode",
+                    timestamp: bucketStart.addingTimeInterval(90),
+                    cpuPermille: 400,
+                    footprintMB: 120,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                ),
+                ProcessRow(
+                    name: "Safari",
+                    timestamp: bucketStart.addingTimeInterval(30),
+                    cpuPermille: 900,
+                    footprintMB: 50,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                ),
             ],
             tier: .thirtySeconds
         )
@@ -714,7 +961,16 @@ private func twoDisagreeingBuckets(in store: HistoryStore) throws {
     try await withStore { store in
         try store.write(
             processes: [
-                ProcessRow(name: "Xcode", timestamp: bucketStart, cpuPermille: 500, footprintMB: 10, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
+                ProcessRow(
+                    name: "Xcode",
+                    timestamp: bucketStart,
+                    cpuPermille: 500,
+                    footprintMB: 10,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                )
             ],
             tier: .minute
         )
@@ -1148,5 +1404,37 @@ private func crowd(cpu: Double = 1.0) -> [ProcessSample] {
             try String.fetchAll(db, sql: "SELECT name FROM process_names ORDER BY name")
         }
         #expect(names == ["Xcode", "ghost"])
+    }
+}
+
+@Test func theRollupsEnergyRankingDoesNotKeepATieOfZeroes() async throws {
+    try await withStore { store in
+        // Twelve names, two of them drawing nothing and ranking nowhere else.
+        // A rank taken over the whole tie would hand those two a place.
+        var rows: [ProcessRow] = []
+        for bucket in 0..<2 {
+            let timestamp = bucketStart.addingTimeInterval(Double(bucket * 30))
+            for index in 0..<12 {
+                rows.append(
+                    ProcessRow(
+                        name: "p\(index)",
+                        timestamp: timestamp,
+                        cpuPermille: 1000 - index,
+                        footprintMB: 1000 - index,
+                        diskKBps: 0,
+                        energyMJ: 0,
+                        keep: .ranked,
+                        count: 1
+                    )
+                )
+            }
+        }
+        try store.write(processes: rows, tier: .thirtySeconds)
+        try await Downsampler(store: store).compact(now: bucketStart.addingTimeInterval(3600))
+
+        let names = try await store.consumers(at: bucketStart, tier: .minute).consumers.map(\.name)
+        #expect(names.count == ProcessTier.topCount)
+        #expect(!names.contains("p10"))
+        #expect(!names.contains("p11"))
     }
 }

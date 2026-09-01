@@ -98,7 +98,7 @@ final class ProcessCardModel {
 
     var canPin: Bool {
         guard let preferences else { return false }
-        return isPinned || preferences.pinnedProcesses.count < Preferences.pinLimit
+        return isPinned || preferences.hasRoomForAPin
     }
 
     func togglePin() {

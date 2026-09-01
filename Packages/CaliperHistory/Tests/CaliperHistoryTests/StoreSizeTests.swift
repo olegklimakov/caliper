@@ -69,8 +69,10 @@ private func megabytesReported(by store: HistoryStore) -> Double {
     }
 }
 
-/// Stage B budgets the process history at roughly 10 MB across both tiers, of
-/// which a day of the thirty-second tier is ~2.3 MB. The same claim about bytes,
+/// Stage B budgeted the process history at roughly 10 MB across both tiers. It
+/// now costs ~15.6 MB at fourteen days — 22 names a bucket rather than 20 once
+/// energy ranks and the sticky window holds, and a wider row — which is the
+/// number `Preferences.megabytesPerPin` and the settings screen quote. The same claim about bytes,
 /// measured the same way — and the reason the values are scaled integers and the
 /// names are interned rather than repeated 2880 times a day.
 ///
@@ -144,7 +146,16 @@ private func megabytesReported(by store: HistoryStore) -> Double {
         try store.write(samples, tier: .tenSeconds)
         try store.write(
             processes: [
-                ProcessRow(name: "Xcode", timestamp: start, cpuPermille: 100, footprintMB: 1, diskKBps: 0, energyMJ: 0, keep: .ranked, count: 1)
+                ProcessRow(
+                    name: "Xcode",
+                    timestamp: start,
+                    cpuPermille: 100,
+                    footprintMB: 1,
+                    diskKBps: 0,
+                    energyMJ: 0,
+                    keep: .ranked,
+                    count: 1,
+                )
             ],
             tier: .thirtySeconds
         )

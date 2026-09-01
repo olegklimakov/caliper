@@ -269,6 +269,7 @@ enum UIPreview {
                     topByMemory: [],
                     topByDisk: [],
                     topByPower: [],
+                    watched: [],
                     roster: load.map { ProcessIdentity(name: $0.0, path: nil) },
                     unreadableCount: 0
                 )
@@ -296,7 +297,9 @@ enum UIPreview {
                         footprint: UInt64(1.4e9 + load * 8e8),
                         diskRate: load * 2e5,
                         energy: (0.4 + load) * 60,
-                        keep: .ranked
+                        // The strip is captioned from these, so the live card's
+                        // bars have to be what a pinned process really stores.
+                        keep: live ? .pinned : .ranked
                     )
                 )
             }
@@ -311,8 +314,13 @@ enum UIPreview {
 
         // Pinned on the live card and not on the dead one, so one render of the
         // pair shows both states of the control and both captions each of the
-        // strip and the energy line can carry.
-        previewPreferences.setPinned(live, for: "Google Chrome")
+        // strip and the energy line can carry. A defaults store per card, not
+        // the shared one: both models are built before either is drawn, so a
+        // shared store would render whichever state was set last, twice.
+        let preferences = Preferences(
+            defaults: UserDefaults(suiteName: "caliper.preview.card.\(live)") ?? .standard
+        )
+        preferences.setPinned(live, for: "Google Chrome")
         let family = ProcessFamilyKey.bundle(
             identifier: "com.google.Chrome",
             appURL: URL(fileURLWithPath: "/Applications/Google Chrome.app", isDirectory: true)
@@ -326,7 +334,7 @@ enum UIPreview {
                 history: history,
                 energy: energy,
                 historyEnd: end,
-                preferences: previewPreferences
+                preferences: preferences
             )
         }
 
@@ -387,7 +395,7 @@ enum UIPreview {
             history: history,
             energy: energy,
             historyEnd: end,
-            preferences: previewPreferences
+            preferences: preferences
         )
     }
 
