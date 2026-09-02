@@ -4838,7 +4838,8 @@
                   "fill": "$text-primary",
                   "content": "Google Chrome",
                   "fontFamily": "$font-ui",
-                  "fontSize": 12
+                  "fontSize": 12,
+                  "fontWeight": "normal"
                 },
                 {
                   "type": "text",
@@ -4867,7 +4868,8 @@
                   "fill": "$text-secondary",
                   "content": "18.2 %",
                   "fontFamily": "$font-mono",
-                  "fontSize": 11
+                  "fontSize": 11,
+                  "fontWeight": "normal"
                 },
                 {
                   "type": "text",
@@ -6350,7 +6352,8 @@
                       "fill": "$text-secondary",
                       "content": "1h",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -6395,7 +6398,8 @@
                       "fill": "$text-secondary",
                       "content": "7d",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -6417,7 +6421,8 @@
                       "fill": "$text-secondary",
                       "content": "30d",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -6439,7 +6444,8 @@
                       "fill": "$text-secondary",
                       "content": "1y",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 }
@@ -6547,7 +6553,8 @@
                       "fill": "$text-secondary",
                       "content": "Memory",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -6599,7 +6606,8 @@
                       "fill": "$text-secondary",
                       "content": "Disk",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -6651,7 +6659,8 @@
                       "fill": "$text-secondary",
                       "content": "Network",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -6703,7 +6712,8 @@
                       "fill": "$text-secondary",
                       "content": "Sensors",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -11267,7 +11277,8 @@
                       "fill": "$text-secondary",
                       "content": "1h",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -11312,7 +11323,8 @@
                       "fill": "$text-secondary",
                       "content": "7d",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -11334,7 +11346,8 @@
                       "fill": "$text-secondary",
                       "content": "30d",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -11356,7 +11369,8 @@
                       "fill": "$text-secondary",
                       "content": "1y",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 }
@@ -11464,7 +11478,8 @@
                       "fill": "$text-secondary",
                       "content": "Memory",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -11516,7 +11531,8 @@
                       "fill": "$text-secondary",
                       "content": "Disk",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -11568,7 +11584,8 @@
                       "fill": "$text-secondary",
                       "content": "Network",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -11620,7 +11637,8 @@
                       "fill": "$text-secondary",
                       "content": "Sensors",
                       "fontFamily": "$font-ui",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -15382,6 +15400,169 @@
           "fontFamily": "$font-ui",
           "fontSize": 12,
           "fontWeight": "normal"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "Wzgdn",
+      "x": 2480,
+      "y": 2081,
+      "name": "Dashboard / Process Card",
+      "clip": true,
+      "width": 920,
+      "height": 640,
+      "fill": "$win-bg",
+      "layout": "vertical",
+      "gap": 12,
+      "padding": 24,
+      "children": [
+        {
+          "type": "frame",
+          "id": "f1izg",
+          "name": "Card head",
+          "width": "fill_container",
+          "gap": 12,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "eO9pX",
+              "name": "back",
+              "fill": "$text-secondary",
+              "content": "‹",
+              "fontFamily": "$font-ui",
+              "fontSize": 17,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "vMNHm",
+              "name": "App icon",
+              "clip": true,
+              "width": 32,
+              "height": 32,
+              "fill": "$bg-inset",
+              "cornerRadius": 7,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "ellipse",
+                  "id": "pzXTE",
+                  "x": 5,
+                  "y": 5,
+                  "name": "ring",
+                  "fill": "$accent-cpu",
+                  "width": 22,
+                  "height": 22
+                },
+                {
+                  "type": "ellipse",
+                  "id": "pdikm",
+                  "x": 11,
+                  "y": 11,
+                  "name": "core",
+                  "fill": "$bg-card",
+                  "width": 10,
+                  "height": 10
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "IXuEj",
+              "name": "Name block",
+              "layout": "vertical",
+              "gap": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "i1BQJR",
+                  "name": "App name",
+                  "fill": "$text-primary",
+                  "content": "Google Chrome",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 17,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "l1UAv",
+                  "name": "Bundle id",
+                  "fill": "$text-secondary",
+                  "content": "com.google.Chrome · 43 processes",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "cjcV4",
+              "name": "spacer",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "text",
+              "id": "BGw6u",
+              "name": "Running for",
+              "fill": "$text-secondary",
+              "content": "running 3 h 12 m",
+              "fontFamily": "$font-ui",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "ciXsI",
+              "name": "btn Quit…",
+              "fill": "$bg-inset",
+              "cornerRadius": 6,
+              "padding": [
+                5,
+                10
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dANeU",
+                  "name": "label",
+                  "fill": "$text-primary",
+                  "content": "Quit…",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "jt0Y7",
+              "name": "btn Force Quit…",
+              "fill": "$bg-inset",
+              "cornerRadius": 6,
+              "padding": [
+                5,
+                10
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "M3JIh",
+                  "name": "label",
+                  "fill": "$text-primary",
+                  "content": "Force Quit…",
+                  "fontFamily": "$font-ui",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
         }
       ]
     }
