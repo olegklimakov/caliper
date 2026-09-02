@@ -33,14 +33,33 @@ while (($# > 0)); do
         fi
         shift 2
         ;;
+    -*)
+        echo "unknown option: $1" >&2
+        echo "usage: Scripts/footprint_check.sh [minutes] [path/to/Caliper.app] [--card NAME]" >&2
+        exit 1
+        ;;
     *)
-        if [[ -z "$MINUTES" ]]; then MINUTES="$1"; else APP_ARGUMENT="$1"; fi
+        if [[ -z "$MINUTES" ]]; then
+            MINUTES="$1"
+        elif [[ -z "$APP_ARGUMENT" ]]; then
+            APP_ARGUMENT="$1"
+        else
+            echo "unexpected argument: $1" >&2
+            exit 1
+        fi
         shift
         ;;
     esac
 done
 
 MINUTES="${MINUTES:-30}"
+# Checked before it reaches arithmetic: a mistyped option taken as the minutes
+# fails inside `$((...))` half the script away from the mistake, and this is a
+# command someone comes back to an hour later.
+if ! [[ "$MINUTES" =~ ^[1-9][0-9]*$ ]]; then
+    echo "minutes must be a positive whole number, got: $MINUTES" >&2
+    exit 1
+fi
 APP=$(caliper_app_path "$APP_ARGUMENT")
 BINARY="$APP/Contents/MacOS/Caliper"
 MAX_CPU_PERCENT="1.0"
@@ -58,9 +77,16 @@ PEAK_FOOTPRINT=0
 
 # One phase: launch with the given arguments, watch it for MINUTES, and leave
 # the mean CPU and peak footprint behind.
+#
+# `windows` is what the phase is *about*, and it is asserted rather than
+# assumed. `open` hands `--args` only to a new instance, an older bundle would
+# not know the flag at all, and a phase that quietly measured the idle state
+# under the heading "card open" would report a delta of nothing and read as
+# good news. Measured on this machine: menu-bar-only owns no on-screen window,
+# a card open owns one.
 measure() {
-    local label="$1"
-    shift
+    local label="$1" windows="$2"
+    shift 2
 
     echo "measuring $MINUTES min: $label"
     pkill -x Caliper 2>/dev/null || true
@@ -76,6 +102,7 @@ measure() {
         exit 1
     fi
     echo "pid: $pid"
+    assert_windows "$windows" "at launch"
 
     local samples=$((MINUTES * 60 / SAMPLE_INTERVAL))
     PEAK_FOOTPRINT=0
@@ -107,12 +134,26 @@ measure() {
         fi
     done
 
+    # Again at the end rather than on every sample: each check compiles a Swift
+    # snippet, and two that bracket the phase catch both a card that never
+    # opened and a window closed halfway.
+    assert_windows "$windows" "after $MINUTES min"
+
     MEAN_CPU=$(caliper_mean_cpu_percent "$pid")
     caliper_stop "$BINARY"
 }
 
+assert_windows() {
+    local wanted="$1" when="$2" found
+    found=$(caliper_window_count)
+    if [[ "$found" != "$wanted" ]]; then
+        echo "FAIL: expected $wanted on-screen window(s) $when, found $found" >&2
+        exit 1
+    fi
+}
+
 echo "app: $APP"
-measure "menu bar only"
+measure "menu bar only" 0
 IDLE_CPU=$MEAN_CPU
 IDLE_FOOTPRINT=$PEAK_FOOTPRINT
 
@@ -135,7 +176,7 @@ fi
 
 if [[ -n "$CARD" ]]; then
     echo
-    measure "a card open on \"$CARD\"" --open-card "$CARD"
+    measure "a card open on \"$CARD\"" 1 --open-card "$CARD"
     echo
     echo "card open"
     printf "  mean CPU:        %.2f%%\n" "$MEAN_CPU"
