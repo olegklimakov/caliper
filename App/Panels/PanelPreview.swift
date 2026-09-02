@@ -1,4 +1,5 @@
 import AppKit
+import CaliperHistory
 import SwiftUI
 
 /// Renders a panel to an image, so the popovers can be compared against the
@@ -102,6 +103,15 @@ enum PanelPreview {
     @MainActor
     static func renderProcessCard(model: ProcessCardModel, appearance: NSAppearance) -> NSImage? {
         render(ProcessCardPane(model: model, onBack: {}), appearance: appearance, height: 640)
+    }
+
+    @MainActor
+    static func renderProcesses(
+        search: ProcessNameSearch,
+        query: String,
+        appearance: NSAppearance
+    ) -> NSImage? {
+        render(ProcessesPane(preloaded: search, query: query), appearance: appearance)
     }
 
     private static func render(

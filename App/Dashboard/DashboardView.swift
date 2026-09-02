@@ -53,6 +53,13 @@ struct DashboardView: View {
                     recordsProcesses: preferences.recordsProcessHistory,
                     openCard: { navigation.section = .process($0) }
                 )
+            case .processes:
+                ProcessesPane(
+                    history: history,
+                    processRetention: preferences.processRetention,
+                    recordsProcesses: preferences.recordsProcessHistory,
+                    openCard: { navigation.section = .process($0) }
+                )
             case .module(let module):
                 DashboardPane(metrics: metrics, history: history, module: module)
             case .process(let target):
@@ -134,6 +141,10 @@ struct DashboardView: View {
 /// iterates the modules.
 enum DashboardSection: Hashable {
     case overview
+    /// Every name the machine has run, searchable. A room rather than a field
+    /// somewhere: the answer is a list of hundreds, and the question is asked
+    /// about a process no other room can show, because it is not running.
+    case processes
     case module(MenuBarModule)
 
     case settings
@@ -143,11 +154,13 @@ enum DashboardSection: Hashable {
     case process(ProcessCardTarget)
 
     /// Settings is not in it — it is pinned under the list.
-    static let listed: [DashboardSection] = [.overview] + MenuBarModule.allCases.map(DashboardSection.module)
+    static let listed: [DashboardSection] =
+        [.overview, .processes] + MenuBarModule.allCases.map(DashboardSection.module)
 
     var title: String {
         switch self {
         case .overview: "Overview"
+        case .processes: "Processes"
         case .module(let module): module.title
         case .settings: "Settings"
         case .process(let target): target.name

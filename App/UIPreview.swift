@@ -100,6 +100,20 @@ enum UIPreview {
                             background: nil
                         )
                     }
+                    for (state, search) in previewRegistry {
+                        if let pane = PanelPreview.renderProcesses(
+                            search: search.result,
+                            query: search.query,
+                            appearance: theme
+                        ) {
+                            write(
+                                pane,
+                                to: url.appendingPathComponent("processes-\(state)-\(appearance).png"),
+                                scale: 1,
+                                background: nil
+                            )
+                        }
+                    }
                     for fate in CardFate.allCases {
                         let model = previewProcessCard(fate)
                         if let card = PanelPreview.renderProcessCard(model: model, appearance: theme) {
@@ -277,6 +291,42 @@ enum UIPreview {
         }
         guard (try? recorder.flushNow()) != nil else { return nil }
         return try? await reader.consumers(at: cursor, retention: .week)
+    }
+
+    /// The search room in its two states worth checking: a query with matches,
+    /// and a query with none — which has to say how much *is* recorded, or
+    /// "not found" reads as "never ran".
+    @MainActor
+    private static var previewRegistry: [(String, (query: String, result: ProcessNameSearch))] {
+        // Relative to the real clock, unlike the card's fixed fixture: the three
+        // widths `RegistryDate` prints are chosen by age, and a frozen date
+        // would only ever exercise one of them.
+        let now = Date()
+        func seen(
+            _ name: String,
+            _ path: String?,
+            last: TimeInterval,
+            first: TimeInterval
+        ) -> ProcessAppearance {
+            ProcessAppearance(
+                name: name,
+                path: path,
+                firstSeen: now.addingTimeInterval(-first),
+                lastSeen: now.addingTimeInterval(-last)
+            )
+        }
+        let matches = [
+            seen("Google Chrome", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", last: 600, first: 9 * 86_400),
+            seen("Google Chrome Helper (Renderer)", "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/141.0.7390.55/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)", last: 600, first: 9 * 86_400),
+            // The room's whole reason: a name that ran once in the night, ranks
+            // nowhere, and is not on the machine any more.
+            seen("chromedriver", "/opt/homebrew/bin/chromedriver", last: 4 * 86_400 + 3_600, first: 4 * 86_400 + 5_400),
+            seen("chrome_crashpad_handler", nil, last: 5 * 86_400, first: 9 * 86_400),
+        ]
+        return [
+            ("found", ("chrom", ProcessNameSearch(matches: matches, matched: 12, recorded: 611))),
+            ("empty", ("figma", ProcessNameSearch(matches: [], matched: 0, recorded: 611))),
+        ]
     }
 
     /// The three cards worth looking at, which are the three captions the strip

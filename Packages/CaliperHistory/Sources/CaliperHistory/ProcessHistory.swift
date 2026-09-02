@@ -326,6 +326,24 @@ public struct ProcessAppearance: Sendable, Equatable {
     }
 }
 
+/// What the registry answers a search with.
+public struct ProcessNameSearch: Sendable, Equatable {
+    /// Most recently seen first, capped at the limit asked for.
+    public let matches: [ProcessAppearance]
+    /// How many names matched, which `matches` may be only the head of.
+    public let matched: Int
+    /// Every name the registry holds, matched or not — the size of the record,
+    /// which is what says whether an empty result means "no such name" or
+    /// "nothing recorded yet".
+    public let recorded: Int
+
+    public init(matches: [ProcessAppearance], matched: Int, recorded: Int) {
+        self.matches = matches
+        self.matched = matched
+        self.recorded = recorded
+    }
+}
+
 /// How long the process history is kept. Deliberately short options: a
 /// per-minute log of which applications ran is a behavioural record, and the
 /// whole store is budgeted at 60 MB.
