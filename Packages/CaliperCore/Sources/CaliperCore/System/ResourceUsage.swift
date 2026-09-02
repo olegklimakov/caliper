@@ -135,9 +135,8 @@ enum ResourceUsage {
 
     /// Name and path in one pass, which is one `proc_pidpath` a pid — the call
     /// the whole-machine sweep pays for six hundred times. The unreadable case
-    /// has to come through here too: reaching for `name(for:)` as the fallback
-    /// asked the kernel for the same path a second time, for every process the
-    /// first ask had already refused.
+    /// has to resolve its name here rather than through `name(for:)`, which
+    /// would ask the kernel for the same path the first ask has just refused.
     static func identity(for pid: pid_t) -> (name: String, path: String?) {
         let path = path(for: pid)
         if let executable = path?.split(separator: "/").last {

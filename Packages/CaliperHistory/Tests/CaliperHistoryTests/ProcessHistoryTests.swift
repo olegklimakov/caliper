@@ -1168,6 +1168,38 @@ private func crowd(cpu: Double = 1.0) -> [ProcessSample] {
     }
 }
 
+/// `watchLimit` is room for the names a bucket carries *beyond* its rankings.
+/// A bucket ranks up to thirty — ten by CPU, ten by footprint, ten by energy —
+/// so taking those out of the cap instead of adding them on top leaves ten
+/// slots for a sticky window that routinely holds more.
+@Test func theOpenBucketsOwnRanksDoNotEatTheStickyBudget() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        // Fifteen names rank in the first bucket: ten by CPU, five by memory.
+        let fallers =
+            (0..<10).map { process("faller-cpu\($0)", cpu: Double(100 + $0)) }
+            + (0..<5).map { process("faller-mem\($0)", footprint: UInt64(900 + $0) * megabyte) }
+        recorder.record(sweep(at: bucketStart, fallers))
+
+        // The second bucket ranks thirty *different* names, which is the widest
+        // any bucket can rank.
+        var wide: [ProcessSample] = []
+        for index in 0..<10 {
+            wide.append(process("cpu\(index)", cpu: Double(50 + index)))
+            wide.append(process("mem\(index)", footprint: UInt64(index + 1) * 512 * megabyte))
+            wide.append(process("watt\(index)", power: Double(index + 1)))
+        }
+        recorder.record(sweep(at: bucketStart.addingTimeInterval(30), wide, interval: 30))
+
+        // Every faller is still inside its sticky window, so every one of them
+        // has to still be asked for by name.
+        let watching = recorder.watching
+        for name in fallers.map(\.name) {
+            #expect(watching.contains(name))
+        }
+    }
+}
+
 @Test func theStickyWindowLetsGoOnceItHasRunOut() async throws {
     try await withStore { store in
         let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
@@ -1370,8 +1402,8 @@ private func recordRegistry(_ store: HistoryStore, _ names: [ProcessIdentity]) t
         )
         let reader = HistoryReader(store: store)
 
-        // Case-folded, because nobody types the capital of an app they are
-        // trying to remember the name of.
+        // Case-folded for ASCII, which is what an executable name is; nobody
+        // types the capital of an app whose name they are trying to remember.
         #expect(try await reader.searchProcessNames(matching: "chrom").matches.map(\.name) == ["Google Chrome"])
         // By path: half of what anyone remembers about a daemon is where it
         // lived.
@@ -1380,6 +1412,18 @@ private func recordRegistry(_ store: HistoryStore, _ names: [ProcessIdentity]) t
         #expect(miss.matches.isEmpty)
         // Which is what tells "no such name" from "nothing recorded yet".
         #expect(miss.recorded == 2)
+    }
+}
+
+/// A non-positive `LIMIT` is "no limit" to SQLite, which would hand back every
+/// row while `matched` said the list was complete.
+@Test func aLimitOfZeroReturnsNoMoreThanOneRatherThanEverything() async throws {
+    try await withStore { store in
+        try recordRegistry(store, (0..<4).map { ProcessIdentity(name: "helper\($0)", path: nil) })
+
+        let found = try await HistoryReader(store: store).searchProcessNames(matching: "", limit: 0)
+        #expect(found.matches.count == 1)
+        #expect(found.matched == 4)
     }
 }
 

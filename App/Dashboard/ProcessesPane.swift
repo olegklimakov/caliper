@@ -1,14 +1,8 @@
 import CaliperHistory
 import SwiftUI
 
-/// Every name the machine has run, searched — the ones not running now
-/// included.
-///
-/// The registry's only reader, and the reason it is written at all: a top-N
-/// tier is structurally blind to a program that is deliberately cheap, because
-/// being cheap is how it never ranks. "What was that thing called that ate the
-/// battery on Tuesday" is asked afterwards, of a name that may no longer exist
-/// on the machine, and no ranking can answer it.
+/// The registry's room — see `HistoryReader.searchProcessNames` for what it can
+/// answer that no ranked tier can.
 struct ProcessesPane: View {
     let history: HistoryReader?
     /// Says how far back the answers go, which a search with no hits has to
@@ -20,12 +14,31 @@ struct ProcessesPane: View {
     /// the point.
     let openCard: (ProcessCardTarget) -> Void
 
+    /// Three answers, not two: with only an optional result, "not asked yet",
+    /// "there is no store" and "the read threw" are the same value, and the
+    /// room sits on "Loading…" for the life of the window.
+    enum Listing: Equatable {
+        case loading
+        case loaded(ProcessNameSearch)
+        case unavailable
+    }
+
     @State private var query = ""
-    @State private var found: ProcessNameSearch?
+    @State private var listing: Listing = .loading
+    /// Bumped when the store changes under the room, which re-runs the query
+    /// through the same `task(id:)` that the query itself does — and so cancels
+    /// the read in flight, which was issued against the store as it was before
+    /// the delete and would otherwise put the deleted names back.
+    @State private var generation = 0
 
     /// Handed in by the preview harness, which renders off-screen and can
     /// neither run a query nor type into a field.
     private let preloaded: ProcessNameSearch?
+
+    private struct Request: Equatable {
+        let query: String
+        let generation: Int
+    }
 
     init(
         history: HistoryReader?,
@@ -47,6 +60,7 @@ struct ProcessesPane: View {
         openCard = { _ in }
         self.preloaded = preloaded
         _query = State(initialValue: query)
+        _listing = State(initialValue: .loaded(preloaded))
     }
 
     var body: some View {
@@ -69,34 +83,38 @@ struct ProcessesPane: View {
         }
         .padding(20)
         .frame(minWidth: 560, minHeight: 560, alignment: .topLeading)
-        // Keyed on the query, so a keystroke cancels the query before it and
-        // the store is asked once for a word rather than once a letter.
-        .task(id: query) {
-            guard let history else { return }
+        // Keyed on the query, so a keystroke cancels the read before it and the
+        // store is asked once for a word rather than once a letter.
+        .task(id: Request(query: query, generation: generation)) {
+            guard preloaded == nil else { return }
+            guard let history else {
+                listing = .unavailable
+                return
+            }
             try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled else { return }
-            found = try? await history.searchProcessNames(matching: query)
+            let found = try? await history.searchProcessNames(matching: query)
+            guard !Task.isCancelled else { return }
+            listing = found.map(Listing.loaded) ?? .unavailable
         }
         .onReceive(NotificationCenter.default.publisher(for: .historyDidChange)) { _ in
-            // The delete button empties the registry too, and a list still
-            // showing what was deleted is the one thing that button must not
+            // The delete button empties the registry too, and a room still
+            // listing what it deleted is the one thing that button must not
             // leave behind.
-            found = nil
-            Task { found = try? await history?.searchProcessNames(matching: query) }
+            listing = .loading
+            generation += 1
         }
     }
-
-    private var active: ProcessNameSearch? { found ?? preloaded }
 
     /// The size of the record, which is what tells "no such name" from
     /// "nothing recorded yet" — and the sentence the whole room is justified
     /// by: six hundred names, against the twenty a bucket ranks.
     private var countLine: String {
-        guard let active else { return " " }
-        guard active.matched < active.recorded else {
-            return "\(active.recorded) names · kept for \(processRetention.label)"
+        guard case .loaded(let found) = listing else { return " " }
+        guard found.matched < found.recorded else {
+            return "\(found.recorded) names · kept for \(processRetention.label)"
         }
-        return "\(active.matched) of \(active.recorded) names"
+        return "\(found.matched) of \(found.recorded) names"
     }
 
     // MARK: - The field
@@ -148,14 +166,17 @@ struct ProcessesPane: View {
                 "Process history is switched off",
                 "Nothing is being recorded, so there is nothing to search. Settings turns it on."
             )
-        } else if let active {
-            if active.matches.isEmpty {
-                emptyResult(active)
-            } else {
-                list(active)
-            }
         } else {
-            note("Loading…", "")
+            switch listing {
+            case .loading:
+                note("Loading…", "")
+            case .unavailable:
+                note("History unavailable", "The store could not be read.")
+            case .loaded(let found) where found.matches.isEmpty:
+                emptyResult(found)
+            case .loaded(let found):
+                list(found)
+            }
         }
     }
 
@@ -267,37 +288,5 @@ struct ProcessesPane: View {
             "\(appearance.name), last seen \(RegistryDate.moment(appearance.lastSeen)),"
                 + " first seen \(RegistryDate.day(appearance.firstSeen))"
         )
-    }
-}
-
-/// When a name was seen, as a list of hundreds of them can be read down.
-///
-/// Widths that narrow with age rather than "5 minutes ago": the registry is
-/// written every ten minutes, so a relative time to the minute would claim a
-/// precision the record does not have.
-enum RegistryDate {
-    /// Last seen, where the time of day is the answer — "it was running an
-    /// hour ago" and "it was running at four this morning" are different
-    /// facts.
-    static func moment(_ date: Date, now: Date = Date()) -> String {
-        if Calendar.current.isDate(date, inSameDayAs: now) {
-            return date.formatted(date: .omitted, time: .shortened)
-        }
-        if now.timeIntervalSince(date) < 6 * 24 * 3600 {
-            return date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
-        }
-        return date.formatted(.dateTime.day().month(.abbreviated))
-    }
-
-    /// First seen, where only the day is: what anyone wants from it is "this
-    /// arrived on Tuesday", and a minute of precision on that is noise.
-    static func day(_ date: Date, now: Date = Date()) -> String {
-        if Calendar.current.isDate(date, inSameDayAs: now) {
-            return "today"
-        }
-        if now.timeIntervalSince(date) < 6 * 24 * 3600 {
-            return date.formatted(.dateTime.weekday(.abbreviated))
-        }
-        return date.formatted(.dateTime.day().month(.abbreviated))
     }
 }

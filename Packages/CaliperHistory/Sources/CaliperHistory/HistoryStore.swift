@@ -336,12 +336,12 @@ public struct HistoryStore: Sendable {
         )
     }
 
-    /// The registry, searched. Matched on the name and on the path, because
-    /// half of what anyone remembers about a program is where it lived.
+    /// The registry, searched — see `HistoryReader.searchProcessNames`.
     ///
-    /// Most recently seen first, so an empty query answers with the inventory
-    /// rather than an empty box — the registry is small enough to browse, which
-    /// is the whole reason it is affordable to keep every name in it.
+    /// `LIKE` folds case for ASCII only, which is what every executable name on
+    /// this machine is; a path through a home folder named in Cyrillic is the
+    /// case it will not fold, and folding that wants a stored folded column
+    /// rather than a cleverer query.
     ///
     /// Ties broken by *first* seen, which is not a tidiness rule: the registry
     /// is written every ten minutes, so on this machine 658 names share one
@@ -359,7 +359,10 @@ public struct HistoryStore: Sendable {
             trimmed.isEmpty
             ? ""
             : "WHERE name LIKE :pattern ESCAPE '\\' OR path LIKE :pattern ESCAPE '\\'"
-        let arguments: StatementArguments = trimmed.isEmpty ? [:] : ["pattern": "%\(escapingWildcards(trimmed))%"]
+        var arguments: StatementArguments = ["limit": Swift.max(limit, 1)]
+        if !trimmed.isEmpty {
+            arguments += ["pattern": "%\(escapingWildcards(trimmed))%"]
+        }
 
         let matched =
             trimmed.isEmpty
@@ -374,6 +377,9 @@ public struct HistoryStore: Sendable {
                 arguments: arguments
             ) ?? 0
 
+        // Bound, not interpolated: SQLite reads a non-positive `LIMIT` as no
+        // limit at all, which would silently make `matched` disagree with what
+        // came back.
         let rows = try Row.fetchAll(
             db,
             sql: """
@@ -382,19 +388,12 @@ public struct HistoryStore: Sendable {
                 JOIN process_names ON process_names.id = process_inventory.name_id
                 \(filter)
                 ORDER BY last_seen DESC, first_seen DESC, name
-                LIMIT \(limit)
+                LIMIT :limit
                 """,
             arguments: arguments
         )
         return ProcessNameSearch(
-            matches: rows.map { row in
-                ProcessAppearance(
-                    name: row["name"],
-                    path: row["path"],
-                    firstSeen: Date(timeIntervalSince1970: TimeInterval(row["first_seen"] as Int)),
-                    lastSeen: Date(timeIntervalSince1970: TimeInterval(row["last_seen"] as Int))
-                )
-            },
+            matches: rows.map(appearance(from:)),
             matched: matched,
             recorded: recorded
         )
@@ -422,14 +421,16 @@ public struct HistoryStore: Sendable {
                 """,
             arguments: [name]
         )
-        .map { row in
-            ProcessAppearance(
-                name: row["name"],
-                path: row["path"],
-                firstSeen: Date(timeIntervalSince1970: TimeInterval(row["first_seen"] as Int)),
-                lastSeen: Date(timeIntervalSince1970: TimeInterval(row["last_seen"] as Int))
-            )
-        }
+        .map(appearance(from:))
+    }
+
+    private static func appearance(from row: Row) -> ProcessAppearance {
+        ProcessAppearance(
+            name: row["name"],
+            path: row["path"],
+            firstSeen: Date(timeIntervalSince1970: TimeInterval(row["first_seen"] as Int)),
+            lastSeen: Date(timeIntervalSince1970: TimeInterval(row["last_seen"] as Int))
+        )
     }
 
     /// The settings button behind "a behavioural record you can take back".

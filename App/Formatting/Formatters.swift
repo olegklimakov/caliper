@@ -128,3 +128,35 @@ enum DurationFormatter {
         return String(format: "%d:%02d:%02d", total / 3600, (total / 60) % 60, total % 60)
     }
 }
+
+/// When a name was seen, as a list of hundreds of them can be read down.
+///
+/// Widths that narrow with age rather than "5 minutes ago": the registry is
+/// written every ten minutes, so a relative time to the minute would claim a
+/// precision the record does not have.
+enum RegistryDate {
+    /// Last seen, where the time of day is the answer — "it was running an
+    /// hour ago" and "it was running at four this morning" are different
+    /// facts.
+    static func moment(_ date: Date, now: Date = Date()) -> String {
+        if Calendar.current.isDate(date, inSameDayAs: now) {
+            return date.formatted(date: .omitted, time: .shortened)
+        }
+        if now.timeIntervalSince(date) < 6 * 24 * 3600 {
+            return date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
+        }
+        return date.formatted(.dateTime.day().month(.abbreviated))
+    }
+
+    /// First seen, where only the day is: what anyone wants from it is "this
+    /// arrived on Tuesday", and a minute of precision on that is noise.
+    static func day(_ date: Date, now: Date = Date()) -> String {
+        if Calendar.current.isDate(date, inSameDayAs: now) {
+            return "today"
+        }
+        if now.timeIntervalSince(date) < 6 * 24 * 3600 {
+            return date.formatted(.dateTime.weekday(.abbreviated))
+        }
+        return date.formatted(.dateTime.day().month(.abbreviated))
+    }
+}
