@@ -1132,6 +1132,42 @@ private func crowd(cpu: Double = 1.0) -> [ProcessSample] {
     }
 }
 
+/// The sweep can only name what the recorder was asking for when it was taken,
+/// which is what the test above supplies by hand. Hidden, that sweep is the
+/// whole bucket: a watch list refreshed when a bucket closes arrives a sweep
+/// late, and the first bucket of the sticky run is lost outright.
+@Test func aFallerIsHeldFromTheVeryFirstBucketAfterItStopsRanking() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        // One sweep a bucket, and each one asked for what the previous one
+        // left the recorder wanting — the order `AppDelegate` drives.
+        for bucket in 0..<4 {
+            let wanted = recorder.watching.contains("faller")
+            let ranking = bucket == 0 ? [process("faller", cpu: 40, footprint: 400 * megabyte)] : []
+            recorder.record(
+                sweep(
+                    at: bucketStart.addingTimeInterval(Double(bucket) * 30),
+                    crowd() + ranking,
+                    interval: 30,
+                    watched: wanted ? [process("faller", cpu: 0.01)] : []
+                )
+            )
+        }
+        try recorder.flushNow()
+
+        let history = try await store.databaseQueue.read { db in
+            try HistoryStore.fetchProcessHistory(
+                name: "faller",
+                tier: .thirtySeconds,
+                from: bucketStart,
+                to: bucketStart.addingTimeInterval(180),
+                in: db
+            )
+        }
+        #expect(history.points.map(\.keep) == [.ranked, .sticky, .sticky, .sticky])
+    }
+}
+
 @Test func theStickyWindowLetsGoOnceItHasRunOut() async throws {
     try await withStore { store in
         let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)

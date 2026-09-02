@@ -116,33 +116,34 @@ enum ResourceUsage {
         return CString.string(pathBuffer, length: Int(pathLength))
     }
 
-    /// `proc_pidpath` gives the real executable name where `proc_name`
-    /// truncates at sixteen characters, but the path is unreadable for another
-    /// user's processes — and a runaway root process is the one worth seeing, so
-    /// a truncated name beats dropping it.
-    static func name(for pid: pid_t) -> String {
-        if let executable = path(for: pid)?.split(separator: "/").last {
-            return String(executable)
-        }
-
+    /// The kernel's own name for a pid, truncated at sixteen characters. All
+    /// there is for another user's process, whose path is unreadable — and a
+    /// runaway root process is the one worth seeing, so a truncated name beats
+    /// dropping it.
+    private static func shortName(for pid: pid_t) -> String {
         var nameBuffer = [CChar](repeating: 0, count: Int(MAXCOMLEN) * 2 + 1)
         let nameLength = proc_name(pid, &nameBuffer, UInt32(nameBuffer.count))
-        if nameLength > 0 {
-            return CString.string(nameBuffer, length: Int(nameLength))
-        }
-
-        return "pid \(pid)"
+        guard nameLength > 0 else { return "pid \(pid)" }
+        return CString.string(nameBuffer, length: Int(nameLength))
     }
 
-    /// Name and path in one pass. `name(for:)` reads the path and throws it
-    /// away; the process sweep wants both for every pid it can read, and a
-    /// second `proc_pidpath` a pid is the one cost worth avoiding here.
+    /// `proc_pidpath` gives the real executable name where `proc_name`
+    /// truncates.
+    static func name(for pid: pid_t) -> String {
+        identity(for: pid).name
+    }
+
+    /// Name and path in one pass, which is one `proc_pidpath` a pid — the call
+    /// the whole-machine sweep pays for six hundred times. The unreadable case
+    /// has to come through here too: reaching for `name(for:)` as the fallback
+    /// asked the kernel for the same path a second time, for every process the
+    /// first ask had already refused.
     static func identity(for pid: pid_t) -> (name: String, path: String?) {
         let path = path(for: pid)
         if let executable = path?.split(separator: "/").last {
             return (String(executable), path)
         }
-        return (name(for: pid), path)
+        return (shortName(for: pid), path)
     }
 
     struct ShortInfo {

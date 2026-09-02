@@ -421,16 +421,21 @@ struct ProcessCardPane: View {
     /// thing that can caption the ones beside it.
     private func stripCaption(_ history: ProcessNameHistory) -> String {
         let name = model.target.name
-        let pinned = history.points.filter { $0.keep == .pinned }
-        guard let earliest = pinned.first?.bucketStart else {
+        guard let earliest = history.points.first(where: { $0.keep == .pinned })?.bucketStart else {
             return "Bars where \(name) ranked in the stored top ten — a gap means unranked, not idle."
         }
-        guard pinned.count < history.points.count else {
+        // How far back the promise reaches is a question about the span on
+        // screen, not about the points that happen to exist: a process pinned a
+        // minute ago and never ranked before returns nothing *but* pinned
+        // points, and every hole behind them is unrecorded rather than idle.
+        // A bucket of slack because the earliest one starts inside the span.
+        let covered = earliest.timeIntervalSince(model.historyEnd.addingTimeInterval(-model.span))
+        guard covered > Double(history.tier.seconds) else {
             return "Every bucket of \(name) is recorded — a gap is time it was not running."
         }
         let since = earliest.formatted(date: .omitted, time: .shortened)
-        return "Every bucket since \(since), when \(name) was pinned — a gap after that is time it"
-            + " was not running. Before it, only where it ranked."
+        return "Every bucket from \(since) on — a gap after that is time \(name) was not running."
+            + " Before it, only where it ranked."
     }
 
     /// A total the reader can trust the shape of: the unrecorded buckets
@@ -441,11 +446,16 @@ struct ProcessCardPane: View {
         // The span reads as the button that chose it, not as a duration: "over
         // the last 24 h 0 m" is a sentence nobody says.
         let span = model.span <= 3600 ? "hour" : "24 hours"
+        // Named, because the record is per process and the card is per app: a
+        // bare total under a header reading "Google Chrome" is read as Chrome's,
+        // when it is one of its executables'.
+        let name = model.target.name
         guard energy.coveredSeconds < model.span * 0.99 else {
-            return "\(EnergyFormatter.string(energy.joules)) over the last \(span)."
+            return "\(name) drew \(EnergyFormatter.string(energy.joules)) over the last \(span)."
         }
-        return "At least \(EnergyFormatter.string(energy.joules)) over the last \(span)"
-            + " — from the \(DurationFormatter.brief(energy.coveredSeconds)) it was recorded for."
+        return "\(name) drew at least \(EnergyFormatter.string(energy.joules)) over the last"
+            + " \(span) — from the \(DurationFormatter.brief(energy.coveredSeconds))"
+            + " it was recorded for."
     }
 
     private func spanButton(_ title: String, span: TimeInterval) -> some View {
