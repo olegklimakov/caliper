@@ -336,6 +336,80 @@ public struct HistoryStore: Sendable {
         )
     }
 
+    /// The registry, searched. Matched on the name and on the path, because
+    /// half of what anyone remembers about a program is where it lived.
+    ///
+    /// Most recently seen first, so an empty query answers with the inventory
+    /// rather than an empty box — the registry is small enough to browse, which
+    /// is the whole reason it is affordable to keep every name in it.
+    ///
+    /// Ties broken by *first* seen, which is not a tidiness rule: the registry
+    /// is written every ten minutes, so on this machine 658 names share one
+    /// `last_seen` and the head of the list would otherwise be whatever sorts
+    /// first alphabetically. Newest arrivals first is the one ordering of a
+    /// running machine that says anything.
+    static func search(
+        names query: String,
+        limit: Int,
+        in db: Database
+    ) throws -> ProcessNameSearch {
+        let recorded = try Int.fetchOne(db, sql: "SELECT count(*) FROM process_inventory") ?? 0
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        let filter =
+            trimmed.isEmpty
+            ? ""
+            : "WHERE name LIKE :pattern ESCAPE '\\' OR path LIKE :pattern ESCAPE '\\'"
+        let arguments: StatementArguments = trimmed.isEmpty ? [:] : ["pattern": "%\(escapingWildcards(trimmed))%"]
+
+        let matched =
+            trimmed.isEmpty
+            ? recorded
+            : try Int.fetchOne(
+                db,
+                sql: """
+                    SELECT count(*) FROM process_inventory
+                    JOIN process_names ON process_names.id = process_inventory.name_id
+                    \(filter)
+                    """,
+                arguments: arguments
+            ) ?? 0
+
+        let rows = try Row.fetchAll(
+            db,
+            sql: """
+                SELECT name, path, first_seen, last_seen
+                FROM process_inventory
+                JOIN process_names ON process_names.id = process_inventory.name_id
+                \(filter)
+                ORDER BY last_seen DESC, first_seen DESC, name
+                LIMIT \(limit)
+                """,
+            arguments: arguments
+        )
+        return ProcessNameSearch(
+            matches: rows.map { row in
+                ProcessAppearance(
+                    name: row["name"],
+                    path: row["path"],
+                    firstSeen: Date(timeIntervalSince1970: TimeInterval(row["first_seen"] as Int)),
+                    lastSeen: Date(timeIntervalSince1970: TimeInterval(row["last_seen"] as Int))
+                )
+            },
+            matched: matched,
+            recorded: recorded
+        )
+    }
+
+    /// `%`, `_` and the escape itself are literal in a name someone typed:
+    /// "Google Chrome_Helper" is a search for that name, not for any character
+    /// between the words.
+    private static func escapingWildcards(_ query: String) -> String {
+        query
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "%", with: "\\%")
+            .replacingOccurrences(of: "_", with: "\\_")
+    }
+
     /// One name's registry entry, or nil for a name never recorded.
     static func fetchAppearance(name: String, in db: Database) throws -> ProcessAppearance? {
         try Row.fetchOne(

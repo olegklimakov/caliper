@@ -80,6 +80,21 @@ public struct HistoryReader: Sendable {
         }
     }
 
+    /// The registry, searched by name and by path.
+    ///
+    /// The one question no ranked tier can answer: a program too cheap to ever
+    /// rank leaves no bucket behind, and "what was that thing called that ate
+    /// the battery on Tuesday" is asked of a name that may no longer exist on
+    /// the machine.
+    public func searchProcessNames(
+        matching query: String,
+        limit: Int = 60
+    ) async throws -> ProcessNameSearch {
+        try await store.databaseQueue.read { db in
+            try HistoryStore.search(names: query, limit: limit, in: db)
+        }
+    }
+
     /// Removes every stored process row and every interned name. Off the
     /// caller's thread: two table-wide deletes and a vacuum, from a settings
     /// window.

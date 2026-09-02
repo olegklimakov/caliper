@@ -1305,6 +1305,106 @@ private func crowd(cpu: Double = 1.0) -> [ProcessSample] {
     }
 }
 
+/// Registers three names an hour apart, so "most recently seen" has an order
+/// to get right.
+private func recordRegistry(_ store: HistoryStore, _ names: [ProcessIdentity]) throws {
+    let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+    for (index, identity) in names.enumerated() {
+        recorder.record(
+            sweep(at: bucketStart.addingTimeInterval(Double(index) * 3600), [], roster: [identity])
+        )
+    }
+    try recorder.flushNow()
+}
+
+@Test func anEmptyQueryIsTheInventoryMostRecentlySeenFirst() async throws {
+    try await withStore { store in
+        try recordRegistry(
+            store,
+            [
+                ProcessIdentity(name: "oldest", path: nil),
+                ProcessIdentity(name: "middle", path: nil),
+                ProcessIdentity(name: "newest", path: nil),
+            ]
+        )
+
+        let found = try await HistoryReader(store: store).searchProcessNames(matching: "")
+        #expect(found.matches.map(\.name) == ["newest", "middle", "oldest"])
+        #expect(found.matched == 3)
+        #expect(found.recorded == 3)
+    }
+}
+
+/// Every name still running shares one `last_seen` — the registry is written
+/// on one schedule for all of them — so the tie is most of the list, and
+/// breaking it alphabetically would head the room with whatever begins with A.
+@Test func namesSeenAtTheSameMomentAreNewestArrivalsFirst() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        // "old" has been around since yesterday; both are seen again now, in
+        // the same sweep, so their last-seen is identical.
+        let yesterday = bucketStart.addingTimeInterval(-86_400)
+        recorder.record(sweep(at: yesterday, [], roster: [ProcessIdentity(name: "old", path: nil)]))
+        recorder.record(
+            sweep(
+                at: bucketStart,
+                [],
+                roster: [ProcessIdentity(name: "old", path: nil), ProcessIdentity(name: "new", path: nil)]
+            )
+        )
+        try recorder.flushNow()
+
+        let found = try await HistoryReader(store: store).searchProcessNames(matching: "")
+        #expect(found.matches.map(\.name) == ["new", "old"])
+    }
+}
+
+@Test func aNameIsFoundByPartOfItOrByWhereItLived() async throws {
+    try await withStore { store in
+        try recordRegistry(
+            store,
+            [
+                ProcessIdentity(name: "ghost", path: "/usr/local/libexec/ghost"),
+                ProcessIdentity(name: "Google Chrome", path: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+            ]
+        )
+        let reader = HistoryReader(store: store)
+
+        // Case-folded, because nobody types the capital of an app they are
+        // trying to remember the name of.
+        #expect(try await reader.searchProcessNames(matching: "chrom").matches.map(\.name) == ["Google Chrome"])
+        // By path: half of what anyone remembers about a daemon is where it
+        // lived.
+        #expect(try await reader.searchProcessNames(matching: "libexec").matches.map(\.name) == ["ghost"])
+        let miss = try await reader.searchProcessNames(matching: "nothing of the sort")
+        #expect(miss.matches.isEmpty)
+        // Which is what tells "no such name" from "nothing recorded yet".
+        #expect(miss.recorded == 2)
+    }
+}
+
+@Test func aWildcardTypedIntoTheSearchIsALiteralCharacter() async throws {
+    try await withStore { store in
+        try recordRegistry(
+            store,
+            [ProcessIdentity(name: "a_b", path: nil), ProcessIdentity(name: "axb", path: nil)]
+        )
+
+        let found = try await HistoryReader(store: store).searchProcessNames(matching: "a_b")
+        #expect(found.matches.map(\.name) == ["a_b"])
+    }
+}
+
+@Test func aTruncatedResultSaysHowManyItMatched() async throws {
+    try await withStore { store in
+        try recordRegistry(store, (0..<5).map { ProcessIdentity(name: "helper\($0)", path: nil) })
+
+        let found = try await HistoryReader(store: store).searchProcessNames(matching: "helper", limit: 2)
+        #expect(found.matches.count == 2)
+        #expect(found.matched == 5)
+    }
+}
+
 @Test func aNameSeenAcrossTwoDaysGetsARowForEach() async throws {
     try await withStore { store in
         let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
