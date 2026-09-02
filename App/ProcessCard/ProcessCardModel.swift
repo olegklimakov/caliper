@@ -186,6 +186,18 @@ final class ProcessCardModel {
         startProbe()
     }
 
+    /// By name, where the live half of the card is by family — deliberately.
+    ///
+    /// The store keys on the executable name, and the registry's paths could
+    /// resolve a bundle to its helpers' names at read time. Two things say no.
+    /// Summing them makes every *bar* a floor rather than only the gaps — a
+    /// helper that did not rank is missing from its bucket — which is the one
+    /// property the strip exists to have. And a pin is per name: promising
+    /// "every bucket" for a family would pin forty of Chrome's helpers against
+    /// a cap of ten, at forty times the 0.7 MB a fortnight settings quotes.
+    ///
+    /// So the strip says which name it is drawn for, in its heading and in both
+    /// its captions, rather than claiming the app's total.
     private func loadHistory() {
         guard let reader else { return }
         historyTask?.cancel()

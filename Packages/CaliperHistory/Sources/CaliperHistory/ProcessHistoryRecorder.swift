@@ -32,10 +32,14 @@ public final class ProcessHistoryRecorder: Sendable {
         /// Names that ranked recently, and the bucket they last ranked in.
         /// What keeps a strip from being a comb; see `ProcessTier.stickiness`.
         var sticky: [String: Date] = [:]
-        /// `sticky` and `pinned` resolved into what the sweep is asked for.
-        /// Held rather than derived because the app reads it every tick and a
-        /// sort of the sticky table a second is a sort a second for an answer
-        /// that only changes when a bucket closes.
+        /// The names ranking in the bucket still filling. Held because the
+        /// watch list has to carry them before the *next* sweep is taken, not
+        /// when the bucket closes — see `noteOpenRanks`.
+        var openRanks: Set<String> = []
+        /// `sticky`, `openRanks` and `pinned` resolved into what the sweep is
+        /// asked for. Held rather than derived because the app reads it every
+        /// tick and a sort of the sticky table a tick is a sort for an answer
+        /// that rarely changes.
         var watchList: Set<String> = []
         /// A snapshot carries the newest process sample rather than one taken
         /// on its own tick, so the same sweep arrives every second — up to
@@ -78,7 +82,8 @@ public final class ProcessHistoryRecorder: Sendable {
     }
 
     /// What the sweep has to report by name for the next bucket to be
-    /// complete: the pins, plus the names still inside their sticky window.
+    /// complete: the pins, the names ranking in the bucket still filling, and
+    /// the names still inside their sticky window.
     public var watching: Set<String> {
         state.withLock { $0.isEnabled ? $0.watchList : [] }
     }
@@ -88,11 +93,27 @@ public final class ProcessHistoryRecorder: Sendable {
     /// top ten inside one window — and a bucket's width is not allowed to
     /// follow it.
     private static func refreshWatchList(_ state: inout State) {
+        let promised = state.pinned.union(state.openRanks)
         let recent = state.sticky
             .sorted { $0.value > $1.value }
-            .prefix(max(ProcessTier.watchLimit - state.pinned.count, 0))
+            .prefix(max(ProcessTier.watchLimit - promised.count, 0))
             .map(\.key)
-        state.watchList = state.pinned.union(recent)
+        state.watchList = promised.union(recent)
+    }
+
+    /// Puts the bucket still filling on the watch list as soon as it has ranks,
+    /// rather than when it closes.
+    ///
+    /// Hidden, the sweep runs every thirty seconds and a bucket *is* thirty
+    /// seconds, so one sweep is a whole bucket. A list refreshed at close is
+    /// then a sweep too late: the sweep that arrives with the close was taken
+    /// against the previous list, so a name that has just stopped ranking is
+    /// absent from the first bucket of the very window that exists to hold it —
+    /// one tooth of comb in the middle of a run the `keep` column says is
+    /// continuous.
+    private static func noteOpenRanks(_ state: inout State, bucket: Date) {
+        state.openRanks = ranked(in: rows(of: state, at: bucket))
+        refreshWatchList(&state)
     }
 
     /// What the delete button needs: emptying the tables while the recorder
@@ -111,6 +132,7 @@ public final class ProcessHistoryRecorder: Sendable {
         state.lastSweep = nil
         state.rosterBucket = nil
         state.sticky.removeAll(keepingCapacity: false)
+        state.openRanks.removeAll(keepingCapacity: false)
         state.watchList = state.pinned
         state.pending.removeAll(keepingCapacity: false)
         state.appearances.removeAll(keepingCapacity: false)
@@ -130,6 +152,7 @@ public final class ProcessHistoryRecorder: Sendable {
             state.openBucket = bucket
 
             Self.fold(processes, into: &state)
+            Self.noteOpenRanks(&state, bucket: bucket)
             if state.rosterBucket != bucket {
                 state.rosterBucket = bucket
                 Self.register(processes.roster, at: processes.sampledAt, in: &state)
@@ -227,18 +250,21 @@ public final class ProcessHistoryRecorder: Sendable {
         }
     }
 
-    /// Top ten by CPU, by footprint and by energy, plus every name held by a
-    /// pin or by its sticky window.
+    /// What the bucket accumulated so far, as rows. Cheap enough to build on
+    /// every sweep as well as at close: a bucket holds tens of names, against
+    /// the whole-machine pid sweep that produced them.
+    private static func rows(of state: State, at start: Date) -> [ProcessRow] {
+        state.open.map { name, accumulator in
+            accumulator.row(name: name, timestamp: start)
+        }
+    }
+
+    /// Top ten by CPU, by footprint and by energy, unioned.
     ///
     /// Not by disk: that question is answered by the disk series itself, and a
     /// fourth ranking would cost rows for a fact already stored. The rate is
     /// still kept for whoever makes the list.
-    private static func close(bucket start: Date, in state: inout State) {
-        var rows = state.open.map { name, accumulator in
-            accumulator.row(name: name, timestamp: start)
-        }
-        state.open.removeAll(keepingCapacity: true)
-
+    private static func ranked(in rows: [ProcessRow]) -> Set<String> {
         // Zeroes never rank. Most of the machine draws no measurable power and
         // touches no disk, so a ranking that admitted them would fill ten rows
         // a bucket with an arbitrary pick from the tie — the rule the sweep's
@@ -255,6 +281,15 @@ public final class ProcessHistoryRecorder: Sendable {
         rank(by: \.cpuPermille)
         rank(by: \.footprintMB)
         rank(by: \.energyMJ)
+        return ranked
+    }
+
+    /// Writes the closing bucket: everything that ranked, plus every name held
+    /// by a pin or by its sticky window.
+    private static func close(bucket start: Date, in state: inout State) {
+        var rows = rows(of: state, at: start)
+        state.open.removeAll(keepingCapacity: true)
+        let ranked = ranked(in: rows)
 
         // The sticky window is measured from the last bucket a name ranked in,
         // so it has to be read before this bucket's ranks are written into it.
@@ -277,6 +312,7 @@ public final class ProcessHistoryRecorder: Sendable {
             state.sticky[name] = start
         }
         state.sticky = state.sticky.filter { $0.value >= held }
+        state.openRanks.removeAll(keepingCapacity: true)
         refreshWatchList(&state)
 
         for index in rows.indices {

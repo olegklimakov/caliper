@@ -100,14 +100,14 @@ enum UIPreview {
                             background: nil
                         )
                     }
-                    for (state, model) in [
-                        ("live", previewProcessCard(live: true)),
-                        ("dead", previewProcessCard(live: false)),
-                    ] {
+                    for fate in CardFate.allCases {
+                        let model = previewProcessCard(fate)
                         if let card = PanelPreview.renderProcessCard(model: model, appearance: theme) {
                             write(
                                 card,
-                                to: url.appendingPathComponent("process-card-\(state)-\(appearance).png"),
+                                to: url.appendingPathComponent(
+                                    "process-card-\(fate.rawValue)-\(appearance).png"
+                                ),
                                 scale: 1,
                                 background: nil
                             )
@@ -279,14 +279,29 @@ enum UIPreview {
         return try? await reader.consumers(at: cursor, retention: .week)
     }
 
-    /// The card in both fates, built from literals: a live family shaped like
-    /// a browser — one root, helpers doing the work — and the same identity
-    /// after it exited, when the strip is all that remains.
+    /// The three cards worth looking at, which are the three captions the strip
+    /// can carry — every gap ambiguous, every gap meaningful, and the pinned
+    /// run that only reaches part of the way back.
+    private enum CardFate: String, CaseIterable {
+        case live
+        case pinned
+        case dead
+
+        var isLive: Bool { self != .dead }
+    }
+
+    /// The card built from literals: a live family shaped like a browser — one
+    /// root, helpers doing the work — and the same identity after it exited,
+    /// when the strip is all that remains.
     @MainActor
-    private static func previewProcessCard(live: Bool) -> ProcessCardModel {
+    private static func previewProcessCard(_ fate: CardFate) -> ProcessCardModel {
         let end = Date(timeIntervalSince1970: 1_788_180_000)
         var points: [ProcessNamePoint] = []
-        for (range, peak) in [(60..<95, 0.55), (400..<480, 1.9), (1_200..<1_265, 0.7)] {
+        // Pinned four hours ago and never ranked before it: the case that
+        // decides whether the caption reads coverage off the span or off the
+        // points it happens to have, which are all pinned either way.
+        let humps = fate == .pinned ? [(1_200..<1_265, 0.7)] : [(60..<95, 0.55), (400..<480, 1.9), (1_200..<1_265, 0.7)]
+        for (range, peak) in humps {
             for minute in range {
                 let phase = Double(minute - range.lowerBound) / Double(range.count)
                 let load = peak * exp(-pow((phase - 0.5) * 3.2, 2))
@@ -297,9 +312,9 @@ enum UIPreview {
                         footprint: UInt64(1.4e9 + load * 8e8),
                         diskRate: load * 2e5,
                         energy: (0.4 + load) * 60,
-                        // The strip is captioned from these, so the live card's
+                        // The strip is captioned from these, so a pinned card's
                         // bars have to be what a pinned process really stores.
-                        keep: live ? .pinned : .ranked
+                        keep: fate == .pinned ? .pinned : .ranked
                     )
                 )
             }
@@ -312,20 +327,18 @@ enum UIPreview {
             tier: .minute
         )
 
-        // Pinned on the live card and not on the dead one, so one render of the
-        // pair shows both states of the control and both captions each of the
-        // strip and the energy line can carry. A defaults store per card, not
-        // the shared one: both models are built before either is drawn, so a
-        // shared store would render whichever state was set last, twice.
+        // A defaults store per card, not the shared one: the models are built
+        // before any of them is drawn, so a shared store would render whichever
+        // state was set last, three times.
         let preferences = Preferences(
-            defaults: UserDefaults(suiteName: "caliper.preview.card.\(live)") ?? .standard
+            defaults: UserDefaults(suiteName: "caliper.preview.card.\(fate.rawValue)") ?? .standard
         )
-        preferences.setPinned(live, for: "Google Chrome")
+        preferences.setPinned(fate == .pinned, for: "Google Chrome")
         let family = ProcessFamilyKey.bundle(
             identifier: "com.google.Chrome",
             appURL: URL(fileURLWithPath: "/Applications/Google Chrome.app", isDirectory: true)
         )
-        guard live else {
+        guard fate.isLive else {
             return ProcessCardModel(
                 preloaded: .name("Google Chrome"),
                 family: family,
