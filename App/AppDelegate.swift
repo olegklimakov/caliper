@@ -226,6 +226,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// straight back.
     private func deleteProcessHistory() async throws {
         processRecorder?.discardPending()
+        // This delete takes the registry with it, and the search room is a
+        // list of exactly what it deleted. Deferred for the same reason as
+        // below: the rows go in the first statement, so a vacuum that throws
+        // still leaves a window drawing a record that is gone.
+        defer { NotificationCenter.default.post(name: .historyDidChange, object: nil) }
         try await history?.deleteProcessHistory()
     }
 

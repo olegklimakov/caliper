@@ -296,6 +296,9 @@ enum UIPreview {
     /// The search room in its two states worth checking: a query with matches,
     /// and a query with none — which has to say how much *is* recorded, or
     /// "not found" reads as "never ran".
+    ///
+    /// The switched-off and unavailable states are one `note` each with the
+    /// same shape as the empty one, which this already draws.
     @MainActor
     private static var previewRegistry: [(String, (query: String, result: ProcessNameSearch))] {
         // Relative to the real clock, unlike the card's fixed fixture: the three
@@ -329,15 +332,29 @@ enum UIPreview {
         ]
     }
 
-    /// The three cards worth looking at, which are the three captions the strip
-    /// can carry — every gap ambiguous, every gap meaningful, and the pinned
-    /// run that only reaches part of the way back.
+    /// The four cards worth looking at, which are the four captions the strip
+    /// can carry: gaps that mean only "did not rank", a pinned run reaching
+    /// part of the way back, a pinned run that has since ended, and the same
+    /// identity after it exited.
     private enum CardFate: String, CaseIterable {
         case live
         case pinned
+        case unpinned
         case dead
 
         var isLive: Bool { self != .dead }
+        /// Pinned *now*, which is what decides whether the promise runs to the
+        /// leading edge or stops at the last bucket it covered.
+        var isPinned: Bool { self == .pinned }
+    }
+
+    /// Which buckets a fate has pinned, by minute of the day the strip covers.
+    private static func keep(_ fate: CardFate, minute: Int) -> ProcessKeepReason {
+        switch fate {
+        case .pinned: .pinned
+        case .unpinned: (400..<480).contains(minute) ? .pinned : .ranked
+        case .live, .dead: .ranked
+        }
     }
 
     /// The card built from literals: a live family shaped like a browser — one
@@ -347,10 +364,14 @@ enum UIPreview {
     private static func previewProcessCard(_ fate: CardFate) -> ProcessCardModel {
         let end = Date(timeIntervalSince1970: 1_788_180_000)
         var points: [ProcessNamePoint] = []
-        // Pinned four hours ago and never ranked before it: the case that
-        // decides whether the caption reads coverage off the span or off the
-        // points it happens to have, which are all pinned either way.
-        let humps = fate == .pinned ? [(1_200..<1_265, 0.7)] : [(60..<95, 0.55), (400..<480, 1.9), (1_200..<1_265, 0.7)]
+        // `pinned` is pinned four hours ago and never ranked before it, so
+        // every point it has is pinned and coverage can only be read off the
+        // span. `unpinned` was pinned for a stretch in the middle of the day
+        // and is not now, so the promise has both a beginning and an end.
+        let humps =
+            fate == .pinned
+            ? [(1_200..<1_265, 0.7)]
+            : [(60..<95, 0.55), (400..<480, 1.9), (1_200..<1_265, 0.7)]
         for (range, peak) in humps {
             for minute in range {
                 let phase = Double(minute - range.lowerBound) / Double(range.count)
@@ -364,7 +385,7 @@ enum UIPreview {
                         energy: (0.4 + load) * 60,
                         // The strip is captioned from these, so a pinned card's
                         // bars have to be what a pinned process really stores.
-                        keep: fate == .pinned ? .pinned : .ranked
+                        keep: keep(fate, minute: minute)
                     )
                 )
             }
@@ -383,7 +404,7 @@ enum UIPreview {
         let preferences = Preferences(
             defaults: UserDefaults(suiteName: "caliper.preview.card.\(fate.rawValue)") ?? .standard
         )
-        preferences.setPinned(fate == .pinned, for: "Google Chrome")
+        preferences.setPinned(fate.isPinned, for: "Google Chrome")
         let family = ProcessFamilyKey.bundle(
             identifier: "com.google.Chrome",
             appURL: URL(fileURLWithPath: "/Applications/Google Chrome.app", isDirectory: true)

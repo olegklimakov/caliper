@@ -421,21 +421,51 @@ struct ProcessCardPane: View {
     /// thing that can caption the ones beside it.
     private func stripCaption(_ history: ProcessNameHistory) -> String {
         let name = model.target.name
-        guard let earliest = history.points.first(where: { $0.keep == .pinned })?.bucketStart else {
+        guard let run = pinnedRun(history.points) else {
             return "Bars where \(name) ranked in the stored top ten — a gap means unranked, not idle."
         }
-        // How far back the promise reaches is a question about the span on
-        // screen, not about the points that happen to exist: a process pinned a
-        // minute ago and never ranked before returns nothing *but* pinned
-        // points, and every hole behind them is unrecorded rather than idle.
-        // A bucket of slack because the earliest one starts inside the span.
-        let covered = earliest.timeIntervalSince(model.historyEnd.addingTimeInterval(-model.span))
-        guard covered > Double(history.tier.seconds) else {
+        // Whether the promise still runs at the leading edge: a pin still on,
+        // and a strip whose newest bucket it covered. Otherwise it ended, and
+        // the caption has to say where — the buckets after it are ranked ones
+        // whose gaps mean only "did not rank".
+        guard model.isPinned, history.points.last?.keep == .pinned else {
+            return "Every bucket between \(RegistryDate.moment(run.from)) and"
+                + " \(RegistryDate.moment(run.until)) is recorded — a gap in that stretch is time"
+                + " \(name) was not running. Outside it, only where it ranked."
+        }
+        // How far back it reaches is a question about the span on screen, not
+        // about the points that happen to exist: a process pinned a minute ago
+        // and never ranked before returns nothing *but* pinned points, and
+        // every hole behind them is unrecorded rather than idle. A bucket of
+        // slack, because the earliest one starts inside the span.
+        let slack = TimeInterval(history.tier.seconds)
+        guard run.from > model.historyEnd.addingTimeInterval(-model.span) + slack else {
             return "Every bucket of \(name) is recorded — a gap is time it was not running."
         }
-        let since = earliest.formatted(date: .omitted, time: .shortened)
-        return "Every bucket from \(since) on — a gap after that is time \(name) was not running."
-            + " Before it, only where it ranked."
+        return "Every bucket from \(RegistryDate.moment(run.from)) on — a gap after that is time"
+            + " \(name) was not running. Before it, only where it ranked."
+    }
+
+    /// The last unbroken stretch of pinned buckets, rather than the first and
+    /// last pinned bucket in the strip: a pin taken off and put back leaves
+    /// ranked buckets between two stretches, and one promise spanning both
+    /// would caption the gaps in the middle as time the process was idle.
+    ///
+    /// A *gap* inside a stretch does not break it — that is precisely what the
+    /// pin buys. Only a bucket kept for another reason does.
+    private func pinnedRun(_ points: [ProcessNamePoint]) -> (from: Date, until: Date)? {
+        var run: (from: Date, until: Date)?
+        var isOpen = false
+        for point in points {
+            guard point.keep == .pinned else {
+                isOpen = false
+                continue
+            }
+            run = isOpen ? (run?.from ?? point.bucketStart, point.bucketStart)
+                : (point.bucketStart, point.bucketStart)
+            isOpen = true
+        }
+        return run
     }
 
     /// A total the reader can trust the shape of: the unrecorded buckets

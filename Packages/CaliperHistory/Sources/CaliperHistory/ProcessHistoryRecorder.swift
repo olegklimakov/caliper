@@ -36,10 +36,10 @@ public final class ProcessHistoryRecorder: Sendable {
         /// watch list has to carry them before the *next* sweep is taken, not
         /// when the bucket closes — see `noteOpenRanks`.
         var openRanks: Set<String> = []
-        /// `sticky`, `openRanks` and `pinned` resolved into what the sweep is
-        /// asked for. Held rather than derived because the app reads it every
-        /// tick and a sort of the sticky table a tick is a sort for an answer
-        /// that rarely changes.
+        /// `sticky`, `openRanks` and `pinned` resolved into the one list the
+        /// sweep is handed. A field rather than a computed property because the
+        /// app reads it on every tick — up to thirty times per sweep when
+        /// hidden — and it can only change when a sweep is folded.
         var watchList: Set<String> = []
         /// A snapshot carries the newest process sample rather than one taken
         /// on its own tick, so the same sweep arrives every second — up to
@@ -93,12 +93,16 @@ public final class ProcessHistoryRecorder: Sendable {
     /// top ten inside one window — and a bucket's width is not allowed to
     /// follow it.
     private static func refreshWatchList(_ state: inout State) {
-        let promised = state.pinned.union(state.openRanks)
         let recent = state.sticky
             .sorted { $0.value > $1.value }
-            .prefix(max(ProcessTier.watchLimit - promised.count, 0))
+            .prefix(max(ProcessTier.watchLimit - state.pinned.count, 0))
             .map(\.key)
-        state.watchList = promised.union(recent)
+        // The open bucket's own ranks go on top of the cap rather than out of
+        // it. `watchLimit` is room for what a bucket carries *beyond* its
+        // rankings, and a bucket ranks up to thirty: spending the cap on names
+        // the sweep already reports for ranking evicted a third of the sticky
+        // window the cap exists to hold.
+        state.watchList = state.pinned.union(recent).union(state.openRanks)
     }
 
     /// Puts the bucket still filling on the watch list as soon as it has ranks,
@@ -111,8 +115,8 @@ public final class ProcessHistoryRecorder: Sendable {
     /// absent from the first bucket of the very window that exists to hold it —
     /// one tooth of comb in the middle of a run the `keep` column says is
     /// continuous.
-    private static func noteOpenRanks(_ state: inout State, bucket: Date) {
-        state.openRanks = ranked(in: rows(of: state, at: bucket))
+    private static func noteOpenRanks(_ state: inout State) {
+        state.openRanks = ranked(in: state.open)
         refreshWatchList(&state)
     }
 
@@ -152,7 +156,7 @@ public final class ProcessHistoryRecorder: Sendable {
             state.openBucket = bucket
 
             Self.fold(processes, into: &state)
-            Self.noteOpenRanks(&state, bucket: bucket)
+            Self.noteOpenRanks(&state)
             if state.rosterBucket != bucket {
                 state.rosterBucket = bucket
                 Self.register(processes.roster, at: processes.sampledAt, in: &state)
@@ -250,32 +254,28 @@ public final class ProcessHistoryRecorder: Sendable {
         }
     }
 
-    /// What the bucket accumulated so far, as rows. Cheap enough to build on
-    /// every sweep as well as at close: a bucket holds tens of names, against
-    /// the whole-machine pid sweep that produced them.
-    private static func rows(of state: State, at start: Date) -> [ProcessRow] {
-        state.open.map { name, accumulator in
-            accumulator.row(name: name, timestamp: start)
-        }
-    }
-
     /// Top ten by CPU, by footprint and by energy, unioned.
     ///
     /// Not by disk: that question is answered by the disk series itself, and a
     /// fourth ranking would cost rows for a fact already stored. The rate is
     /// still kept for whoever makes the list.
-    private static func ranked(in rows: [ProcessRow]) -> Set<String> {
+    ///
+    /// Over the accumulators rather than over built rows, because this runs on
+    /// every sweep and not only at close — and on the values as they will be
+    /// *stored*, so a hundredth of a millijoule is the zero it will be on disk
+    /// rather than something that ranks.
+    private static func ranked(in open: [String: Accumulator]) -> Set<String> {
         // Zeroes never rank. Most of the machine draws no measurable power and
         // touches no disk, so a ranking that admitted them would fill ten rows
         // a bucket with an arbitrary pick from the tie — the rule the sweep's
         // own power and disk lists already follow.
         var ranked: Set<String> = []
-        func rank(by value: (ProcessRow) -> Int) {
-            for row in rows.filter({ value($0) > 0 })
-                .sorted(by: { value($0) > value($1) })
+        func rank(by value: (Accumulator) -> Int) {
+            for entry in open.filter({ value($0.value) > 0 })
+                .sorted(by: { value($0.value) > value($1.value) })
                 .prefix(ProcessTier.topCount)
             {
-                ranked.insert(row.name)
+                ranked.insert(entry.key)
             }
         }
         rank(by: \.cpuPermille)
@@ -287,9 +287,11 @@ public final class ProcessHistoryRecorder: Sendable {
     /// Writes the closing bucket: everything that ranked, plus every name held
     /// by a pin or by its sticky window.
     private static func close(bucket start: Date, in state: inout State) {
-        var rows = rows(of: state, at: start)
+        let ranked = ranked(in: state.open)
+        var rows = state.open.map { name, accumulator in
+            accumulator.row(name: name, timestamp: start)
+        }
         state.open.removeAll(keepingCapacity: true)
-        let ranked = ranked(in: rows)
 
         // The sticky window is measured from the last bucket a name ranked in,
         // so it has to be read before this bucket's ranks are written into it.
@@ -366,18 +368,25 @@ public final class ProcessHistoryRecorder: Sendable {
             count += 1
         }
 
-        /// A process whose sweeps were all rejected as non-finite still has a
-        /// row: it was in the top ten, and zero says so more honestly than
-        /// dropping it.
+        /// A process whose sweeps were all rejected as non-finite still counts
+        /// as one reading: it was in the top ten, and zero says so more
+        /// honestly than dropping it.
+        var readings: Int { Swift.max(count, 1) }
+
+        // The three the rankings run on, in the scale they are stored in, so
+        // what ranks and what is written cannot disagree about which is zero.
+        var cpuPermille: Int { Int((cpuTotal / Double(readings) * 1000).rounded()) }
+        var footprintMB: Int { Int(peakFootprint / 1_048_576) }
+        var energyMJ: Int { Int((energyTotal * 1000).rounded()) }
+
         func row(name: String, timestamp: Date) -> ProcessRow {
-            let readings = Swift.max(count, 1)
-            return ProcessRow(
+            ProcessRow(
                 name: name,
                 timestamp: timestamp,
-                cpuPermille: Int((cpuTotal / Double(readings) * 1000).rounded()),
-                footprintMB: Int(peakFootprint / 1_048_576),
+                cpuPermille: cpuPermille,
+                footprintMB: footprintMB,
                 diskKBps: Int((diskTotal / Double(readings) / 1024).rounded()),
-                energyMJ: Int((energyTotal * 1000).rounded()),
+                energyMJ: energyMJ,
                 keep: .ranked,
                 count: readings
             )
