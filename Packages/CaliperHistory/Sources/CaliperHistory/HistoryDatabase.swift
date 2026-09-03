@@ -214,6 +214,23 @@ public enum HistoryDatabase {
                     """
             )
         }
+        // Births, by the hour. Its own table rather than a column on
+        // `process_presence`, whose key is a UTC *day*: a local day spans two
+        // of those and a per-day total cannot be split between them, so "how
+        // many times did this restart today" would have no answer outside UTC.
+        // Sparse, so a name that starts once holds one row.
+        migrator.registerMigration("process starts") { db in
+            try db.execute(
+                sql: """
+                    CREATE TABLE process_starts (
+                        name_id INTEGER NOT NULL REFERENCES process_names(id),
+                        hour INTEGER NOT NULL,
+                        count INTEGER NOT NULL,
+                        PRIMARY KEY (name_id, hour)
+                    ) WITHOUT ROWID
+                    """
+            )
+        }
         return migrator
     }
 }

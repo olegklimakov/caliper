@@ -139,6 +139,7 @@ struct ProcessCardPane: View {
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
+                startsBadge
                 if !model.quitTargets.isEmpty {
                     Button("Quit…") { confirming = .quit }
                     Button("Force Quit…") { confirming = .force }
@@ -154,6 +155,31 @@ struct ProcessCardPane: View {
             case .warming:
                 EmptyView()
             }
+        }
+    }
+
+    /// Shown from two starts up. One is what every running process has done,
+    /// and printing it would make the interesting case — a helper being
+    /// relaunched all morning — look like the ordinary one.
+    @ViewBuilder
+    private var startsBadge: some View {
+        if let starts = model.starts, starts.count > 1 {
+            Text("started \(starts.count)× today")
+                .font(.system(size: 11, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(Color(Palette.warning))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 5))
+                // The floor is stated where it is asked about rather than in
+                // the badge: a number with "at least" in it beside a running
+                // time reads as an error bar on the running time.
+                .help(
+                    "Since \(starts.from.formatted(date: .omitted, time: .shortened)), and at"
+                        + " least this many: the process sweep runs every 30 seconds while"
+                        + " Caliper is hidden, so anything that started and exited between two"
+                        + " sweeps was never seen."
+                )
         }
     }
 

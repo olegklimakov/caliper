@@ -1,4 +1,5 @@
 import Darwin
+import Foundation
 import Testing
 
 @testable import CaliperCore
@@ -92,6 +93,105 @@ import Testing
     #expect(sample.topByCPU == sample.topByCPU.sorted { $0.cpu > $1.cpu })
     #expect(sample.topByMemory == sample.topByMemory.sorted { $0.memoryFootprint > $1.memoryFootprint })
     #expect(sample.topByCPU.allSatisfy { !$0.name.isEmpty })
+}
+
+/// A live test because the birth rule is the sweep's, not a pure function's:
+/// what makes a pid new is that its `ri_proc_start_abstime` is later than the
+/// previous sweep began, and only a real pid has one.
+@Test func aProcessBornSinceTheLastSweepIsCountedOnceAndNotAgain() throws {
+    // A copy under a name nothing else on the machine answers to. The roster
+    // is keyed by name, so a test that spawned `/bin/sleep` would be counting
+    // every other `sleep` on the machine — including the ones this project's
+    // own scripts run.
+    let executable = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("caliper-birth-\(UUID().uuidString.prefix(8))")
+    try FileManager.default.copyItem(at: URL(fileURLWithPath: "/bin/sleep"), to: executable)
+    defer { try? FileManager.default.removeItem(at: executable) }
+
+    var sampler = ProcessSampler()
+    var clock = ContinuousClock.now
+    // Two, because the rate window needs a pair before it reports anything.
+    _ = sampler.sample(at: clock)
+    clock = clock.advanced(by: .seconds(1))
+    _ = sampler.sample(at: clock)
+
+    let child = Process()
+    child.executableURL = executable
+    child.arguments = ["30"]
+    try child.run()
+    defer {
+        child.terminate()
+        child.waitUntilExit()
+    }
+
+    clock = clock.advanced(by: .seconds(1))
+    guard let born = sampler.sample(at: clock) else {
+        Issue.record("third sample should produce a reading")
+        return
+    }
+    let name = executable.lastPathComponent
+    #expect(born.births[name] == 1)
+
+    // The same pid on the next sweep is not a new one — absent from `births`
+    // rather than present with a zero, which is the half of the rule a table
+    // of pids alone would get wrong after a wake or an unreadable moment.
+    clock = clock.advanced(by: .seconds(1))
+    guard let settled = sampler.sample(at: clock) else {
+        Issue.record("fourth sample should produce a reading")
+        return
+    }
+    #expect(settled.births[name] == nil)
+}
+
+/// The one assertion that can catch a pid counted twice. Births claim to be a
+/// floor, so *more* of them than were actually spawned is always the bug — and
+/// it only appears when a process is born while the sweep is reading the pid
+/// list, because a spawn between two sweeps is counted correctly whichever
+/// side of the read the watermark is taken. Spawning immediately before each
+/// sweep is what opens that window; it is a guard on the invariant rather than
+/// a reproduction of the race, and the upper bound is the half that matters.
+@Test func birthsUnderChurnNeverExceedWhatWasSpawned() throws {
+    let executable = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("caliper-churn-\(UUID().uuidString.prefix(8))")
+    try FileManager.default.copyItem(at: URL(fileURLWithPath: "/bin/sleep"), to: executable)
+    defer { try? FileManager.default.removeItem(at: executable) }
+    let name = executable.lastPathComponent
+
+    var children: [Process] = []
+    defer {
+        for child in children {
+            child.terminate()
+            child.waitUntilExit()
+        }
+    }
+
+    var sampler = ProcessSampler()
+    var clock = ContinuousClock.now
+    _ = sampler.sample(at: clock)
+    clock = clock.advanced(by: .seconds(1))
+    _ = sampler.sample(at: clock)
+
+    let spawned = 24
+    var counted = 0
+    func sweep() {
+        clock = clock.advanced(by: .seconds(1))
+        counted += sampler.sample(at: clock)?.births[name] ?? 0
+    }
+    for _ in 0..<spawned {
+        let child = Process()
+        child.executableURL = executable
+        child.arguments = ["30"]
+        try child.run()
+        children.append(child)
+        sweep()
+    }
+    // Three more, for any that were not yet in a pid list when their own sweep
+    // read one.
+    for _ in 0..<3 { sweep() }
+
+    #expect(counted <= spawned)
+    // And it has to be finding them, or the bound above holds vacuously.
+    #expect(counted > 0)
 }
 
 @Test func sweepCountsWhatItCannotRead() {

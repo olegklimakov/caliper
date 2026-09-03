@@ -391,6 +391,17 @@ enum UIPreview {
             }
         }
         let history = ProcessNameHistory(tier: .minute, points: points)
+        // Only the unpinned live card carries a start count, so one render of
+        // the set shows the badge and the rest show the header without it —
+        // which is what a process that has simply been running looks like.
+        let starts =
+            fate == .live
+            ? ProcessStarts(
+                count: 14,
+                from: end.addingTimeInterval(-14 * 3600),
+                to: end
+            )
+            : nil
         // Summed from the same points, so the caption and the strip agree.
         let energy = ProcessEnergy(
             joules: points.reduce(0) { $0 + $1.energy },
@@ -417,6 +428,7 @@ enum UIPreview {
                 presence: .exited(lastSeen: end.addingTimeInterval(-600)),
                 history: history,
                 energy: energy,
+                starts: starts,
                 historyEnd: end,
                 preferences: preferences
             )
@@ -478,6 +490,7 @@ enum UIPreview {
             presence: .live,
             history: history,
             energy: energy,
+            starts: starts,
             historyEnd: end,
             preferences: preferences
         )

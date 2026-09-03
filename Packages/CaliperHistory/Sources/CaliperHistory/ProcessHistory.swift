@@ -281,6 +281,10 @@ struct ProcessAppearanceRow: Sendable, Equatable {
     var lastSeen: Date
     /// Day since the epoch to a bit per hour of that day.
     var hours: [Int: Int]
+    /// Hour since the epoch to how many pids of this name were born in it.
+    /// By the hour rather than by the day the presence mask uses — see the
+    /// `process starts` migration.
+    var starts: [Int: Int]
 
     init(identity: ProcessIdentity, at moment: Date) {
         name = identity.name
@@ -288,6 +292,7 @@ struct ProcessAppearanceRow: Sendable, Equatable {
         firstSeen = moment
         lastSeen = moment
         hours = [:]
+        starts = [:]
     }
 
     static func day(of moment: Date) -> Int {
@@ -298,12 +303,23 @@ struct ProcessAppearanceRow: Sendable, Equatable {
         1 << (Int(moment.timeIntervalSince1970) % 86400 / 3600)
     }
 
+    static func hour(of moment: Date) -> Int {
+        Int(moment.timeIntervalSince1970) / 3600
+    }
+
     mutating func observe(identity: ProcessIdentity, at moment: Date, day: Int, hour: Int) {
         // A pid whose path was refused this time may be readable the next.
         path = path ?? identity.path
         firstSeen = Swift.min(firstSeen, moment)
         lastSeen = Swift.max(lastSeen, moment)
         hours[day, default: 0] |= hour
+    }
+
+    /// Separate from `observe` because the two are folded at different rates;
+    /// see `ProcessHistoryRecorder.record`.
+    mutating func observe(starts count: Int, at moment: Date, hour: Int) {
+        lastSeen = Swift.max(lastSeen, moment)
+        starts[hour, default: 0] += count
     }
 }
 
@@ -323,6 +339,25 @@ public struct ProcessAppearance: Sendable, Equatable {
         self.path = path
         self.firstSeen = firstSeen
         self.lastSeen = lastSeen
+    }
+}
+
+/// How many times a name's processes were born over a span, and the span the
+/// answer actually covers.
+public struct ProcessStarts: Sendable, Equatable {
+    /// A floor: a pid that started and exited between two sweeps — thirty
+    /// seconds apart while the app is hidden — was never in a list to be
+    /// counted, and the registry holds only what the retention keeps.
+    public let count: Int
+    /// The span summed — the asked-for one widened to whole hours, which is
+    /// the grain the counts are stored at.
+    public let from: Date
+    public let to: Date
+
+    public init(count: Int, from: Date, to: Date) {
+        self.count = count
+        self.from = from
+        self.to = to
     }
 }
 
