@@ -16,6 +16,11 @@ public enum MetricKind: String, Sendable, CaseIterable, Codable {
     case processes
     /// GPU time per process, from the accelerator's user clients.
     case gpu
+    /// What the accelerator itself is doing — utilisation and memory, from its
+    /// own statistics rather than from its clients.
+    case gpuDevice
+    /// Battery, adapter and low-power mode.
+    case power
     case selfMetrics
 }
 
@@ -49,11 +54,13 @@ public enum CadenceTable {
     /// forgotten in the others.
     private static func rates(for kind: MetricKind) -> (foreground: Int, background: Int, hidden: Int) {
         switch kind {
-        // The cheapest four, all under 0.15 ms a sweep, and the ones the
+        // The cheapest five, all under 0.15 ms a sweep, and the ones the
         // ten-second history buckets fold min/avg/max out of. Slowing them off
         // screen would cost the history its shape and save nothing worth
-        // measuring, so background matches foreground.
-        case .cpu, .memory, .network, .diskActivity: (1, 1, 5)
+        // measuring, so background matches foreground. The accelerator's own
+        // statistics measure 0.038 ms and belong here; its *clients* cost
+        // thirty times that and do not.
+        case .cpu, .memory, .network, .diskActivity, .gpuDevice: (1, 1, 5)
         case .volumes, .connection: (10, 30, 60)
         // A full pid sweep, one syscall per process.
         case .processes: (3, 10, 30)
@@ -72,6 +79,14 @@ public enum CadenceTable {
         // Wear is measured in whole percent of a drive's lifetime; ten minutes
         // is already far more often than it can change, on screen or off.
         case .driveHealth: (600, 600, 600)
+        // Set by how fast the number can change, not by what it costs: at
+        // 0.121 ms it would sit in the group above, but a charge moves about a
+        // point every five minutes and reading it every second is three
+        // hundred reads for one change. Sixty seconds hidden is coarser than
+        // the ten-second bucket, so the finest tier keeps one reading in six
+        // there — which still answers "how fast did it drain overnight" at the
+        // resolution anyone asks it.
+        case .power: (5, 10, 60)
         case .selfMetrics: (10, 30, 30)
         }
     }

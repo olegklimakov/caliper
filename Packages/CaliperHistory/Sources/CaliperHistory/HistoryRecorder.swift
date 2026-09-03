@@ -128,6 +128,15 @@ public final class HistoryRecorder: Sendable {
         if let peak = snapshot.sensors?.peakTemperature {
             values[.temperature] = peak
         }
+        if let gpu = snapshot.gpuDevice {
+            values[.gpuUtilisation] = gpu.utilisation
+        }
+        // Only where there is a battery: a desktop would otherwise record a
+        // flat zero for two years and the chart would read as a machine that
+        // has been dead the whole time.
+        if let battery = snapshot.power?.battery {
+            values[.batteryCharge] = battery.charge
+        }
         return values
     }
 }

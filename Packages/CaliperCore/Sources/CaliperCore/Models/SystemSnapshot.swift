@@ -22,6 +22,13 @@ public struct SystemSnapshot: Sendable, Codable, Equatable {
     public let driveHealth: DriveHealth?
     public let processes: ProcessesSample?
     public let gpu: GPUSample?
+    /// What the accelerator itself was doing — the context `gpu`'s per-process
+    /// times are read against, and a far cheaper read, which is why it is its
+    /// own field on its own cadence.
+    public let gpuDevice: GPUDeviceSample?
+    /// Charge, cycles and the adapter. `nil` where no battery is installed as
+    /// well as where the read failed; `PowerSample.battery` tells them apart.
+    public let power: PowerSample?
     public let selfMetrics: SelfMetrics?
 
     /// Stable JSON used by `Caliper --selftest` and by accuracy checks against

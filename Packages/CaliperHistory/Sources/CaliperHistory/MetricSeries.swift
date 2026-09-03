@@ -15,6 +15,13 @@ public enum MetricSeries: String, Sendable, CaseIterable, Codable {
     case diskWrite
     /// Hottest real sensor, in degrees Celsius.
     case temperature
+    /// What the accelerator was doing, 0…1. Recorded rather than derived: it
+    /// is an instantaneous reading, so a bucket that was not sampled cannot be
+    /// reconstructed afterwards from anything else.
+    case gpuUtilisation
+    /// Battery charge as a fraction, 0…1. Absent on a desktop, which is a
+    /// series with no rows rather than a series of zeroes.
+    case batteryCharge
 }
 
 /// How coarse a stored bucket is.

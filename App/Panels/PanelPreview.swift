@@ -1,4 +1,5 @@
 import AppKit
+import CaliperCore
 import CaliperHistory
 import SwiftUI
 
@@ -101,8 +102,16 @@ enum PanelPreview {
     }
 
     @MainActor
-    static func renderProcessCard(model: ProcessCardModel, appearance: NSAppearance) -> NSImage? {
-        render(ProcessCardPane(model: model, onBack: {}), appearance: appearance, height: 640)
+    static func renderProcessCard(
+        model: ProcessCardModel,
+        machine: SystemSnapshot?,
+        appearance: NSAppearance
+    ) -> NSImage? {
+        render(
+            ProcessCardPane(model: model, machine: machine, onBack: {}),
+            appearance: appearance,
+            height: 640
+        )
     }
 
     @MainActor

@@ -36,6 +36,8 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
     /// does not have to be revisited when the cadence table moves.
     static let drawnMetrics: Set<MetricKind> = [
         .cpu, .memory, .network, .diskActivity, .volumes, .sensors,
+        // The process card reads both beside the process it is about.
+        .gpuDevice, .power,
     ]
 
     let navigation = DashboardNavigation()
