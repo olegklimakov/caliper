@@ -12,6 +12,16 @@ struct ProcessSampler {
     private var previous: [pid_t: ResourceUsage.Counters] = [:]
     private var identities: [pid_t: Identity] = [:]
     private var window = RateWindow()
+    /// When the previous sweep's pid list was taken, in the clock
+    /// `ri_proc_start_abstime` is written in. A pid whose start is newer than
+    /// this was born since, which is the whole of how starts are counted.
+    ///
+    /// Compared against rather than converted: this clock does not tick during
+    /// sleep, so `startTime` is honest as an ordering and wrong as a date —
+    /// and an ordering is all a count of births needs. Set at construction, so
+    /// the first sweep claims only the pids that appeared after the app did
+    /// rather than the six hundred that were already running.
+    private var previousSweep = mach_absolute_time()
 
     /// How many processes each list keeps. Panels show a handful, and the
     /// history's own depth is its business — what a bucket keeps is decided
@@ -32,6 +42,14 @@ struct ProcessSampler {
 
     mutating func sample(at instant: ContinuousClock.Instant, watching: Set<String> = []) -> ProcessesSample? {
         guard let list = pids.read() else { return nil }
+        // *After* the list, and this is the whole correctness of the count.
+        // The kernel snapshots the pid table somewhere inside `read()`, so a
+        // watermark taken before it is earlier than pids the snapshot already
+        // holds — and every one of those would be counted again on the next
+        // sweep. Taken after, nothing in this snapshot can be recounted, and
+        // what is lost is a pid born in the microseconds between the snapshot
+        // and this clock read: a floor, which is what the count claims to be.
+        let listTaken = mach_absolute_time()
 
         var current: [pid_t: ResourceUsage.Counters] = [:]
         current.reserveCapacity(list.count)
@@ -60,6 +78,7 @@ struct ProcessSampler {
         var live: [pid_t: Identity] = [:]
         live.reserveCapacity(current.count)
         var roster: [String: ProcessIdentity] = [:]
+        var births: [String: Int] = [:]
         for (pid, counters) in current {
             let identity: Identity
             if let known = identities[pid], known.startTime == counters.startTime {
@@ -70,8 +89,12 @@ struct ProcessSampler {
             }
             live[pid] = identity
             roster[identity.name] = ProcessIdentity(name: identity.name, path: identity.path)
+            if identity.startTime > previousSweep {
+                births[identity.name, default: 0] += 1
+            }
         }
         identities = live
+        previousSweep = listTaken
 
         let usage = current.map { pid, counters in
             Self.usage(pid: pid, counters: counters, previous: previous[pid], seconds: seconds)
@@ -118,6 +141,7 @@ struct ProcessSampler {
             topByPower: samples(byPower),
             watched: samples(watched),
             roster: Array(roster.values),
+            births: births,
             unreadableCount: unreadableCount
         )
     }

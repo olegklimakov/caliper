@@ -80,6 +80,22 @@ public struct HistoryReader: Sendable {
         }
     }
 
+    /// How many of a name's processes were born inside a span.
+    ///
+    /// A crash loop is the question — a helper that restarts twenty times an
+    /// hour costs more in starts than in anything a bucket records — and the
+    /// registry is the only place it can be asked of, because a process too
+    /// short-lived to rank is exactly the one that never appears in a tier.
+    public func processStarts(
+        name: String,
+        from start: Date,
+        to end: Date = Date()
+    ) async throws -> ProcessStarts {
+        try await store.databaseQueue.read { db in
+            try HistoryStore.fetchStarts(name: name, from: start, to: end, in: db)
+        }
+    }
+
     /// The registry, searched by name and by path.
     ///
     /// The one question no ranked tier can answer: a program too cheap to ever

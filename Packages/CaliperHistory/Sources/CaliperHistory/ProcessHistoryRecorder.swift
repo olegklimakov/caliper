@@ -133,7 +133,12 @@ public final class ProcessHistoryRecorder: Sendable {
     private static func discard(_ state: inout State) {
         state.open.removeAll(keepingCapacity: false)
         state.openBucket = nil
-        state.lastSweep = nil
+        // `lastSweep` deliberately survives. A snapshot carries the newest
+        // sweep until a newer one arrives, so clearing it let the sweep already
+        // folded be folded again on the next tick — harmless for a presence
+        // mask, which ORs the same bit back, but a count of births would add
+        // twice, and after the delete button that is part of a record the user
+        // asked to be rid of coming straight back.
         state.rosterBucket = nil
         state.sticky.removeAll(keepingCapacity: false)
         state.openRanks.removeAll(keepingCapacity: false)
@@ -157,6 +162,12 @@ public final class ProcessHistoryRecorder: Sendable {
 
             Self.fold(processes, into: &state)
             Self.noteOpenRanks(&state)
+            // Every sweep, unlike the presence mask below. The mask is the
+            // same answer for every sweep of a bucket, so it is taken once; a
+            // count of births taken once a bucket would drop nine in ten of
+            // them at the visible cadence, which is ten sweeps to a bucket.
+            // Free when nothing was born, which is almost every sweep.
+            Self.registerStarts(processes.births, at: processes.sampledAt, in: &state)
             if state.rosterBucket != bucket {
                 state.rosterBucket = bucket
                 Self.register(processes.roster, at: processes.sampledAt, in: &state)
@@ -206,6 +217,23 @@ public final class ProcessHistoryRecorder: Sendable {
         try store.write(appearances: batch.appearances)
     }
 
+    /// Writes the registry without closing the bucket still filling.
+    ///
+    /// What a window opening wants: the registry is written every ten minutes,
+    /// so a card's start count and the search room's "last seen" are otherwise
+    /// up to ten minutes stale — and ten minutes is exactly the span in which
+    /// someone opens a card *because* something is restarting. Synchronous, so
+    /// it lands before the room it was opened for reads.
+    public func flushRegistry() throws {
+        let rows = state.withLock { state -> [ProcessAppearanceRow] in
+            guard state.isEnabled, !state.appearances.isEmpty else { return [] }
+            state.lastRegistryFlush = Date()
+            return Self.takeAppearances(&state)
+        }
+        guard !rows.isEmpty else { return }
+        try store.write(appearances: rows)
+    }
+
     private struct Batch {
         var rows: [ProcessRow]
         var appearances: [ProcessAppearanceRow]
@@ -251,6 +279,24 @@ public final class ProcessHistoryRecorder: Sendable {
         for identity in roster {
             state.appearances[identity.name, default: ProcessAppearanceRow(identity: identity, at: moment)]
                 .observe(identity: identity, at: moment, day: day, hour: hour)
+        }
+    }
+
+    /// A name with a birth but no registry row yet gets one from this fold
+    /// rather than waiting for the bucket's roster: the row is where the count
+    /// lives, and a process that starts and exits inside one bucket would
+    /// otherwise have nowhere to be counted.
+    private static func registerStarts(
+        _ births: [String: Int],
+        at moment: Date,
+        in state: inout State
+    ) {
+        guard !births.isEmpty else { return }
+        let hour = ProcessAppearanceRow.hour(of: moment)
+        for (name, count) in births {
+            let identity = ProcessIdentity(name: name, path: nil)
+            state.appearances[name, default: ProcessAppearanceRow(identity: identity, at: moment)]
+                .observe(starts: count, at: moment, hour: hour)
         }
     }
 

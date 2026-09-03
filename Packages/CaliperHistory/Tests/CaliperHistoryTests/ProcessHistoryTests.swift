@@ -47,7 +47,8 @@ private func sweep(
     _ samples: [ProcessSample],
     interval: TimeInterval = 1,
     watched: [ProcessSample] = [],
-    roster: [ProcessIdentity] = []
+    roster: [ProcessIdentity] = [],
+    births: [String: Int] = [:]
 ) -> ProcessesSample {
     ProcessesSample(
         sampledAt: date,
@@ -58,6 +59,7 @@ private func sweep(
         topByPower: samples.filter { $0.power > 0 }.sorted { $0.power > $1.power },
         watched: watched,
         roster: roster,
+        births: births,
         unreadableCount: 0
     )
 }
@@ -1478,21 +1480,223 @@ private func recordRegistry(_ store: HistoryStore, _ names: [ProcessIdentity]) t
     }
 }
 
+@Test func birthsAreCountedByTheHourAndSummedOverASpan() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        // 03:00 and 03:30 UTC fall in one hour; 04:10 in the next.
+        let night = Date(timeIntervalSince1970: 1_700_017_200)
+        for (offset, starts) in [(0.0, 2), (1_800.0, 3), (4_200.0, 1)] {
+            recorder.record(
+                sweep(
+                    at: night.addingTimeInterval(offset),
+                    [],
+                    roster: [ProcessIdentity(name: "crasher", path: "/tmp/crasher")],
+                    births: ["crasher": starts]
+                )
+            )
+        }
+        try recorder.flushNow()
+        let reader = HistoryReader(store: store)
+
+        let firstHour = try await reader.processStarts(
+            name: "crasher",
+            from: night,
+            to: night.addingTimeInterval(1_800)
+        )
+        #expect(firstHour.count == 5)
+
+        let whole = try await reader.processStarts(
+            name: "crasher",
+            from: night,
+            to: night.addingTimeInterval(4_200)
+        )
+        #expect(whole.count == 6)
+
+        // The span it answers for reaches back to the start of an hour, which
+        // is what lets a local day be summed out of UTC storage — and forward
+        // only as far as it was asked, because the last hour is still filling.
+        #expect(whole.from == night)
+        #expect(whole.to == night.addingTimeInterval(4_200))
+    }
+}
+
+@Test func aSweepWithNoBirthsWritesNoStartsRow() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        recorder.record(
+            sweep(at: bucketStart, [], roster: [ProcessIdentity(name: "steady", path: nil)])
+        )
+        try recorder.flushNow()
+
+        // Most names start once and never again; a row per name per hour
+        // regardless would be the cost the sparse table exists to avoid.
+        let rows = try await store.databaseQueue.read { db in
+            try Int.fetchOne(db, sql: "SELECT count(*) FROM process_starts") ?? 0
+        }
+        #expect(rows == 0)
+        let none = try await HistoryReader(store: store).processStarts(
+            name: "steady",
+            from: bucketStart.addingTimeInterval(-3_600),
+            to: bucketStart
+        )
+        #expect(none.count == 0)
+    }
+}
+
+/// What a window opening calls, and it has to write the registry *without*
+/// writing the bucket still filling — a half-filled bucket landing on disk
+/// every time someone opens a window would be a partial reading merged into
+/// the one that follows it.
+@Test func theRegistryCanBeFlushedWithoutClosingTheBucketStillFilling() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        let night = Date(timeIntervalSince1970: 1_700_017_200)
+        recorder.record(
+            sweep(
+                at: night,
+                [process("busy", cpu: 5)],
+                roster: [ProcessIdentity(name: "crasher", path: nil)],
+                births: ["crasher": 2]
+            )
+        )
+
+        try recorder.flushRegistry()
+        let found = try await HistoryReader(store: store).processStarts(
+            name: "crasher",
+            from: night,
+            to: night
+        )
+        #expect(found.count == 2)
+        #expect(try store.processRowCount(tier: .thirtySeconds) == 0)
+
+        // And the bucket it left alone is still written when its own flush
+        // comes.
+        try recorder.flushNow()
+        #expect(try store.processRowCount(tier: .thirtySeconds) > 0)
+    }
+}
+
+/// The clause the whole design rests on: the recorder clears what it has
+/// flushed, so a second flush inside the same hour carries only the births
+/// since the first and has to be added to what is already there.
+@Test func twoFlushesInsideOneHourAddRatherThanReplace() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        let night = Date(timeIntervalSince1970: 1_700_017_200)
+        recorder.record(sweep(at: night, [], births: ["crasher": 2]))
+        try recorder.flushNow()
+        recorder.record(sweep(at: night.addingTimeInterval(600), [], births: ["crasher": 3]))
+        try recorder.flushNow()
+
+        let found = try await HistoryReader(store: store).processStarts(
+            name: "crasher",
+            from: night,
+            to: night.addingTimeInterval(600)
+        )
+        #expect(found.count == 5)
+    }
+}
+
+/// A snapshot carries the newest sweep until a newer one arrives, so the tick
+/// after a discard hands back the sweep already folded. Harmless for a
+/// presence mask, which ORs the same bit back; a count of births would add
+/// twice — and right after the delete button, which is when `discardPending`
+/// runs.
+@Test func theSweepAlreadyFoldedIsNotFoldedAgainAfterADiscard() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        let night = Date(timeIntervalSince1970: 1_700_017_200)
+        let arriving = sweep(at: night, [], births: ["crasher": 4])
+        recorder.record(arriving)
+        try recorder.flushNow()
+
+        recorder.discardPending()
+        recorder.record(arriving)
+        try recorder.flushNow()
+
+        let found = try await HistoryReader(store: store).processStarts(
+            name: "crasher",
+            from: night,
+            to: night
+        )
+        #expect(found.count == 4)
+    }
+}
+
+@Test func startsAgeOutOnTheSameRetentionAsTheRest() async throws {
+    try await withStore { store in
+        let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
+        let now = Date(timeIntervalSince1970: 1_700_000_040)
+        let longAgo = now.addingTimeInterval(-8 * 86_400)
+        for moment in [longAgo, now] {
+            recorder.record(sweep(at: moment, [], births: ["crasher": 4]))
+            try recorder.flushNow()
+        }
+
+        try await Downsampler(store: store).compact(
+            now: now,
+            processRetention: ProcessRetention.week.seconds
+        )
+
+        let rows = try await store.databaseQueue.read { db in
+            try Row.fetchAll(db, sql: "SELECT hour, count FROM process_starts ORDER BY hour")
+                .map { (hour: $0["hour"] as Int, count: $0["count"] as Int) }
+        }
+        #expect(rows.count == 1)
+        #expect(rows.first?.count == 4)
+        #expect(rows.first?.hour == Int(now.timeIntervalSince1970) / 3600)
+    }
+}
+
+@Test func aNameHeldOnlyByItsStartsIsNotCollected() async throws {
+    try await withStore { store in
+        // The name table is garbage-collected against every table that
+        // references it, and a new one that was forgotten there would take
+        // its names out from under it.
+        try await store.databaseQueue.write { db in
+            let id = try Int64.fetchOne(
+                db,
+                sql: "INSERT INTO process_names (name) VALUES ('orphan') RETURNING id"
+            )
+            try db.execute(
+                sql: "INSERT INTO process_starts (name_id, hour, count) VALUES (?, ?, 1)",
+                arguments: [id, Int(Date().timeIntervalSince1970) / 3600]
+            )
+        }
+
+        try await Downsampler(store: store).compact(
+            processRetention: ProcessRetention.week.seconds
+        )
+
+        #expect(try store.internedNameCount() == 1)
+    }
+}
+
 @Test func deletingTheProcessHistoryTakesTheRegistryWithIt() async throws {
     try await withStore { store in
         let recorder = ProcessHistoryRecorder(store: store, isEnabled: true)
         recorder.record(
-            sweep(at: bucketStart, [process("Xcode", cpu: 1)], roster: [ProcessIdentity(name: "ghost", path: nil)])
+            sweep(
+                at: bucketStart,
+                [process("Xcode", cpu: 1)],
+                roster: [ProcessIdentity(name: "ghost", path: nil)],
+                births: ["ghost": 3]
+            )
         )
         try recorder.flushNow()
 
         try await store.deleteProcessHistory()
 
+        // Counted per table rather than summed in one expression: `??` binds
+        // looser than `+`, so the sum this used to be parsed as
+        // `inventory ?? (0 + presence)` — and `count(*)` is never nil, so the
+        // second table was never looked at.
         let remaining = try await store.databaseQueue.read { db in
-            try Int.fetchOne(db, sql: "SELECT count(*) FROM process_inventory") ?? 0
-                + (try Int.fetchOne(db, sql: "SELECT count(*) FROM process_presence") ?? 0)
+            try ["process_inventory", "process_presence", "process_starts"].map {
+                try Int.fetchOne(db, sql: "SELECT count(*) FROM \($0)") ?? 0
+            }
         }
-        #expect(remaining == 0)
+        #expect(remaining == [0, 0, 0])
     }
 }
 

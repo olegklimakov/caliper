@@ -41,6 +41,12 @@ final class ProcessCardModel {
     /// What the process drew over the span on screen. A floor while it is
     /// unpinned — see `ProcessEnergy`.
     private(set) var energy: ProcessEnergy?
+    /// How many times this name's processes have been born since local
+    /// midnight. Its own span rather than the strip's: "restarted 14 times"
+    /// is asked about a day, and the answer would change meaning if it
+    /// followed the 1 H button.
+    private(set) var starts: ProcessStarts?
+
     /// The strip's right edge: bars are placed against the moment the history
     /// was asked, so buckets missing at the leading edge read as the gaps
     /// they are.
@@ -76,6 +82,7 @@ final class ProcessCardModel {
         presence: Presence,
         history: ProcessNameHistory?,
         energy: ProcessEnergy? = nil,
+        starts: ProcessStarts? = nil,
         historyEnd: Date = Date(),
         preferences: Preferences? = nil
     ) {
@@ -85,6 +92,7 @@ final class ProcessCardModel {
         self.presence = presence
         self.history = history
         self.energy = energy
+        self.starts = starts
         self.historyEnd = historyEnd
         self.preferences = preferences
         reader = nil
@@ -204,12 +212,15 @@ final class ProcessCardModel {
         let name = target.name
         let span = span
         let asked = Date()
+        let midnight = Calendar.current.startOfDay(for: asked)
         historyTask = Task { [weak self] in
             let history = try? await reader.processHistory(name: name, span: span, now: asked)
             let energy = try? await reader.processEnergy(name: name, span: span, now: asked)
+            let starts = try? await reader.processStarts(name: name, from: midnight, to: asked)
             guard !Task.isCancelled else { return }
             self?.history = history
             self?.energy = energy
+            self?.starts = starts
             self?.historyEnd = asked
         }
     }

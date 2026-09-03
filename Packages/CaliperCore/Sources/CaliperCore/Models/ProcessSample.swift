@@ -134,6 +134,12 @@ public struct ProcessesSample: Sendable, Codable, Equatable {
     public let watched: [ProcessSample]
     /// Every name this sweep could read, deduped.
     public let roster: [ProcessIdentity]
+    /// Names to how many of their pids were born since the previous sweep.
+    ///
+    /// Summed over a name's pids, because forty helpers of one browser being
+    /// relaunched is forty starts — that is what a crash loop looks like from
+    /// outside. Absent names had none; most sweeps carry an empty dictionary.
+    public let births: [String: Int]
     /// Pids whose counters the kernel refused — other users' processes, about
     /// a quarter of the machine, plus the few that exited between the pid
     /// sweep and the read. They carry no numbers, so no list can rank them;
@@ -151,6 +157,7 @@ public struct ProcessesSample: Sendable, Codable, Equatable {
         topByPower: [ProcessSample],
         watched: [ProcessSample],
         roster: [ProcessIdentity],
+        births: [String: Int] = [:],
         unreadableCount: Int
     ) {
         self.sampledAt = sampledAt
@@ -161,6 +168,7 @@ public struct ProcessesSample: Sendable, Codable, Equatable {
         self.topByPower = topByPower
         self.watched = watched
         self.roster = roster
+        self.births = births
         self.unreadableCount = unreadableCount
     }
 
@@ -172,7 +180,7 @@ public struct ProcessesSample: Sendable, Codable, Equatable {
     /// Which makes decoding lossy: nothing decodes a snapshot — the JSON exists
     /// to be read by a person and grepped by the smoke test — and a roster
     /// that came back empty is the honest reading of a form that never carried
-    /// it.
+    /// it. `births` rides with it for the same reason.
     private enum CodingKeys: String, CodingKey {
         case sampledAt, interval, topByCPU, topByMemory, topByDisk, topByPower
         case watched, rosterCount, unreadableCount
@@ -201,6 +209,7 @@ public struct ProcessesSample: Sendable, Codable, Equatable {
         topByPower = try container.decode([ProcessSample].self, forKey: .topByPower)
         watched = try container.decode([ProcessSample].self, forKey: .watched)
         roster = []
+        births = [:]
         unreadableCount = try container.decode(Int.self, forKey: .unreadableCount)
     }
 }

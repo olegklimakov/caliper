@@ -252,6 +252,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func dashboardVisibilityChanged(_ isVisible: Bool) {
         isDashboardVisible = isVisible
         updateDemand()
+        // Before the window's first read, and on this thread for that reason:
+        // the registry is written every ten minutes, so a card's start count
+        // and the search room's "last seen" would otherwise be up to ten
+        // minutes behind the machine — and a card gets opened *because*
+        // something is restarting right now.
+        if isVisible {
+            try? processRecorder?.flushRegistry()
+        }
     }
 
     // MARK: - Activity

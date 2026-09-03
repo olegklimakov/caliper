@@ -243,6 +243,10 @@ public struct Downsampler: Sendable {
             arguments: [horizon / 86400]
         )
         try db.execute(
+            sql: "DELETE FROM process_starts WHERE hour < ?",
+            arguments: [horizon / 3600]
+        )
+        try db.execute(
             sql: "DELETE FROM process_inventory WHERE last_seen < ?",
             arguments: [horizon]
         )
@@ -261,7 +265,11 @@ public struct Downsampler: Sendable {
     private func collectProcessNames(in db: Database) throws {
         let referenced =
             (ProcessTier.allCases.map { "SELECT name_id FROM \($0.tableName)" }
-            + ["SELECT name_id FROM process_inventory", "SELECT name_id FROM process_presence"])
+            + [
+                "SELECT name_id FROM process_inventory",
+                "SELECT name_id FROM process_presence",
+                "SELECT name_id FROM process_starts",
+            ])
             .joined(separator: " UNION ")
         try db.execute(sql: "DELETE FROM process_names WHERE id NOT IN (\(referenced))")
     }

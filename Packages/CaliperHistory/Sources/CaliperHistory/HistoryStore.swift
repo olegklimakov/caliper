@@ -157,6 +157,20 @@ public struct HistoryStore: Sendable {
                         arguments: [id, day, hours]
                     )
                 }
+                // Added rather than replaced, the rule energy already follows:
+                // the recorder clears what it has flushed, so a second flush
+                // inside the same hour carries only the births since the first.
+                for (hour, count) in row.starts {
+                    try db.execute(
+                        sql: """
+                            INSERT INTO process_starts (name_id, hour, count)
+                            VALUES (?, ?, ?)
+                            ON CONFLICT (name_id, hour) DO UPDATE SET
+                                count = count + excluded.count
+                            """,
+                        arguments: [id, hour, count]
+                    )
+                }
             }
         }
     }
@@ -424,6 +438,41 @@ public struct HistoryStore: Sendable {
         .map(appearance(from:))
     }
 
+    /// How many of a name's processes were born inside a span, widened to the
+    /// whole hours the counts are kept in.
+    ///
+    /// Which is exact for a local midnight everywhere but the timezones offset
+    /// by a fraction of an hour — there it reaches up to three quarters of an
+    /// hour further back than asked, and says so by reporting the span it
+    /// summed.
+    static func fetchStarts(
+        name: String,
+        from start: Date,
+        to end: Date,
+        in db: Database
+    ) throws -> ProcessStarts {
+        let firstHour = ProcessAppearanceRow.hour(of: start)
+        let lastHour = ProcessAppearanceRow.hour(of: end)
+        let count =
+            try Int.fetchOne(
+                db,
+                sql: """
+                    SELECT sum(count) FROM process_starts
+                    JOIN process_names ON process_names.id = process_starts.name_id
+                    WHERE name = ? AND hour BETWEEN ? AND ?
+                    """,
+                arguments: [name, firstHour, lastHour]
+            ) ?? 0
+        return ProcessStarts(
+            count: count,
+            from: Date(timeIntervalSince1970: TimeInterval(firstHour) * 3600),
+            // Not the end of the last hour: that hour is still filling, and a
+            // span reaching into the future is a claim about time that has not
+            // happened.
+            to: min(end, Date(timeIntervalSince1970: TimeInterval(lastHour + 1) * 3600))
+        )
+    }
+
     private static func appearance(from row: Row) -> ProcessAppearance {
         ProcessAppearance(
             name: row["name"],
@@ -492,6 +541,7 @@ public struct HistoryStore: Sendable {
         for tier in ProcessTier.allCases {
             try db.execute(sql: "DELETE FROM \(tier.tableName)")
         }
+        try db.execute(sql: "DELETE FROM process_starts")
         try db.execute(sql: "DELETE FROM process_presence")
         try db.execute(sql: "DELETE FROM process_inventory")
         try db.execute(sql: "DELETE FROM process_names")
