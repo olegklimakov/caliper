@@ -29,6 +29,11 @@ private func megabytesReported(by store: HistoryStore) -> Double {
     Double(HistoryReader(store: store).storeSize()) / 1_048_576
 }
 
+/// Two more series — the accelerator's utilisation and the battery's charge —
+/// took a day of the finest tier from 3.10 MB to **4.04 MB**, which is 28 %
+/// more rows for a budget with 0.96 MB left in it. The next series added is the
+/// one that has to argue with the budget rather than fit under it.
+///
 /// PRD §3 budgets the store at roughly 60 MB steady state, and the Phase 3 exit
 /// criterion puts a day of the finest tier under 5 MB. Both are claims about
 /// bytes on disk, so they are measured rather than reasoned about.

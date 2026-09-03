@@ -44,6 +44,8 @@ public actor SamplingCoordinator {
     private let driveHealthSampler = DriveHealthSampler()
     private var processSampler = ProcessSampler()
     private var gpuSampler = GPUProcessSampler()
+    private let deviceGPUSampler = DeviceGPUSampler()
+    private let powerSampler = PowerSampler()
     private var selfSampler = SelfMetricsSampler()
 
     private var latestCPU: CPUSample?
@@ -60,6 +62,8 @@ public actor SamplingCoordinator {
     private var latestProcesses: ProcessesSample?
     /// Holds an empty sweep too, for the same reason as `latestSensors`.
     private var latestGPU: GPUSample?
+    private var latestGPUDevice: GPUDeviceSample?
+    private var latestPower: PowerSample?
     private var latestSelfMetrics: SelfMetrics?
 
     /// Base tick of the whole app. Everything slower is a multiple of this.
@@ -196,6 +200,15 @@ public actor SamplingCoordinator {
         {
             latestGPU = gpu
         }
+        if deviceGPUSampler.isAvailable,
+            shouldSample(.gpuDevice, hasValue: latestGPUDevice != nil),
+            let device = deviceGPUSampler.sample()
+        {
+            latestGPUDevice = device
+        }
+        if shouldSample(.power, hasValue: latestPower != nil) {
+            latestPower = powerSampler.sample()
+        }
         if shouldSample(.selfMetrics, hasValue: latestSelfMetrics != nil),
             let metrics = selfSampler.sample(at: instant)
         {
@@ -223,6 +236,8 @@ public actor SamplingCoordinator {
             driveHealth: latestDriveHealth,
             processes: latestProcesses,
             gpu: gpu(),
+            gpuDevice: latestGPUDevice,
+            power: latestPower,
             selfMetrics: latestSelfMetrics
         )
     }

@@ -21,6 +21,17 @@ enum Palette {
     /// Temperature draws neutral: red is reserved for danger, and a warm line
     /// on a temperature chart reads as a warning that isn't there.
     static let temperature = dynamic(dark: 0xA0_A0A8, light: 0x6E_6E73)
+    /// Teal, which is the one accent the five metrics above had not taken —
+    /// and far enough from `cpuEfficiency` to sit beside it on the same card.
+    static let gpu = dynamic(dark: 0x30_D5C8, light: 0x0F_A79B)
+    /// The platform's battery green: every gauge on this Mac is green, and a
+    /// battery line in any other colour reads as a different quantity.
+    ///
+    /// Its own constant despite matching `ok` today. The severity block below
+    /// is single-purpose by policy, and a metric accent that borrowed from it
+    /// would tie the two together — change what "healthy" looks like and the
+    /// battery chart changes with it for no reason.
+    static let battery = dynamic(dark: 0x32_D74B, light: 0x24_8A3D)
 
     // Severity. Single-purpose: red means critical and nothing else.
     static let ok = dynamic(dark: 0x32_D74B, light: 0x24_8A3D)

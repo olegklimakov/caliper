@@ -68,6 +68,7 @@ struct DashboardView: View {
                 ProcessCardRoom(
                     target: target,
                     reader: history,
+                    metrics: metrics,
                     preferences: preferences,
                     onBack: { navigation.section = navigation.returnSection }
                 )

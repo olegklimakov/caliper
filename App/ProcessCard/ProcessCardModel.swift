@@ -46,6 +46,11 @@ final class ProcessCardModel {
     /// is asked about a day, and the answer would change meaning if it
     /// followed the 1 H button.
     private(set) var starts: ProcessStarts?
+    /// The machine's own stored series over the span on screen — what the
+    /// card's GPU and power tiles draw behind their live readings. Read with
+    /// the process's history and over the same span, so one span button
+    /// governs everything on the card.
+    private(set) var machineHistory: HistorySlice?
 
     /// The strip's right edge: bars are placed against the moment the history
     /// was asked, so buckets missing at the leading edge read as the gaps
@@ -83,6 +88,7 @@ final class ProcessCardModel {
         history: ProcessNameHistory?,
         energy: ProcessEnergy? = nil,
         starts: ProcessStarts? = nil,
+        machineHistory: HistorySlice? = nil,
         historyEnd: Date = Date(),
         preferences: Preferences? = nil
     ) {
@@ -93,6 +99,7 @@ final class ProcessCardModel {
         self.history = history
         self.energy = energy
         self.starts = starts
+        self.machineHistory = machineHistory
         self.historyEnd = historyEnd
         self.preferences = preferences
         reader = nil
@@ -217,10 +224,18 @@ final class ProcessCardModel {
             let history = try? await reader.processHistory(name: name, span: span, now: asked)
             let energy = try? await reader.processEnergy(name: name, span: span, now: asked)
             let starts = try? await reader.processStarts(name: name, from: midnight, to: asked)
+            // One read for both, so the two tiles cannot end up drawing
+            // different spans of the same moment.
+            let machine = try? await reader.slice(
+                [.gpuUtilisation, .batteryCharge],
+                span: span,
+                now: asked
+            )
             guard !Task.isCancelled else { return }
             self?.history = history
             self?.energy = energy
             self?.starts = starts
+            self?.machineHistory = machine
             self?.historyEnd = asked
         }
     }

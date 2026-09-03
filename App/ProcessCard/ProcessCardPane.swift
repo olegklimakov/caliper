@@ -8,6 +8,11 @@ import SwiftUI
 struct ProcessCardRoom: View {
     let target: ProcessCardTarget
     let reader: HistoryReader?
+    /// The machine the process is running on. A process's GPU seconds and
+    /// watts mean nothing on their own — four seconds is a lot on an idle
+    /// accelerator and nothing on a busy one — so the card reads the device
+    /// beside the process.
+    let metrics: LiveMetrics
     let onBack: () -> Void
 
     @State private var model: ProcessCardModel
@@ -15,11 +20,13 @@ struct ProcessCardRoom: View {
     init(
         target: ProcessCardTarget,
         reader: HistoryReader?,
+        metrics: LiveMetrics,
         preferences: Preferences,
         onBack: @escaping () -> Void
     ) {
         self.target = target
         self.reader = reader
+        self.metrics = metrics
         self.onBack = onBack
         _model = State(
             initialValue: ProcessCardModel(target: target, reader: reader, preferences: preferences)
@@ -27,7 +34,7 @@ struct ProcessCardRoom: View {
     }
 
     var body: some View {
-        ProcessCardPane(model: model, onBack: onBack)
+        ProcessCardPane(model: model, machine: metrics.snapshot, onBack: onBack)
             .onAppear { model.start() }
             .onDisappear { model.stop() }
     }
@@ -36,6 +43,9 @@ struct ProcessCardRoom: View {
 /// One process's room in the history window — the app, not the pid.
 struct ProcessCardPane: View {
     @Bindable var model: ProcessCardModel
+    /// nil before the first snapshot, and on a machine where the accelerator
+    /// or the battery cannot be read at all.
+    let machine: SystemSnapshot?
     let onBack: () -> Void
 
     @State private var confirming: Termination?
@@ -218,9 +228,26 @@ struct ProcessCardPane: View {
                             .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 4))
                     }
                 }
-                CardStat(label: "Power", value: PowerFormatter.string(reading.power))
+                CardStat(label: "Power", value: PowerFormatter.string(reading.power)) {
+                    machineTile(
+                        machinePower.map { "of \($0.short)" },
+                        series: .batteryCharge,
+                        colour: Color(Palette.battery),
+                        help: machinePower?.full ?? "The machine's own power draw is not readable."
+                    )
+                }
                 if reading.gpuIsAvailable {
-                    CardStat(label: "GPU time", value: DurationFormatter.clock(reading.gpuTime))
+                    CardStat(label: "GPU time", value: DurationFormatter.clock(reading.gpuTime)) {
+                        machineTile(
+                            gpuBusy,
+                            series: .gpuUtilisation,
+                            colour: Color(Palette.gpu),
+                            help:
+                                "What the whole accelerator was doing, against this family's"
+                                + " cumulative time on it. The line is the stored series over the"
+                                + " span chosen below."
+                        )
+                    }
                 }
                 CardStat(label: "Wakeups", value: Decimals.string("%.0f /s", reading.wakeupsPerSecond))
             }
@@ -243,6 +270,100 @@ struct ProcessCardPane: View {
                 qosStat(reading)
             }
         }
+    }
+
+    /// The machine's context under one of the card's live readings: a line of
+    /// text saying what it is doing now, and the stored series behind it saying
+    /// what it has been doing.
+    ///
+    /// `HistoryChart` rather than a sparkline of its own, because it is the one
+    /// thing in the app that already draws a *stored* series honestly: a Mac
+    /// asleep overnight leaves no rows, and every chart that joins across that
+    /// gap draws a sixteen-hour ramp that never happened.
+    @ViewBuilder
+    private func machineTile(
+        _ now: String?,
+        series: MetricSeries,
+        colour: Color,
+        help: String
+    ) -> some View {
+        let runs = machineHistory?.runs(series) ?? []
+        // Stacked, not beside the value: four tiles across this card leave
+        // about eighty points here, which is a 72-point chart *or* a dozen
+        // characters and not both. The sentence the short label stands for is
+        // on the tile's help.
+        VStack(alignment: .leading, spacing: 1) {
+            if let now {
+                Text(now)
+                    .font(.system(size: 10))
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+            if !runs.isEmpty {
+                HistoryChart(
+                    runs: runs,
+                    colour: colour,
+                    // Fixed, both being fractions: auto-scaling makes an idle
+                    // machine's noise look like a workload — the rule the menu
+                    // bar's own sparklines follow.
+                    range: 0...1,
+                    timeDomain: model.historyEnd.addingTimeInterval(-model.span)...model.historyEnd,
+                    showsTimeAxis: false,
+                    yAxisValues: 0,
+                    axisLabel: { _ in "" }
+                )
+                .frame(width: 72, height: 18)
+            }
+        }
+        .help(help)
+        .accessibilityLabel(help)
+    }
+
+    /// The stored series the tiles draw, or nil before the first read.
+    private var machineHistory: HistorySlice? { model.machineHistory }
+
+    /// What the accelerator is doing now — the context four seconds of GPU
+    /// time is read against.
+    private var gpuBusy: String? {
+        guard let device = machine?.gpuDevice else { return nil }
+        return device.utilisation > 0.005
+            ? "GPU \(PercentFormatter.string(device.utilisation)) busy"
+            : "GPU idle"
+    }
+
+    /// What the whole machine is drawing, so a process's watts have a share to
+    /// be a share of — short enough for the tile, and in full for its help.
+    ///
+    /// On battery that is the battery's own discharge, which *is* the machine's
+    /// total; the number is signed the way the hardware signs it, so it is
+    /// negated here rather than at the sampler. On mains there is no equivalent
+    /// total: the adapter's rating is what it can supply, not what is being
+    /// taken, and printing it as a denominator would invent one.
+    private var machinePower: (short: String, full: String)? {
+        guard let power = machine?.power else { return nil }
+        if let battery = power.battery, !battery.isCharging, battery.watts < 0 {
+            let total = PowerFormatter.string(-battery.watts)
+            return (
+                total,
+                "The whole machine was drawing \(total) from the battery. The line is the"
+                    + " stored charge over the span chosen below."
+            )
+        }
+        if let watts = power.adapterWatts {
+            return (
+                "\(PowerFormatter.string(watts)) adapter",
+                "On a \(PowerFormatter.string(watts)) adapter. What the machine is taking from"
+                    + " it is not readable — the rating is what the adapter can supply, not what"
+                    + " is being drawn, so there is no honest total to divide by here."
+            )
+        }
+        guard power.battery?.isCharging == true else { return nil }
+        return (
+            "on mains",
+            "On mains and charging, so there is no battery discharge to read the machine's"
+                + " own draw from."
+        )
     }
 
     private func memoryStat(_ reading: ProcessCardReading) -> some View {

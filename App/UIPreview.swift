@@ -116,7 +116,15 @@ enum UIPreview {
                     }
                     for fate in CardFate.allCases {
                         let model = previewProcessCard(fate)
-                        if let card = PanelPreview.renderProcessCard(model: model, appearance: theme) {
+                        if let card = PanelPreview.renderProcessCard(
+                            model: model,
+                            // The real machine, sampled at the top of this
+                            // run: the card's device context is a reading, and
+                            // a literal would be the one number in the picture
+                            // nobody had measured.
+                            machine: state.snapshot,
+                            appearance: theme
+                        ) {
                             write(
                                 card,
                                 to: url.appendingPathComponent(
@@ -332,6 +340,44 @@ enum UIPreview {
         ]
     }
 
+    /// A day of the machine's own two series, with a hole in it: the card's
+    /// tiles draw stored history, and a picture that never shows a gap would
+    /// not check the one property those charts exist to have.
+    private static func previewMachineSlice(endingAt end: Date) -> HistorySlice {
+        let tier = HistoryTier.minute
+        var gpu: [HistorySample] = []
+        var battery: [HistorySample] = []
+        for minute in 0..<1_440 {
+            // Asleep for two hours in the small hours, which is what leaves
+            // the gap.
+            if (300..<420).contains(minute) { continue }
+            let at = end.addingTimeInterval(Double(minute - 1_440) * 60)
+            let load = max(0, sin(Double(minute) / 90) * 0.5 + 0.15)
+            gpu.append(
+                HistorySample(
+                    series: .gpuUtilisation,
+                    timestamp: tier.bucketStart(of: at),
+                    aggregate: Aggregate(minimum: load * 0.4, average: load, maximum: min(1, load * 1.6))
+                )
+            )
+            // Draining, and charging over the last three hours.
+            let charge = minute < 1_260 ? 0.95 - Double(minute) / 1_260 * 0.7 : 0.25 + Double(minute - 1_260) / 180 * 0.6
+            battery.append(
+                HistorySample(
+                    series: .batteryCharge,
+                    timestamp: tier.bucketStart(of: at),
+                    aggregate: Aggregate(charge)
+                )
+            )
+        }
+        return HistorySlice(
+            tier: tier,
+            start: end.addingTimeInterval(-24 * 3600),
+            end: end,
+            rows: [.gpuUtilisation: gpu, .batteryCharge: battery]
+        )
+    }
+
     /// The four cards worth looking at, which are the four captions the strip
     /// can carry: gaps that mean only "did not rank", a pinned run reaching
     /// part of the way back, a pinned run that has since ended, and the same
@@ -391,6 +437,11 @@ enum UIPreview {
             }
         }
         let history = ProcessNameHistory(tier: .minute, points: points)
+        // The machine's own series behind the card's GPU and power tiles,
+        // shaped like a day rather than read from the store: the harness runs
+        // against whatever this Mac happens to have recorded, and a picture
+        // that is empty on a fresh clone checks nothing.
+        let machineSlice = previewMachineSlice(endingAt: end)
         // Only the unpinned live card carries a start count, so one render of
         // the set shows the badge and the rest show the header without it —
         // which is what a process that has simply been running looks like.
@@ -429,6 +480,7 @@ enum UIPreview {
                 history: history,
                 energy: energy,
                 starts: starts,
+            machineHistory: machineSlice,
                 historyEnd: end,
                 preferences: preferences
             )
@@ -491,6 +543,7 @@ enum UIPreview {
             history: history,
             energy: energy,
             starts: starts,
+            machineHistory: machineSlice,
             historyEnd: end,
             preferences: preferences
         )
