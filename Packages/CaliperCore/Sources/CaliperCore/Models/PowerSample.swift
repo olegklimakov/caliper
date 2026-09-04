@@ -8,12 +8,15 @@ public struct PowerSample: Sendable, Codable, Equatable {
     public let sampledAt: Date
     /// nil on a Mac with no battery, which is a desktop and not a failure.
     public let battery: BatterySample?
-    /// Watts the adapter is supplying, or nil when nothing is connected.
+    /// The adapter's rating in watts, or nil when nothing is connected —
+    /// `AdapterDetails` is `{ FamilyCode = 0 }` with no `Watts` key on
+    /// battery, rather than a zero.
     ///
-    /// **Unverified against hardware.** The machine this was written on has
-    /// never been read while plugged in — `AdapterDetails` is
-    /// `{ FamilyCode = 0 }` on battery — so the fixture test is the only thing
-    /// standing behind the arithmetic.
+    /// Checked against the machine: 85 W here, where `system_profiler
+    /// SPPowerDataType` reports "Wattage (W): 85".
+    ///
+    /// What it is *not* is a draw. It is what the adapter can supply, which is
+    /// why nothing divides a process's watts by it.
     public let adapterWatts: Double?
     /// macOS Low Power Mode, which changes what every other number here means.
     public let isLowPowerMode: Bool

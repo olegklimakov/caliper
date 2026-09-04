@@ -229,24 +229,28 @@ struct ProcessCardPane: View {
                     }
                 }
                 CardStat(label: "Power", value: PowerFormatter.string(reading.power)) {
-                    machineTile(
-                        machinePower.map { "of \($0.short)" },
-                        series: .batteryCharge,
+                    MachineTile(
+                        now: machinePower?.short,
+                        runs: model.batteryRuns,
                         colour: Color(Palette.battery),
+                        domain: chartDomain,
                         help: machinePower?.full ?? "The machine's own power draw is not readable."
                     )
+                    .equatable()
                 }
                 if reading.gpuIsAvailable {
                     CardStat(label: "GPU time", value: DurationFormatter.clock(reading.gpuTime)) {
-                        machineTile(
-                            gpuBusy,
-                            series: .gpuUtilisation,
+                        MachineTile(
+                            now: gpuBusy,
+                            runs: model.gpuRuns,
                             colour: Color(Palette.gpu),
+                            domain: chartDomain,
                             help:
                                 "What the whole accelerator was doing, against this family's"
                                 + " cumulative time on it. The line is the stored series over the"
                                 + " span chosen below."
                         )
+                        .equatable()
                     }
                 }
                 CardStat(label: "Wakeups", value: Decimals.string("%.0f /s", reading.wakeupsPerSecond))
@@ -272,56 +276,11 @@ struct ProcessCardPane: View {
         }
     }
 
-    /// The machine's context under one of the card's live readings: a line of
-    /// text saying what it is doing now, and the stored series behind it saying
-    /// what it has been doing.
-    ///
-    /// `HistoryChart` rather than a sparkline of its own, because it is the one
-    /// thing in the app that already draws a *stored* series honestly: a Mac
-    /// asleep overnight leaves no rows, and every chart that joins across that
-    /// gap draws a sixteen-hour ramp that never happened.
-    @ViewBuilder
-    private func machineTile(
-        _ now: String?,
-        series: MetricSeries,
-        colour: Color,
-        help: String
-    ) -> some View {
-        let runs = machineHistory?.runs(series) ?? []
-        // Stacked, not beside the value: four tiles across this card leave
-        // about eighty points here, which is a 72-point chart *or* a dozen
-        // characters and not both. The sentence the short label stands for is
-        // on the tile's help.
-        VStack(alignment: .leading, spacing: 1) {
-            if let now {
-                Text(now)
-                    .font(.system(size: 10))
-                    .monospacedDigit()
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-            }
-            if !runs.isEmpty {
-                HistoryChart(
-                    runs: runs,
-                    colour: colour,
-                    // Fixed, both being fractions: auto-scaling makes an idle
-                    // machine's noise look like a workload — the rule the menu
-                    // bar's own sparklines follow.
-                    range: 0...1,
-                    timeDomain: model.historyEnd.addingTimeInterval(-model.span)...model.historyEnd,
-                    showsTimeAxis: false,
-                    yAxisValues: 0,
-                    axisLabel: { _ in "" }
-                )
-                .frame(width: 72, height: 18)
-            }
-        }
-        .help(help)
-        .accessibilityLabel(help)
+    /// The span both tiles draw against, so they cannot disagree about which
+    /// moment is where.
+    private var chartDomain: ClosedRange<Date> {
+        model.historyEnd.addingTimeInterval(-model.span)...model.historyEnd
     }
-
-    /// The stored series the tiles draw, or nil before the first read.
-    private var machineHistory: HistorySlice? { model.machineHistory }
 
     /// What the accelerator is doing now — the context four seconds of GPU
     /// time is read against.
@@ -345,17 +304,20 @@ struct ProcessCardPane: View {
         if let battery = power.battery, !battery.isCharging, battery.watts < 0 {
             let total = PowerFormatter.string(-battery.watts)
             return (
-                total,
+                "of \(total)",
                 "The whole machine was drawing \(total) from the battery. The line is the"
                     + " stored charge over the span chosen below."
             )
         }
         if let watts = power.adapterWatts {
+            // Whole watts: an adapter is sold as an 85 W adapter, and "85,00 W"
+            // claims a precision its label does not have.
+            let rating = Decimals.string("%.0f W", watts)
             return (
-                "\(PowerFormatter.string(watts)) adapter",
-                "On a \(PowerFormatter.string(watts)) adapter. What the machine is taking from"
-                    + " it is not readable — the rating is what the adapter can supply, not what"
-                    + " is being drawn, so there is no honest total to divide by here."
+                "\(rating) adapter",
+                "On a \(rating) adapter. What the machine is taking from it is not readable —"
+                    + " the rating is what the adapter can supply, not what is being drawn, so"
+                    + " there is no honest total to divide by here."
             )
         }
         guard power.battery?.isCharging == true else { return nil }
@@ -694,6 +656,60 @@ private struct HistoryStrip: View {
 
 /// Label over value, the dashboard's stat card widened to carry an extra line
 /// — a chip, a bar, a legend.
+/// The machine's context under one of the card's live readings: a line of text
+/// saying what it is doing now, and the stored series behind it saying what it
+/// has been doing.
+///
+/// A view of its own rather than a method on the pane, and `Equatable` so
+/// SwiftUI can skip it. The card's probe replaces the reading once a second and
+/// a method's result is rebuilt with whatever body called it — which is how two
+/// charts of a day's buckets came to be rebuilt sixty times a minute.
+///
+/// `HistoryChart` rather than a sparkline of its own, because it is the one
+/// thing in the app that draws a *stored* series honestly: a Mac asleep
+/// overnight leaves no rows, and a chart that joins across that gap draws a
+/// ramp that never happened.
+private struct MachineTile: View, Equatable {
+    let now: String?
+    let runs: [[HistorySample]]
+    let colour: Color
+    let domain: ClosedRange<Date>
+    let help: String
+
+    /// The width the chart is given, and so the most marks worth drawing.
+    private static let width: CGFloat = 72
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            if let now {
+                Text(now)
+                    .font(.system(size: 10))
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+            if !runs.isEmpty {
+                HistoryChart(
+                    runs: runs,
+                    colour: colour,
+                    // Fixed, both being fractions: auto-scaling makes an idle
+                    // machine's noise look like a workload — the rule the menu
+                    // bar's own sparklines follow.
+                    range: 0...1,
+                    timeDomain: domain,
+                    showsTimeAxis: false,
+                    yAxisValues: 0,
+                    maximumPoints: Int(Self.width),
+                    axisLabel: { _ in "" }
+                )
+                .frame(width: Self.width, height: 18)
+            }
+        }
+        .help(help)
+        .accessibilityLabel(help)
+    }
+}
+
 private struct CardStat<Extra: View>: View {
     let label: String
     let value: String

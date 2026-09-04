@@ -32,13 +32,60 @@ struct HistoryChart: View {
     /// Set to make the chart scrubbable. `nil` once the drag leaves the plot,
     /// which is how a cursor gets dismissed.
     var onScrub: ((Date?) -> Void)?
+    /// At most this many marks, merged from neighbours. `nil` draws every row.
+    ///
+    /// A chart cannot show more points than it has pixels, and Swift Charts
+    /// allocates per mark: a day of minute buckets is 1440 of them, and two
+    /// such charts in 72-point tiles, re-evaluated once a second by the card's
+    /// live probe, took the app from 24 MB to 150 MB in nine minutes and then
+    /// killed it. The menu bar's own sparklines have thinned for the same
+    /// reason since Phase 4 — see `Downsample.peaks`.
+    var maximumPoints: Int?
     var axisLabel: (Double) -> String
+
+    /// Thinned per run, never across one: a gap is the whole reason runs are
+    /// separate, and merging over it would draw the ramp this chart exists to
+    /// refuse.
+    private var drawnRuns: [[HistorySample]] {
+        guard let maximumPoints, maximumPoints > 0 else { return runs }
+        let total = runs.reduce(0) { $0 + $1.count }
+        guard total > maximumPoints else { return runs }
+        return runs.map { run in
+            // Proportional, so a short run keeps at least one point and the
+            // long ones give up the rest.
+            Self.thin(run, to: max(1, run.count * maximumPoints / total))
+        }
+    }
+
+    /// Peaks kept, means re-weighted: a spike that lasted one bucket is what a
+    /// monitor exists to show, and averaging the band away is what would hide
+    /// it.
+    private static func thin(_ run: [HistorySample], to count: Int) -> [HistorySample] {
+        guard run.count > count else { return run }
+        return (0..<count).map { slot in
+            let slice = run[run.count * slot / count..<run.count * (slot + 1) / count]
+            let readings = slice.reduce(0) { $0 + $1.aggregate.count }
+            return HistorySample(
+                series: run[0].series,
+                timestamp: slice.first?.timestamp ?? run[0].timestamp,
+                aggregate: Aggregate(
+                    minimum: slice.map(\.aggregate.minimum).min() ?? 0,
+                    average: readings > 0
+                        ? slice.reduce(0) { $0 + $1.aggregate.average * Double($1.aggregate.count) }
+                            / Double(readings)
+                        : 0,
+                    maximum: slice.map(\.aggregate.maximum).max() ?? 0,
+                    count: readings
+                )
+            )
+        }
+    }
 
     var body: some View {
         Chart {
             // `series:` keeps one run from being joined to the next. It
             // groups only; the colour is set outright, so no legend follows.
-            ForEach(Array(runs.enumerated()), id: \.offset) { index, run in
+            ForEach(Array(drawnRuns.enumerated()), id: \.offset) { index, run in
                 ForEach(run, id: \.timestamp) { sample in
                     AreaMark(
                         x: .value("Time", sample.timestamp),
