@@ -50,7 +50,13 @@ final class ProcessCardModel {
     /// card's GPU and power tiles draw behind their live readings. Read with
     /// the process's history and over the same span, so one span button
     /// governs everything on the card.
-    private(set) var machineHistory: HistorySlice?
+    ///
+    /// Split into runs here rather than in the view: the probe replaces
+    /// `reading` once a second, and `HistorySlice.runs(_:)` walking a day of
+    /// buckets on every one of those is work for an answer that changes when
+    /// the span button does.
+    private(set) var gpuRuns: [[HistorySample]] = []
+    private(set) var batteryRuns: [[HistorySample]] = []
 
     /// The strip's right edge: bars are placed against the moment the history
     /// was asked, so buckets missing at the leading edge read as the gaps
@@ -88,7 +94,7 @@ final class ProcessCardModel {
         history: ProcessNameHistory?,
         energy: ProcessEnergy? = nil,
         starts: ProcessStarts? = nil,
-        machineHistory: HistorySlice? = nil,
+        machine: HistorySlice? = nil,
         historyEnd: Date = Date(),
         preferences: Preferences? = nil
     ) {
@@ -99,7 +105,8 @@ final class ProcessCardModel {
         self.history = history
         self.energy = energy
         self.starts = starts
-        self.machineHistory = machineHistory
+        gpuRuns = machine?.runs(.gpuUtilisation) ?? []
+        batteryRuns = machine?.runs(.batteryCharge) ?? []
         self.historyEnd = historyEnd
         self.preferences = preferences
         reader = nil
@@ -235,7 +242,8 @@ final class ProcessCardModel {
             self?.history = history
             self?.energy = energy
             self?.starts = starts
-            self?.machineHistory = machine
+            self?.gpuRuns = machine?.runs(.gpuUtilisation) ?? []
+            self?.batteryRuns = machine?.runs(.batteryCharge) ?? []
             self?.historyEnd = asked
         }
     }

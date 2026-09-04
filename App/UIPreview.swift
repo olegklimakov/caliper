@@ -480,7 +480,7 @@ enum UIPreview {
                 history: history,
                 energy: energy,
                 starts: starts,
-            machineHistory: machineSlice,
+            machine: machineSlice,
                 historyEnd: end,
                 preferences: preferences
             )
@@ -543,7 +543,7 @@ enum UIPreview {
             history: history,
             energy: energy,
             starts: starts,
-            machineHistory: machineSlice,
+            machine: machineSlice,
             historyEnd: end,
             preferences: preferences
         )
