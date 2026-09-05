@@ -176,6 +176,71 @@ private func tenSecondBuckets(
     #expect(aggregate?.count == 3)
 }
 
+/// A snapshot repeats the newest reading of every metric on every tick, so a
+/// series sampled once a minute arrives sixty times. Folding each of those puts
+/// a row in six ten-second buckets that only ever had one reading — coverage
+/// invented out of a repeat, which is the one thing a sparse series must not
+/// do.
+@Test func aReadingIsFoldedOnceHoweverManyTicksCarryIt() async throws {
+    try await withStore { store in
+        let recorder = HistoryRecorder(store: store)
+        let taken = minuteStart
+        // The same reading arriving on six ten-second ticks, which is what a
+        // sixty-second cadence looks like from the recorder's side.
+        for tick in 0..<6 {
+            recorder.record(
+                [.batteryCharge: 0.9],
+                at: minuteStart.addingTimeInterval(Double(tick) * 10),
+                stamps: [.batteryCharge: taken]
+            )
+        }
+        // And a genuinely new one.
+        recorder.record(
+            [.batteryCharge: 0.8],
+            at: minuteStart.addingTimeInterval(60),
+            stamps: [.batteryCharge: taken.addingTimeInterval(60)]
+        )
+        try recorder.flushNow()
+
+        let samples = try await store.databaseQueue.read { db in
+            try HistoryStore.fetch(
+                [.batteryCharge],
+                tier: .tenSeconds,
+                from: minuteStart,
+                to: minuteStart.addingTimeInterval(120),
+                in: db
+            )[.batteryCharge]
+        }
+        // One bucket for the reading, not six.
+        #expect(samples.count == 2)
+        #expect(samples.first?.aggregate.count == 1)
+        #expect(samples.first?.aggregate.average == 0.9)
+    }
+}
+
+/// The series with no sample time of their own keep folding every tick, which
+/// is what makes the rule above a narrowing rather than a change of behaviour.
+@Test func aSeriesWithNoStampStillFoldsEveryTick() async throws {
+    try await withStore { store in
+        let recorder = HistoryRecorder(store: store)
+        for tick in 0..<3 {
+            recorder.record([.cpu: 0.5], at: minuteStart.addingTimeInterval(Double(tick)))
+        }
+        try recorder.flushNow()
+
+        let samples = try await store.databaseQueue.read { db in
+            try HistoryStore.fetch(
+                [.cpu],
+                tier: .tenSeconds,
+                from: minuteStart,
+                to: minuteStart.addingTimeInterval(60),
+                in: db
+            )[.cpu]
+        }
+        #expect(samples.first?.aggregate.count == 3)
+    }
+}
+
 @Test func discardingLeavesNothingToBeWrittenBackAfterAClear() async throws {
     try await withStore { store in
         let recorder = HistoryRecorder(store: store)

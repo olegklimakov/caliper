@@ -30,6 +30,9 @@ public final class HistoryRecorder: Sendable {
         var openBucket: Date?
         var pending: [HistorySample] = []
         var lastFlush = Date()
+        /// When the reading behind a series was taken, for the series whose
+        /// samples carry that. See `stamps(of:)`.
+        var folded: [MetricSeries: Date] = [:]
     }
 
     public init(store: HistoryStore) {
@@ -37,12 +40,16 @@ public final class HistoryRecorder: Sendable {
     }
 
     public func record(_ snapshot: SystemSnapshot) {
-        record(Self.values(of: snapshot), at: snapshot.timestamp)
+        record(Self.values(of: snapshot), at: snapshot.timestamp, stamps: Self.stamps(of: snapshot))
     }
 
     /// Where the folding happens, and the seam the tests drive: `SystemSnapshot`
     /// has a dozen fields and no public initialiser.
-    func record(_ values: [MetricSeries: Double], at timestamp: Date) {
+    func record(
+        _ values: [MetricSeries: Double],
+        at timestamp: Date,
+        stamps: [MetricSeries: Date] = [:]
+    ) {
         let batch = state.withLock { state -> [HistorySample]? in
             let bucket = tier.bucketStart(of: timestamp)
             if let openBucket = state.openBucket, openBucket != bucket {
@@ -51,6 +58,17 @@ public final class HistoryRecorder: Sendable {
             state.openBucket = bucket
 
             for (series, value) in values {
+                // A snapshot carries the newest reading of every metric, not
+                // only what was taken on this tick, so a series sampled once a
+                // minute arrives sixty times. Folding each of those would
+                // weight one reading sixtyfold *and* put a row in six
+                // ten-second buckets that never had one — coverage invented
+                // out of a repeat. The process recorder has skipped its own
+                // repeats since Stage B for the same reason.
+                if let stamp = stamps[series] {
+                    guard state.folded[series] != stamp else { continue }
+                    state.folded[series] = stamp
+                }
                 state.open[series, default: Accumulator()].add(value)
             }
 
@@ -128,6 +146,7 @@ public final class HistoryRecorder: Sendable {
         if let peak = snapshot.sensors?.peakTemperature {
             values[.temperature] = peak
         }
+
         if let gpu = snapshot.gpuDevice {
             values[.gpuUtilisation] = gpu.utilisation
         }
@@ -138,6 +157,24 @@ public final class HistoryRecorder: Sendable {
             values[.batteryCharge] = battery.charge
         }
         return values
+    }
+
+    /// When the reading behind each series was taken, for the samples that say.
+    ///
+    /// Only these two: the older samples carry no time of their own, and at
+    /// their cadences a repeat is harmless — five folds of one CPU reading
+    /// inflate a bucket's count without moving its average, and every bucket
+    /// is inflated alike. A minute of repeats is a different thing, which is
+    /// why the two that can be told apart are.
+    static func stamps(of snapshot: SystemSnapshot) -> [MetricSeries: Date] {
+        var stamps: [MetricSeries: Date] = [:]
+        if let gpu = snapshot.gpuDevice {
+            stamps[.gpuUtilisation] = gpu.sampledAt
+        }
+        if let power = snapshot.power, power.battery != nil {
+            stamps[.batteryCharge] = power.sampledAt
+        }
+        return stamps
     }
 }
 

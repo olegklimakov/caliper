@@ -217,7 +217,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return HistoryActions(
             sizeOnDisk: { history.storeSize() },
             deleteProcessHistory: { try await self.deleteProcessHistory() },
-            deleteEverything: { try await self.deleteEverything() }
+            deleteEverything: { try await self.deleteEverything() },
+            flushRegistry: { try? self.processRecorder?.flushRegistry() }
         )
     }
 
@@ -255,8 +256,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Before the window's first read, and on this thread for that reason:
         // the registry is written every ten minutes, so a card's start count
         // and the search room's "last seen" would otherwise be up to ten
-        // minutes behind the machine — and a card gets opened *because*
-        // something is restarting right now.
+        // minutes behind the machine. Opening the window is only one of the
+        // ways to reach a room that reads it — see `ProcessCardRoom`, which
+        // flushes again for the card opened from a window already up.
         if isVisible {
             try? processRecorder?.flushRegistry()
         }
