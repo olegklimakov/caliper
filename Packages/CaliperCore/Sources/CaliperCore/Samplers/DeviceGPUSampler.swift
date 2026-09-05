@@ -39,26 +39,27 @@ struct DeviceGPUSampler {
         IORegistry.forEachService(matching: "IOAccelerator") { accelerator in
             guard found == nil,
                 let statistics = IORegistry.property(accelerator, "PerformanceStatistics")
-                    as? [String: Any],
-                let device = statistics["Device Utilization %"] as? Int
+                    as? [String: Any]
             else { return }
 
-            func percent(_ key: String) -> Double {
-                Double(statistics[key] as? Int ?? 0) / 100
-            }
-            func bytes(_ key: String) -> UInt64 {
-                (statistics[key] as? NSNumber)?.uint64Value ?? 0
-            }
+            // Through `NSNumber`, never `as? Int`. These arrive as boxed
+            // CFNumbers, and an accelerator that reports a utilisation as a
+            // float would fail that cast — taking the whole reading down with
+            // it, because the first key is what decides the sampler is
+            // available at all.
+            func number(_ key: String) -> NSNumber? { statistics[key] as? NSNumber }
+            func percent(_ key: String) -> Double { (number(key)?.doubleValue ?? 0) / 100 }
 
+            guard let device = number("Device Utilization %") else { return }
             found = GPUDeviceSample(
                 sampledAt: moment,
-                utilisation: Double(device) / 100,
+                utilisation: device.doubleValue / 100,
                 rendererUtilisation: percent("Renderer Utilization %"),
                 tilerUtilisation: percent("Tiler Utilization %"),
-                memoryInUse: bytes("In use system memory"),
-                memoryAllocated: bytes("Alloc system memory"),
+                memoryInUse: number("In use system memory")?.uint64Value ?? 0,
+                memoryAllocated: number("Alloc system memory")?.uint64Value ?? 0,
                 coreCount: coreCount(of: accelerator),
-                recoveryCount: statistics["recoveryCount"] as? Int ?? 0
+                recoveryCount: number("recoveryCount")?.intValue ?? 0
             )
         }
         return found
@@ -72,6 +73,6 @@ struct DeviceGPUSampler {
             let configuration = IORegistry.property(accelerator, "GPUConfigurationVariable")
                 as? [String: Any]
         else { return nil }
-        return configuration["num_cores"] as? Int
+        return (configuration["num_cores"] as? NSNumber)?.intValue
     }
 }

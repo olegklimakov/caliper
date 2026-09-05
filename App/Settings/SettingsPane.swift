@@ -9,6 +9,10 @@ struct HistoryActions {
     let sizeOnDisk: () -> UInt64
     let deleteProcessHistory: () async throws -> Void
     let deleteEverything: () async throws -> Void
+    /// Writes what the process recorder is holding for the registry, so a room
+    /// about to read it sees the last ten minutes. Synchronous, because the
+    /// read it exists for happens on the very next layout.
+    let flushRegistry: () -> Void
 }
 
 /// The settings room of the history window — a room rather than a window of its

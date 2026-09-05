@@ -62,9 +62,11 @@ import Testing
 
 // MARK: - Power
 
-@Test func theBatteryReadsAsAChargeCyclesAndACapacityPair() throws {
+@Test func theBatteryReadsAsAChargeCyclesAndACapacityPair() {
     let sample = PowerSampler().sample()
-    let battery = try #require(sample.battery, "this machine reports no battery")
+    // A Mac with no battery is a desktop and a pass, the rule the sampler
+    // itself follows — see `aMachineWithNoBatteryIsADesktopAndNotAFailure`.
+    guard let battery = sample.battery else { return }
 
     #expect(battery.charge > 0 && battery.charge <= 1)
     #expect(battery.cycleCount >= 0)

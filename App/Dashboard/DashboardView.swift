@@ -70,6 +70,7 @@ struct DashboardView: View {
                     reader: history,
                     metrics: metrics,
                     preferences: preferences,
+                    willRead: { historyActions?.flushRegistry() },
                     onBack: { navigation.section = navigation.returnSection }
                 )
                 .id(target)

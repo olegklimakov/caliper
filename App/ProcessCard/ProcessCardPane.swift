@@ -13,6 +13,12 @@ struct ProcessCardRoom: View {
     /// accelerator and nothing on a busy one — so the card reads the device
     /// beside the process.
     let metrics: LiveMetrics
+    /// Called before the card's first read. Most cards are opened from a window
+    /// that is already up — a row in the overview, a panel's top list — and
+    /// that path changes a navigation section without the window becoming
+    /// visible, so the flush on visibility never fires for it. Without this the
+    /// start badge is up to ten minutes stale in the ordinary way in.
+    let willRead: () -> Void
     let onBack: () -> Void
 
     @State private var model: ProcessCardModel
@@ -22,11 +28,13 @@ struct ProcessCardRoom: View {
         reader: HistoryReader?,
         metrics: LiveMetrics,
         preferences: Preferences,
+        willRead: @escaping () -> Void,
         onBack: @escaping () -> Void
     ) {
         self.target = target
         self.reader = reader
         self.metrics = metrics
+        self.willRead = willRead
         self.onBack = onBack
         _model = State(
             initialValue: ProcessCardModel(target: target, reader: reader, preferences: preferences)
@@ -35,7 +43,10 @@ struct ProcessCardRoom: View {
 
     var body: some View {
         ProcessCardPane(model: model, machine: metrics.snapshot, onBack: onBack)
-            .onAppear { model.start() }
+            .onAppear {
+                willRead()
+                model.start()
+            }
             .onDisappear { model.stop() }
     }
 }
