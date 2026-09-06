@@ -114,6 +114,23 @@ enum UIPreview {
                             )
                         }
                     }
+                    // Both states worth a picture: a real reading, and the
+                    // one before the first sample arrives — a row of em dashes
+                    // is what a user meets for the first ten seconds.
+                    for (state, reading) in [("read", state.snapshot?.selfMetrics), ("waiting", nil)] {
+                        if let cost = PanelPreview.renderCost(
+                            selfMetrics: reading,
+                            storeSize: 3_312_476,
+                            appearance: theme
+                        ) {
+                            write(
+                                cost,
+                                to: url.appendingPathComponent("cost-\(state)-\(appearance).png"),
+                                scale: 1,
+                                background: nil
+                            )
+                        }
+                    }
                     for fate in CardFate.allCases {
                         let model = previewProcessCard(fate)
                         if let card = PanelPreview.renderProcessCard(

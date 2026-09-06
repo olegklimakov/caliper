@@ -38,6 +38,9 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
         .cpu, .memory, .network, .diskActivity, .volumes, .sensors,
         // The process card reads both beside the process it is about.
         .gpuDevice, .power,
+        // The settings room prints what this app is costing, and a figure that
+        // refreshes every thirty seconds reads as a frozen one.
+        .selfMetrics,
     ]
 
     let navigation = DashboardNavigation()

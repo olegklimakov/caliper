@@ -123,6 +123,30 @@ enum PanelPreview {
         render(ProcessesPane(preloaded: search, query: query), appearance: appearance)
     }
 
+    /// The cost section on its own: the whole settings pane needs an
+    /// `UpdaterService`, and building one starts Sparkle, which is not a thing
+    /// a picture should do.
+    ///
+    /// Drawn `.columns` where the room draws `.grouped`, because a grouped form
+    /// on macOS is scroll-backed and `ImageRenderer` draws those blank — the
+    /// same trap the overview's charts and the search room's list already work
+    /// around. So this checks the rows, their values and their wording; the
+    /// grouped chrome around them is Apple's and goes unchecked.
+    @MainActor
+    static func renderCost(
+        selfMetrics: SelfMetrics?,
+        storeSize: UInt64,
+        appearance: NSAppearance
+    ) -> NSImage? {
+        render(
+            Form { CostSection(selfMetrics: selfMetrics, storeSize: storeSize) }
+                .formStyle(.columns)
+                .padding(20),
+            appearance: appearance,
+            height: 260
+        )
+    }
+
     private static func render(
         _ pane: some View,
         appearance: NSAppearance,
