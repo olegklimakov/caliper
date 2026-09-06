@@ -53,6 +53,7 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
     /// Shared with the updater, which puts up windows of its own.
     private let activation: ActivationPolicy
     private let updater: UpdaterService
+    private let alerts: AlertMonitor?
     /// Lets the sampler run at dashboard rates only while the window is up.
     private let onVisibilityChange: (Bool) -> Void
 
@@ -65,6 +66,7 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
         preferences: Preferences,
         activation: ActivationPolicy,
         updater: UpdaterService,
+        alerts: AlertMonitor?,
         onVisibilityChange: @escaping (Bool) -> Void
     ) {
         self.metrics = metrics
@@ -73,6 +75,7 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
         self.preferences = preferences
         self.activation = activation
         self.updater = updater
+        self.alerts = alerts
         self.onVisibilityChange = onVisibilityChange
     }
 
@@ -104,6 +107,7 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
                 preferences: preferences,
                 historyActions: historyActions,
                 updater: updater,
+                alerts: alerts,
                 navigation: navigation
             )
         )

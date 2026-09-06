@@ -114,6 +114,19 @@ enum UIPreview {
                             )
                         }
                     }
+                    for (state, rules) in previewAlertRules {
+                        if let alerts = PanelPreview.renderAlerts(
+                            preferences: rules,
+                            appearance: theme
+                        ) {
+                            write(
+                                alerts,
+                                to: url.appendingPathComponent("alerts-\(state)-\(appearance).png"),
+                                scale: 1,
+                                background: nil
+                            )
+                        }
+                    }
                     // Both states worth a picture: a real reading, and the
                     // one before the first sample arrives — a row of em dashes
                     // is what a user meets for the first ten seconds.
@@ -316,6 +329,49 @@ enum UIPreview {
         }
         guard (try? recorder.flushNow()) != nil else { return nil }
         return try? await reader.consumers(at: cursor, retention: .week)
+    }
+
+    /// The alerts section with rules and without. The empty one is what every
+    /// user meets, and it is the picture that says whether "Add rule…" alone
+    /// reads as a section worth having.
+    @MainActor
+    private static var previewAlertRules: [(String, Preferences)] {
+        // A defaults store per picture, and not the shared one: these are
+        // built before either is drawn, so one store would render whichever
+        // set was written last, twice.
+        func store(_ suite: String, _ rules: [AlertRule]) -> Preferences {
+            let preferences = Preferences(
+                defaults: UserDefaults(suiteName: "caliper.preview.alerts.\(suite)") ?? .standard
+            )
+            for rule in preferences.alertRules { preferences.removeAlertRule(rule.id) }
+            for rule in rules { preferences.addAlertRule(rule) }
+            return preferences
+        }
+        return [
+            (
+                "set",
+                store(
+                    "set",
+                    [
+                        AlertRule(series: .cpu, comparison: .above, threshold: 0.8, duration: 300),
+                        AlertRule(
+                            series: .temperature,
+                            comparison: .above,
+                            threshold: 95,
+                            duration: 900
+                        ),
+                        AlertRule(
+                            series: .batteryCharge,
+                            comparison: .below,
+                            threshold: 0.15,
+                            duration: 300,
+                            isEnabled: false
+                        ),
+                    ]
+                )
+            ),
+            ("empty", store("empty", [])),
+        ]
     }
 
     /// The search room in its two states worth checking: a query with matches,

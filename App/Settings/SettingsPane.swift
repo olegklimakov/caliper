@@ -28,6 +28,9 @@ struct SettingsPane: View {
     /// there rather than a mock-up of it.
     let metrics: LiveMetrics
     let updater: UpdaterService
+    /// nil when there is no store to watch — the rules are still listed and
+    /// still editable, they simply have nothing to be evaluated against.
+    let alerts: AlertMonitor?
     @State private var launchesAtLogin: Bool
     @State private var loginError: String?
     @State private var confirming: Deletion?
@@ -65,12 +68,14 @@ struct SettingsPane: View {
         preferences: Preferences,
         history: HistoryActions?,
         metrics: LiveMetrics,
-        updater: UpdaterService
+        updater: UpdaterService,
+        alerts: AlertMonitor?
     ) {
         self.preferences = preferences
         self.history = history
         self.metrics = metrics
         self.updater = updater
+        self.alerts = alerts
         _launchesAtLogin = State(initialValue: preferences.launchesAtLogin)
     }
 
@@ -173,6 +178,8 @@ struct SettingsPane: View {
             } message: { deletion in
                 Text(deletion.message)
             }
+
+            AlertsSection(preferences: preferences, monitor: alerts)
 
             CostSection(selfMetrics: metrics.snapshot?.selfMetrics, storeSize: storeSize)
 

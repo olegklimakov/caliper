@@ -15,7 +15,12 @@ public final class HistoryRecorder: Sendable {
     private let store: HistoryStore
     private let tier = HistoryTier.tenSeconds
     /// One transaction a minute: six buckets' worth.
-    private let flushInterval: TimeInterval = 60
+    ///
+    /// Not private, for the reason `ProcessTier.flushInterval` is not: a reader
+    /// asking whether a condition has held has to know how far behind the
+    /// writer is allowed to be, or it reads a window whose newest minute is
+    /// missing by construction and concludes the condition lapsed.
+    public static let flushInterval: TimeInterval = 60
     /// Batched writes go here, so a transaction never lands on whichever
     /// thread happened to deliver a snapshot.
     private let writeQueue = DispatchQueue(
@@ -72,7 +77,7 @@ public final class HistoryRecorder: Sendable {
                 state.open[series, default: Accumulator()].add(value)
             }
 
-            guard timestamp.timeIntervalSince(state.lastFlush) >= flushInterval,
+            guard timestamp.timeIntervalSince(state.lastFlush) >= Self.flushInterval,
                 !state.pending.isEmpty
             else { return nil }
 

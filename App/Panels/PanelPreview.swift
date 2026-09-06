@@ -147,6 +147,19 @@ enum PanelPreview {
         )
     }
 
+    /// The alerts section with rules standing in it, drawn the same way and for
+    /// the same reason as `renderCost`.
+    @MainActor
+    static func renderAlerts(preferences: Preferences, appearance: NSAppearance) -> NSImage? {
+        render(
+            Form { AlertsSection(preferences: preferences, monitor: nil) }
+                .formStyle(.columns)
+                .padding(20),
+            appearance: appearance,
+            height: 260
+        )
+    }
+
     private static func render(
         _ pane: some View,
         appearance: NSAppearance,

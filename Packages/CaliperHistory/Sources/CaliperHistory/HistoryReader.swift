@@ -96,6 +96,26 @@ public struct HistoryReader: Sendable {
         }
     }
 
+    /// The buckets a rule is asked about — its window, at the finest tier.
+    ///
+    /// One series and one window rather than a slice of everything: an alert
+    /// pass runs on a timer and reads only what its rules are about.
+    public func buckets(
+        for rule: AlertRule,
+        now: Date = Date()
+    ) async throws -> [HistorySample] {
+        let window = AlertEvaluator.window(for: rule, now: now)
+        return try await store.databaseQueue.read { db in
+            try HistoryStore.fetch(
+                [rule.series],
+                tier: .tenSeconds,
+                from: window.start,
+                to: window.end,
+                in: db
+            )[rule.series]
+        }
+    }
+
     /// The registry, searched by name and by path.
     ///
     /// The one question no ranked tier can answer: a program too cheap to ever
