@@ -254,16 +254,60 @@ public struct HistoryStore: Sendable {
         return ProcessBucket(
             tier: tier,
             start: start,
-            consumers: rows.map { row in
-                ProcessUsage(
-                    name: row["name"],
-                    cpu: Double(row["cpu_permille"] as Int) / 1000,
-                    footprint: UInt64(row["footprint_mb"] as Int) * 1_048_576,
-                    diskRate: Double(row["disk_kbps"] as Int) * 1024,
-                    energy: Double(row["energy_mj"] as Int) / 1000
-                )
-            }
+            consumers: rows.map(ProcessUsage.init(row:))
         )
+    }
+
+    /// Every bucket of a window, for the incident export.
+    ///
+    /// The exception to `fetchConsumers`' one-bucket rule, and it is allowed
+    /// one because the window is bounded before the call: `IncidentExport`
+    /// reads five minutes either side of a cursor, which is at most twenty
+    /// buckets of twenty-odd names.
+    ///
+    /// No reaching back for a lagging writer, unlike the single-bucket read.
+    /// That reach answers an asked bucket with an earlier one, which is a fair
+    /// approximation for one readout and a falsehood in a file of timestamped
+    /// rows. What the writer has not flushed is simply not here, and
+    /// `IncidentExport.window` ends the range where the rows end so the file
+    /// does not claim to cover it.
+    static func fetchConsumers(
+        from start: Date,
+        to end: Date,
+        tier: ProcessTier,
+        in db: Database
+    ) throws -> [ProcessBucket] {
+        let rows = try Row.fetchAll(
+            db,
+            sql: """
+                SELECT timestamp, name, cpu_permille, footprint_mb, disk_kbps, energy_mj
+                FROM \(tier.tableName)
+                JOIN process_names ON process_names.id = \(tier.tableName).name_id
+                WHERE timestamp >= ? AND timestamp < ?
+                ORDER BY timestamp, cpu_permille DESC, name
+                """,
+            arguments: [Int(start.timeIntervalSince1970), Int(end.timeIntervalSince1970)]
+        )
+
+        // Ordered by timestamp, so a bucket closes when the next row's differs.
+        var buckets: [ProcessBucket] = []
+        var openStart: Date?
+        var open: [ProcessUsage] = []
+        func close() {
+            guard let openStart else { return }
+            buckets.append(ProcessBucket(tier: tier, start: openStart, consumers: open))
+        }
+        for row in rows {
+            let timestamp = Date(timeIntervalSince1970: TimeInterval(row["timestamp"] as Int))
+            if timestamp != openStart {
+                close()
+                openStart = timestamp
+                open = []
+            }
+            open.append(ProcessUsage(row: row))
+        }
+        close()
+        return buckets
     }
 
     /// One name across a span, for the card's strip.
@@ -661,4 +705,20 @@ public struct HistoryStore: Sendable {
     }
 
     var databaseQueue: DatabaseQueue { queue }
+}
+
+extension ProcessUsage {
+    /// The scaling the store's integer columns need on the way out, in one
+    /// place: permille, whole megabytes, kilobytes a second and millijoules go
+    /// in, SI comes back. Two readers select the same five columns and differ
+    /// only in how they group the rows they come back in.
+    fileprivate init(row: Row) {
+        self.init(
+            name: row["name"],
+            cpu: Double(row["cpu_permille"] as Int) / 1000,
+            footprint: UInt64(row["footprint_mb"] as Int) * 1_048_576,
+            diskRate: Double(row["disk_kbps"] as Int) * 1024,
+            energy: Double(row["energy_mj"] as Int) / 1000
+        )
+    }
 }

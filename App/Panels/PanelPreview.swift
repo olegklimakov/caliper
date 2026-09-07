@@ -39,20 +39,37 @@ enum PanelPreview {
     }
 
     /// The overview, with the cursor parked on the moment worth reading.
+    ///
+    /// The span comes with the loader rather than being the pane's default: the
+    /// incident export renders whatever the user is looking at, and a week's
+    /// slice drawn under a header reading "last 24 hours" is a picture that lies
+    /// about itself.
+    ///
+    /// `showsControls` off is what the export asks for; see `OverviewPane`.
     static func renderOverview(
         metrics: LiveMetrics,
         history: DashboardHistory,
+        span: HistorySpan,
         cursor: Date,
-        appearance: NSAppearance
+        appearance: NSAppearance,
+        scale: CGFloat = 1,
+        showsControls: Bool = true
     ) -> NSImage? {
         render(
-            OverviewPane(metrics: metrics, preloaded: history, cursor: cursor),
+            OverviewPane(
+                metrics: metrics,
+                preloaded: history,
+                span: span,
+                cursor: cursor,
+                showsControls: showsControls
+            ),
             appearance: appearance,
             // Taller than the other panes, at the overview's own minimum: five
             // stacked charts and a list of processes do not fit in what one
             // chart needs, and a preview cropped short would hide the thing it
             // is meant to check.
-            height: 620
+            height: 620,
+            scale: scale
         )
     }
 
@@ -160,10 +177,14 @@ enum PanelPreview {
         )
     }
 
+    /// One point per pixel by default, which is what the preview harness
+    /// compares against the mockups. The export asks for two: that picture gets
+    /// opened on somebody else's Retina Mac.
     private static func render(
         _ pane: some View,
         appearance: NSAppearance,
-        height: CGFloat = 560
+        height: CGFloat = 560,
+        scale: CGFloat = 1
     ) -> NSImage? {
         let renderer = ImageRenderer(
             content: pane
@@ -171,7 +192,7 @@ enum PanelPreview {
                 .background(Color(nsColor: .windowBackgroundColor))
                 .environment(\.colorScheme, appearance.name == .darkAqua ? .dark : .light)
         )
-        renderer.scale = 1
+        renderer.scale = scale
         return renderer.nsImage
     }
 

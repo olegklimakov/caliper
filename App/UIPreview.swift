@@ -89,8 +89,14 @@ enum UIPreview {
                         let overview = PanelPreview.renderOverview(
                             metrics: state,
                             history: loader,
+                            // The span `previewHistory` writes and reads back.
+                            span: .day,
                             cursor: history.cursor,
-                            appearance: theme
+                            appearance: theme,
+                            scale: 1,
+                            // The pane a user meets, blocked span picker and
+                            // all; only the export's own render drops them.
+                            showsControls: true
                         )
                     {
                         write(

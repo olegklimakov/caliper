@@ -48,6 +48,26 @@ public struct HistoryReader: Sendable {
         return try await store.consumers(at: moment, tier: tier, now: now, isRecording: isRecording)
     }
 
+    /// Every process bucket of a window — the incident export's half of the
+    /// answer, where `consumers(at:)` is the readout's.
+    ///
+    /// `nil` and an empty array are different answers, the same distinction
+    /// `consumers(at:)` draws: `nil` is "no tier still keeps the oldest end of
+    /// this window", empty is "kept, and holds nothing". Both produce a
+    /// heading-only file, and only the note beside it can say which.
+    public func consumers(
+        from start: Date,
+        to end: Date,
+        retention: ProcessRetention,
+        now: Date = Date()
+    ) async throws -> [ProcessBucket]? {
+        guard let tier = ProcessTier.holding(start, retention: retention.seconds, now: now)
+        else { return nil }
+        return try await store.databaseQueue.read { db in
+            try HistoryStore.fetchConsumers(from: start, to: end, tier: tier, in: db)
+        }
+    }
+
     /// One name's buckets over the last `span` — the card's history strip.
     /// Sparse by design; an unknown name is an empty history, not an error.
     public func processHistory(
