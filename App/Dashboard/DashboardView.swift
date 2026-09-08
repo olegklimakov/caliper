@@ -14,6 +14,8 @@ struct DashboardView: View {
     let preferences: Preferences
     let historyActions: HistoryActions?
     let updater: UpdaterService
+    /// Watches the record for the user's standing rules; nil without a store.
+    let alerts: AlertMonitor?
     /// Owned by the window controller, so the status bar menu can open the
     /// window straight onto the settings.
     @Bindable var navigation: DashboardNavigation
@@ -79,7 +81,8 @@ struct DashboardView: View {
                     preferences: preferences,
                     history: historyActions,
                     metrics: metrics,
-                    updater: updater
+                    updater: updater,
+                    alerts: alerts
                 )
             }
         }

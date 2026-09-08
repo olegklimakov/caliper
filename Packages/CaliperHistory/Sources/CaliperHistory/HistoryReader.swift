@@ -48,6 +48,26 @@ public struct HistoryReader: Sendable {
         return try await store.consumers(at: moment, tier: tier, now: now, isRecording: isRecording)
     }
 
+    /// Every process bucket of a window — the incident export's half of the
+    /// answer, where `consumers(at:)` is the readout's.
+    ///
+    /// `nil` and an empty array are different answers, the same distinction
+    /// `consumers(at:)` draws: `nil` is "no tier still keeps the oldest end of
+    /// this window", empty is "kept, and holds nothing". Both produce a
+    /// heading-only file, and only the note beside it can say which.
+    public func consumers(
+        from start: Date,
+        to end: Date,
+        retention: ProcessRetention,
+        now: Date = Date()
+    ) async throws -> [ProcessBucket]? {
+        guard let tier = ProcessTier.holding(start, retention: retention.seconds, now: now)
+        else { return nil }
+        return try await store.databaseQueue.read { db in
+            try HistoryStore.fetchConsumers(from: start, to: end, tier: tier, in: db)
+        }
+    }
+
     /// One name's buckets over the last `span` — the card's history strip.
     /// Sparse by design; an unknown name is an empty history, not an error.
     public func processHistory(
@@ -93,6 +113,26 @@ public struct HistoryReader: Sendable {
     ) async throws -> ProcessStarts {
         try await store.databaseQueue.read { db in
             try HistoryStore.fetchStarts(name: name, from: start, to: end, in: db)
+        }
+    }
+
+    /// The buckets a rule is asked about — its window, at the finest tier.
+    ///
+    /// One series and one window rather than a slice of everything: an alert
+    /// pass runs on a timer and reads only what its rules are about.
+    public func buckets(
+        for rule: AlertRule,
+        now: Date = Date()
+    ) async throws -> [HistorySample] {
+        let window = AlertEvaluator.window(for: rule, now: now)
+        return try await store.databaseQueue.read { db in
+            try HistoryStore.fetch(
+                [rule.series],
+                tier: .tenSeconds,
+                from: window.start,
+                to: window.end,
+                in: db
+            )[rule.series]
         }
     }
 

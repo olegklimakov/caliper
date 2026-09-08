@@ -1,3 +1,4 @@
+import AppKit
 import CaliperHistory
 import SwiftUI
 
@@ -15,6 +16,8 @@ struct OverviewPane: View {
     @State private var span: HistorySpan = .day
     @State private var cursor: Date?
     @State private var loader: DashboardHistory?
+    @State private var exporting = false
+    @State private var exportFailure: String?
 
     /// In the sidebar's order, so the stack reads the way the window does.
     private static let modules = MenuBarModule.allCases
@@ -41,6 +44,12 @@ struct OverviewPane: View {
     /// name alone, so the card may open on a process that no longer runs —
     /// which is a valid card.
     private let openCard: (ProcessCardTarget) -> Void
+    /// Off for the exported picture. Two reasons, and the second is a defect
+    /// the first would have hidden: a control in a picture is a control nobody
+    /// can press, and `ImageRenderer` draws a segmented `Picker` as a yellow
+    /// block with a prohibition sign through it. The preview harness keeps them
+    /// — it is checking the pane a user meets, blocked picker and all.
+    private let showsControls: Bool
 
     init(
         metrics: LiveMetrics,
@@ -55,16 +64,25 @@ struct OverviewPane: View {
         self.recordsProcesses = recordsProcesses
         self.openCard = openCard
         self.preloaded = nil
+        self.showsControls = true
     }
 
-    init(metrics: LiveMetrics, preloaded: DashboardHistory, cursor: Date) {
+    init(
+        metrics: LiveMetrics,
+        preloaded: DashboardHistory,
+        span: HistorySpan,
+        cursor: Date,
+        showsControls: Bool
+    ) {
         self.metrics = metrics
         self.history = nil
+        self.showsControls = showsControls
         // Never used: the preview's bucket is handed in already read.
         self.processRetention = .week
         self.recordsProcesses = true
         self.openCard = { _ in }
         self.preloaded = preloaded
+        _span = State(initialValue: span)
         _cursor = State(initialValue: cursor)
     }
 
@@ -74,7 +92,10 @@ struct OverviewPane: View {
                 Text("Overview — \(span.title)")
                     .font(.system(size: 17, weight: .semibold))
                 Spacer()
-                SpanPicker(span: $span)
+                if showsControls {
+                    exportButton
+                    SpanPicker(span: $span)
+                }
             }
 
             caption
@@ -114,6 +135,15 @@ struct OverviewPane: View {
             _ in loader?.reload()
         }
         .onDisappear { loader?.stop() }
+        .alert(
+            "Could not export the incident",
+            isPresented: Binding(get: { exportFailure != nil }, set: { if !$0 { exportFailure = nil } }),
+            presenting: exportFailure
+        ) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { reason in
+            Text(reason)
+        }
     }
 
     /// The cursor's bucket, or the most recent one with anything in it. At rest
@@ -135,6 +165,57 @@ struct OverviewPane: View {
     private func inspected(in slice: HistorySlice) -> Date? {
         guard let cursor, slice.cursorRange?.contains(cursor) == true else { return nil }
         return cursor
+    }
+
+    /// Disabled rather than absent without a cursor. A button that only appears
+    /// once the user has already found the gesture is a feature they meet after
+    /// they stopped needing to be told about it — and one that appears mid-drag
+    /// would change the header's width under the pointer.
+    @ViewBuilder
+    private var exportButton: some View {
+        if active?.slice != nil {
+            Button("Export\u{2026}") { export() }
+                .disabled(exporting || inspectedCursor == nil)
+                .help(
+                    inspectedCursor == nil
+                        ? "Place the cursor on a moment to export it"
+                        : "Write this span, what was running, and a picture of it to a folder"
+                )
+        }
+    }
+
+    /// Where the cursor is, if it is anywhere. Distinct from `inspectedMoment`,
+    /// which falls back to the newest recorded bucket so the readout is never
+    /// blank: an export is about a moment the *user* picked.
+    private var inspectedCursor: Date? {
+        guard let slice = active?.slice else { return nil }
+        return inspected(in: slice)
+    }
+
+    private func export() {
+        guard let loader = active, let cursor = inspectedCursor else { return }
+        exporting = true
+        Task {
+            defer { exporting = false }
+            do {
+                let folder = try await IncidentExporter.export(
+                    cursor: cursor,
+                    span: span,
+                    loader: loader,
+                    metrics: metrics,
+                    history: history,
+                    retention: processRetention,
+                    appearance: NSApp.effectiveAppearance
+                )
+                // Nothing to say on success that the folder does not say
+                // better.
+                if let folder {
+                    NSWorkspace.shared.activateFileViewerSelecting([folder])
+                }
+            } catch {
+                exportFailure = error.localizedDescription
+            }
+        }
     }
 
     @ViewBuilder

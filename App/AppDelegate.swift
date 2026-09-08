@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemController: StatusItemController?
     private var panels: PanelController?
     private var dashboard: DashboardWindowController?
+    private var alerts: AlertMonitor?
     private var appNap: AppNapAssertion?
     /// One owner of the Dock tile and the menu bar: the history window and the
     /// updater both put windows up, and either closing must not undress the
@@ -79,13 +80,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         self.updater = updater
 
+        // Before the window, which asks for it: rules are watched whether or not
+        // anything is on screen, because the whole point of an alert is
+        // arriving when nobody is looking.
+        let alerts = AlertMonitor(
+            reader: history,
+            preferences: preferences,
+            centre: .current()
+        )
+        alerts.start()
+        self.alerts = alerts
+
         let dashboard = DashboardWindowController(
             metrics: metrics,
             history: history,
             historyActions: historyActions,
             preferences: preferences,
             activation: activation,
-            updater: updater
+            updater: updater,
+            alerts: alerts
         ) { [weak self] isVisible in
             self?.dashboardVisibilityChanged(isVisible)
         }
