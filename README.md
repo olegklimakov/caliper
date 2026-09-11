@@ -21,11 +21,12 @@
 
 ## What it does
 
-Five modules in the menu bar — CPU, memory, network, disk and temperature —
+Five modules for the menu bar — CPU, memory, network, disk and temperature —
 each drawn at a fixed width so nothing shoves its neighbours around when a
-number changes. Every module is configured on its own: the picture is its live
-graph, the symbol that names it, or nothing at all, and the value switches on
-and off beside it. They can also share a single item, in an order you set by
+number changes. An install starts with three of them, because the menu bar is
+not this app's to fill. Every module is configured on its own: the picture is
+its live graph, the symbol that names it, or nothing at all, and the value
+switches on and off beside it. They can also share a single item, in an order you set by
 dragging.
 
 Behind each one is a panel with the detail.
@@ -89,6 +90,14 @@ drag Caliper onto Applications.
 
 The build is signed with a Developer ID and notarized by Apple, so it opens
 without a warning.
+
+The first launch puts up a window — Caliper has no Dock icon of its own, and an
+app whose only surface is a menu bar item a full menu bar may have no room for
+is an app you cannot find. It says where it went, and asks which readings are
+worth the width: it starts with three of the five in a single item, and the
+window prices every one you add in points of menu bar. Launching Caliper again,
+from Applications or from Spotlight, brings that window back at any time, and
+"Show Caliper in the Dock" in the settings keeps a tile for good.
 
 Sensors are read on a best-effort basis through private interfaces: whatever a
 particular Mac will not report is hidden rather than guessed at, so on some

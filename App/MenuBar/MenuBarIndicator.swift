@@ -107,6 +107,20 @@ struct MenuBarParts: Equatable {
         }
     }
 
+    /// What a Mac that has never run Caliper is offered, against `init()`, which
+    /// is what a Mac that has is left with when it stored no layout of its own.
+    ///
+    /// Narrower, because the strip nobody chose has to fit a menu bar that is
+    /// already full: **152 pt against 208**, and the 74 pt of network — a third
+    /// of the old strip, the widest single thing this app can put up there — is
+    /// the part that has to be asked for rather than inherited. The first-run
+    /// flow prices every module in points as it is switched on.
+    static var opening: MenuBarParts {
+        var parts = MenuBarParts()
+        parts[.network].isEnabled = false
+        return parts
+    }
+
     /// Whatever was stored, ignoring anything this build cannot use.
     init(stored: [String: [String]], order storedOrder: [String]) {
         self.init()
@@ -368,6 +382,24 @@ enum MenuBarBadge {
 
     private static let diameter: CGFloat = 5
     private static let gap: CGFloat = 3
+}
+
+/// What the whole strip asks the menu bar for, in points.
+///
+/// The figure the first-run flow prices a module in, and the only honest form
+/// of it: this is what Caliper *asks for*, not what the strip occupies. macOS
+/// pads every status item by an amount no API states, which is the one real
+/// saving of sharing an item — the padding is paid once instead of once per
+/// module — and a number the app cannot read has no business being added in.
+@MainActor
+enum StripWidth {
+    static func points(of parts: MenuBarParts, combined: Bool) -> CGFloat {
+        let indicators = parts.enabled.map { $0.indicator(parts: parts[$0]) }
+        guard !indicators.isEmpty else { return 0 }
+        return combined
+            ? CombinedStrip.width(of: indicators)
+            : indicators.reduce(0) { $0 + $1.width }
+    }
 }
 
 /// The one image the modules share when they share a status item. Here rather

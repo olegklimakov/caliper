@@ -177,6 +177,22 @@ enum PanelPreview {
         )
     }
 
+    /// One step of the first run. Rendered a step at a time because the flow is
+    /// driven by a button nothing in a still picture can press.
+    @MainActor
+    static func renderWelcome(
+        preferences: Preferences,
+        metrics: LiveMetrics,
+        step: WelcomeStep.Step,
+        appearance: NSAppearance
+    ) -> NSImage? {
+        render(
+            WelcomeStep(preferences: preferences, metrics: metrics, step: step),
+            appearance: appearance,
+            height: 620
+        )
+    }
+
     /// One point per pixel by default, which is what the preview harness
     /// compares against the mockups. The export asks for two: that picture gets
     /// opened on somebody else's Retina Mac.

@@ -150,6 +150,26 @@ enum UIPreview {
                             )
                         }
                     }
+                    // Both steps of the first run: the only two screens a new
+                    // install is guaranteed to see, and the only ones drawn
+                    // over the whole window rather than in a room of it.
+                    for step in WelcomeStep.Step.allCases {
+                        if let welcome = PanelPreview.renderWelcome(
+                            preferences: previewWelcome,
+                            metrics: state,
+                            step: step,
+                            appearance: theme
+                        ) {
+                            write(
+                                welcome,
+                                to: url.appendingPathComponent(
+                                    "welcome-\(step.rawValue)-\(appearance).png"
+                                ),
+                                scale: 1,
+                                background: nil
+                            )
+                        }
+                    }
                     for fate in CardFate.allCases {
                         let model = previewProcessCard(fate)
                         if let card = PanelPreview.renderProcessCard(
@@ -335,6 +355,19 @@ enum UIPreview {
         }
         guard (try? recorder.flushNow()) != nil else { return nil }
         return try? await reader.consumers(at: cursor, retention: .week)
+    }
+
+    /// The strip a Mac that has never run Caliper is offered, set by hand: the
+    /// seeding in `Preferences.settle` only fires for a machine with no store,
+    /// and the one rendering these pictures plainly has one.
+    @MainActor
+    private static var previewWelcome: Preferences {
+        let preferences = Preferences(
+            defaults: UserDefaults(suiteName: "caliper.preview.welcome") ?? .standard
+        )
+        preferences.menuBar = .opening
+        preferences.combinesModules = true
+        return preferences
     }
 
     /// The alerts section with rules and without. The empty one is what every
