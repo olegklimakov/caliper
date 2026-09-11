@@ -33,10 +33,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var updater: UpdaterService?
     private var updates: Task<Void, Never>?
     private var isDashboardVisible = false
-    /// Whether the first-run flow is the thing this window is drawing. Held
-    /// here rather than read off the preference each time, because what the
-    /// Dock tile and the window size follow is the *edge* — the moment the flow
-    /// finishes — and a preference only ever says where it is now.
+    /// Whether the first-run flow is still the thing the window is drawing.
+    ///
+    /// A second answer to a question `preferences.hasCompletedSetup` already
+    /// answers, and it earns the duplication: what the Dock tile and the window
+    /// size follow is the *edge* — the moment the flow finished — and a
+    /// preference only ever says where things are now.
     private var isSettingUp = false
     /// What the open panel is drawing, `nil` when none is. One optional rather
     /// than a flag beside a set, which can disagree.
@@ -215,15 +217,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// itself is taken once, at launch — `hold` brings the app forward, and
     /// doing that on every checkbox in the flow would be a new kind of rude.
     private func applyActivation() {
-        // The one edge, and the only place the window is resized behind the
-        // user's back.
         if isSettingUp, preferences.hasCompletedSetup {
             isSettingUp = false
             activation.release(.setup)
             dashboard?.growToRooms()
         }
         if preferences.showsDockIcon {
-            activation.hold(.dock, activating: false)
+            activation.hold(.dock)
         } else {
             activation.release(.dock)
         }
@@ -236,11 +236,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// surface is a status item macOS may have found no room for, the gesture
     /// everyone tries first has to be the one that brings it back.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        guard let dashboard else { return false }
-        // Not whatever room was last open: a process card is about a process
-        // that may have exited hours ago, and `returnSection` is the room it
-        // was opened from.
-        dashboard.show(dashboard.navigation.returnSection)
+        // `true` without a window controller, not `false`: `false` claims the
+        // gesture was handled, and claiming that while doing nothing is the
+        // reported symptom itself.
+        guard let dashboard else { return true }
+        dashboard.bringForward()
         return false
     }
 

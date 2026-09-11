@@ -26,8 +26,8 @@ each drawn at a fixed width so nothing shoves its neighbours around when a
 number changes. An install starts with three of them, because the menu bar is
 not this app's to fill. Every module is configured on its own: the picture is
 its live graph, the symbol that names it, or nothing at all, and the value
-switches on and off beside it. They can also share a single item, in an order you set by
-dragging.
+switches on and off beside it. They can also share a single item, in an order
+you set by dragging.
 
 Behind each one is a panel with the detail.
 
@@ -94,8 +94,9 @@ without a warning.
 The first launch puts up a window — Caliper has no Dock icon of its own, and an
 app whose only surface is a menu bar item a full menu bar may have no room for
 is an app you cannot find. It says where it went, and asks which readings are
-worth the width: it starts with three of the five in a single item, and the
-window prices every one you add in points of menu bar. Launching Caliper again,
+worth the width: it starts with three of the five in a single item — 154
+points of menu bar, against the 258 four separate items took — and the window
+prices every one you add. Launching Caliper again,
 from Applications or from Spotlight, brings that window back at any time, and
 "Show Caliper in the Dock" in the settings keeps a tile for good.
 

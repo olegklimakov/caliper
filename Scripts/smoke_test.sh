@@ -60,8 +60,11 @@ seed_settled() {
     defaults write "$SUITE_SETTLED" menuBarOrder '(cpu, memory, network, disk, temperature)'
 }
 
-# Launches the app against one domain and waits for it to settle.
+# Launches the app against one domain and waits for it to settle. Quits any
+# instance first rather than killing it: a kill throws away the minute of
+# history the recorder is holding.
 launch_with() {
+    caliper_stop "$BINARY" 2>/dev/null || true
     pkill -x Caliper 2>/dev/null || true
     sleep 1
     open --env "CALIPER_DEFAULTS_SUITE=$1" "$APP"
@@ -173,8 +176,6 @@ fi
 #    draws a strip that a full menu bar may have no room for, and nothing else
 #    at all. Counted through `CGWindowList` rather than Accessibility, so this
 #    one check does not need a permission.
-caliper_stop "$BINARY"
-sleep 2
 launch_with "$SUITE_FRESH"
 [[ -n "$(caliper_pid "$BINARY")" ]] || fail "app is not running on a first launch"
 [[ "$(caliper_window_count)" -gt 0 ]] || fail "first launch put up no window"
@@ -186,8 +187,6 @@ echo "ok: a first launch introduces itself"
 #    And the other half of it: an update is not a first run. A domain carrying
 #    a strip from an older version must launch into the menu bar and leave both
 #    the strip and the screen alone.
-caliper_stop "$BINARY"
-sleep 2
 defaults write "$SUITE_UPGRADE" menuBarLayout '{cpu = (enabled, icon, value);}'
 launch_with "$SUITE_UPGRADE"
 [[ -n "$(caliper_pid "$BINARY")" ]] || fail "app is not running after an upgrade launch"

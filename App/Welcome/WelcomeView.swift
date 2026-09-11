@@ -109,7 +109,7 @@ struct WelcomeStep: View {
 
             box {
                 LaunchAtLoginToggle(preferences: preferences)
-                Toggle("Keep Caliper in the Dock", isOn: $preferences.showsDockIcon)
+                Toggle("Show Caliper in the Dock", isOn: $preferences.showsDockIcon)
             }
         }
     }
@@ -121,10 +121,13 @@ struct WelcomeStep: View {
             Spacer(minLength: 0)
             MenuBarStripPreview(
                 parts: preferences.menuBar,
+                combined: preferences.combinesModules,
                 coloured: preferences.colouredIndicators,
                 metrics: metrics
             )
-            Text(Date.now.formatted(date: .omitted, time: .shortened))
+            // `Text(_:style:)` rather than a formatted string, which is read
+            // once and then sits there wrong beside a live strip.
+            Text(Date.now, style: .time)
                 .font(.system(size: 12))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
@@ -151,7 +154,7 @@ struct WelcomeStep: View {
                 Text(width)
                     .monospacedDigit()
                 Text(
-                    "What it gets is macOS's to decide: every item is padded by an amount no app can read, and a bar with no room drops what will not fit. Fewer readings, or a symbol in place of a graph, is the only way to ask for less."
+                    "Including the padding macOS puts around a menu bar item, which is why sharing one is narrower than taking several. A bar with no room left drops what will not fit, and fewer readings — or a symbol in place of a graph — is the only way to ask for less."
                 )
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -164,6 +167,10 @@ struct WelcomeStep: View {
                 )
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+                // Or the box hands it one line and an ellipsis: the switch
+                // above it has no intrinsic width to speak of, so the box's
+                // own is whatever this paragraph claims to want.
+                .fixedSize(horizontal: false, vertical: true)
             }
 
             VStack(alignment: .leading, spacing: 10) {
@@ -179,7 +186,7 @@ struct WelcomeStep: View {
             of: preferences.menuBar,
             combined: preferences.combinesModules
         )
-        return "This strip asks the menu bar for \(Int(points.rounded())) points."
+        return "This strip takes \(Int(points.rounded())) points of menu bar."
     }
 
     /// A grouped `Form` would be the native shape of these, and

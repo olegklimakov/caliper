@@ -101,23 +101,39 @@ struct MenuBarIndicatorPreview: View {
     }
 }
 
-/// The whole strip in one picture, drawn by `CombinedStrip` — the same code
-/// that draws the shared status item.
+/// The whole strip in one picture, drawn by the same code the status items are.
 ///
 /// The first-run flow's answer to "where does this app live": a screenshot
 /// would go stale the moment the checkboxes below it are touched, and this one
 /// is the real thing, live.
+///
+/// Separate items are drawn apart by the 14 pt macOS puts between two of them —
+/// see `StripWidth` — because the switch above this picture is the choice
+/// between the two arrangements, and a picture that drew them identically would
+/// be arguing against the number beside it.
 struct MenuBarStripPreview: View {
     let parts: MenuBarParts
+    let combined: Bool
     let coloured: Bool
     let metrics: LiveMetrics
 
     var body: some View {
-        let indicators = parts.enabled.map { $0.indicator(parts: parts[$0]) }
+        let indicators = parts.indicators
         let style = IndicatorStyle(isTemplate: !coloured)
-        Image(nsImage: CombinedStrip.image(of: indicators, state: metrics, style: style))
-            .renderingMode(coloured ? .original : .template)
-            .id(indicators.map { $0.identity(metrics) })
-            .accessibilityHidden(true)
+        HStack(spacing: combined ? 0 : MenuBarStripPreview.itemGap) {
+            ForEach(Array(strips(of: indicators).enumerated()), id: \.offset) { _, strip in
+                Image(nsImage: CombinedStrip.image(of: strip, state: metrics, style: style))
+                    .renderingMode(coloured ? .original : .template)
+            }
+        }
+        .id(indicators.map { $0.identity(metrics) })
+        .accessibilityHidden(true)
     }
+
+    /// One picture when the modules share an item, one each when they do not.
+    private func strips(of indicators: [any MenuBarIndicator]) -> [[any MenuBarIndicator]] {
+        combined ? [indicators] : indicators.map { [$0] }
+    }
+
+    private static let itemGap: CGFloat = 14
 }

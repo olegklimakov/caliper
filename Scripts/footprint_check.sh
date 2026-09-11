@@ -75,6 +75,16 @@ fi
 MEAN_CPU=0
 PEAK_FOOTPRINT=0
 
+# A throwaway settings domain, seeded with the strip this budget was set
+# against: four modules in four items, which is what every figure in the review
+# log was measured with.
+SUITE="caliper.footprint.$$"
+defaults write "$SUITE" completedSetup -bool true
+defaults write "$SUITE" combinedMenuBarItem -bool false
+defaults write "$SUITE" menuBarLayout '{cpu = (enabled, graph, value); memory = (enabled, graph, value); network = (enabled, graph, value); disk = (graph, value); temperature = (enabled, graph, value);}'
+defaults write "$SUITE" menuBarOrder '(cpu, memory, network, disk, temperature)'
+trap 'defaults delete "$SUITE" 2>/dev/null || true; rm -f "$HOME/Library/Preferences/$SUITE.plist"' EXIT
+
 # One phase: launch with the given arguments, watch it for MINUTES, and leave
 # the mean CPU and peak footprint behind.
 #
@@ -92,7 +102,12 @@ measure() {
     pkill -x Caliper 2>/dev/null || true
     # `-a` with `--args`, and only after the pkill: `open` hands arguments to a
     # *new* instance and silently just fronts an existing one.
-    open -a "$APP" --args "$@"
+    #
+    # And in a domain of its own, which is what makes the window assertion below
+    # a measurement rather than a question about the tester's Mac: a Mac with no
+    # history file is one that has never run Caliper, and a fresh install puts
+    # the first-run window up. `SUITE` says the flow has been through.
+    open -a "$APP" --env "CALIPER_DEFAULTS_SUITE=$SUITE" --args "$@"
     sleep 5
 
     local pid

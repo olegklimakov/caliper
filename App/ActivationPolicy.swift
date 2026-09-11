@@ -21,21 +21,23 @@ final class ActivationPolicy {
         /// A standing choice rather than something on screen: see
         /// `Preferences.showsDockIcon`.
         case dock
+
+        /// Whether taking this one should bring the app to the front. The Dock
+        /// preference is read at launch, and coming forward for it would take
+        /// the foreground off whatever the user was doing at login.
+        var bringsForward: Bool { self != .dock }
     }
 
     private var holders: Set<Holder> = []
 
-    /// Becomes a regular app on this holder's behalf and brings it forward.
-    ///
-    /// `activating: false` for a holder that is a setting rather than something
-    /// on screen — the Dock preference is read at launch, and coming forward
-    /// there takes the foreground off whatever the user was doing at login.
-    func hold(_ holder: Holder, activating: Bool = true) {
+    /// Becomes a regular app on this holder's behalf, and brings it forward if
+    /// that is a holder that should — see `Holder.bringsForward`.
+    func hold(_ holder: Holder) {
         holders.insert(holder)
         // Before `activate`, not after: the switch itself reorders the app, and
         // a window brought forward first lands behind whatever was in front.
         NSApp.setActivationPolicy(.regular)
-        guard activating else { return }
+        guard holder.bringsForward else { return }
         // A menu bar app is not the active app when someone picks from its
         // menu, and a window ordered front by an inactive app opens behind
         // whatever they were looking at.

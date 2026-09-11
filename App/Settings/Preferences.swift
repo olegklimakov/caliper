@@ -24,11 +24,17 @@ final class Preferences {
         static let completedSetup = "completedSetup"
         static let dockIcon = "showsDockIcon"
 
-        /// Every key this app has ever written. Its emptiness is half the
-        /// answer to "has this Mac run Caliper before" — see `init`.
-        static let all = [
+        /// The keys that existed before the first-run flow did, and so the only
+        /// ones whose presence is evidence that this Mac has run Caliper — see
+        /// `settle`. Not `dockIcon`, which an MDM profile or a `defaults write`
+        /// can put in a domain the app has never opened, and not
+        /// `completedSetup`, which is the answer rather than evidence for it.
+        ///
+        /// A key missing from this list is not a disaster — the store file is
+        /// the other half of the answer — but it is a lie.
+        static let olderVersions = [
             layout, order, combined, coloured, processHistory, processRetention,
-            pinnedProcesses, alertRules, completedSetup, dockIcon,
+            pinnedProcesses, alertRules,
         ]
     }
 
@@ -219,19 +225,18 @@ final class Preferences {
     ///
     /// *Already answered*: nothing to do.
     private static func settle(_ defaults: UserDefaults) {
-        guard !Key.all.contains(where: { defaults.object(forKey: $0) != nil }) else {
-            // Keys but no answer — an install from before this flow existed.
-            if defaults.object(forKey: Key.completedSetup) == nil {
-                defaults.set(true, forKey: Key.completedSetup)
-            }
-            return
-        }
+        guard defaults.object(forKey: Key.completedSetup) == nil else { return }
+
         // A named domain is one this app has been handed for the occasion, so a
-        // store belonging to some other identity is not evidence about it.
-        guard DefaultsPolicy.suiteName != nil || !HistoryDatabase.hasStore else {
+        // store belonging to some other identity says nothing about it.
+        let ranBefore =
+            Key.olderVersions.contains { defaults.object(forKey: $0) != nil }
+            || (DefaultsPolicy.suiteName == nil && HistoryDatabase.hasStore)
+        guard !ranBefore else {
             defaults.set(true, forKey: Key.completedSetup)
             return
         }
+
         let opening = MenuBarParts.opening
         defaults.set(opening.stored, forKey: Key.layout)
         defaults.set(opening.storedOrder, forKey: Key.order)

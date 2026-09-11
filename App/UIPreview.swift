@@ -212,7 +212,7 @@ enum UIPreview {
                         }
                         // The only place the gaps between modules show.
                         let combined = CombinedStrip.image(
-                            of: MenuBarParts().enabled.map { $0.indicator(parts: MenuBarParts()[$0]) },
+                            of: MenuBarParts().indicators,
                             state: state,
                             style: style
                         )

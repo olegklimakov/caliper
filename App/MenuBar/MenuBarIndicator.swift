@@ -98,27 +98,37 @@ struct MenuBarParts: Equatable {
 
     var enabled: [MenuBarModule] { order.filter { self[$0].isEnabled } }
 
+    /// What a Mac that stored no layout of its own is left with — which since
+    /// the first-run flow means one that was running an older Caliper, because
+    /// an install is seeded with `opening` instead.
+    ///
+    /// Disk off, as it has been since this app had four modules: throughput is
+    /// the one people look at least often.
     init() {
         order = MenuBarModule.allCases
-        // Disk off to start with: four items is already a lot of menu bar, and
-        // throughput is the one people look at least often.
         parts = order.reduce(into: [:]) { parts, module in
             parts[module] = module == .disk ? .hidden : .shown
         }
     }
 
-    /// What a Mac that has never run Caliper is offered, against `init()`, which
-    /// is what a Mac that has is left with when it stored no layout of its own.
+    /// What a Mac that has never run Caliper is offered.
     ///
     /// Narrower, because the strip nobody chose has to fit a menu bar that is
-    /// already full: **152 pt against 208**, and the 74 pt of network — a third
-    /// of the old strip, the widest single thing this app can put up there — is
-    /// the part that has to be asked for rather than inherited. The first-run
-    /// flow prices every module in points as it is switched on.
+    /// already full: **154 pt of menu bar against the 258 the four separate
+    /// items took** — see `StripWidth` for where those come from. The 74 pt of
+    /// network is the widest single thing this app can put up there, and is now
+    /// asked for rather than inherited; the first-run flow prices every module
+    /// as it is switched on.
     static var opening: MenuBarParts {
         var parts = MenuBarParts()
         parts[.network].isEnabled = false
         return parts
+    }
+
+    /// The drawings of whatever is in the strip, in the order it draws them.
+    @MainActor
+    var indicators: [any MenuBarIndicator] {
+        enabled.map { $0.indicator(parts: self[$0]) }
     }
 
     /// Whatever was stored, ignoring anything this build cannot use.
@@ -384,22 +394,35 @@ enum MenuBarBadge {
     private static let gap: CGFloat = 3
 }
 
-/// What the whole strip asks the menu bar for, in points.
+/// How much menu bar the strip takes, in points — what it occupies rather than
+/// what it asks for, which are not the same number.
 ///
-/// The figure the first-run flow prices a module in, and the only honest form
-/// of it: this is what Caliper *asks for*, not what the strip occupies. macOS
-/// pads every status item by an amount no API states, which is the one real
-/// saving of sharing an item — the padding is paid once instead of once per
-/// module — and a number the app cannot read has no business being added in.
+/// Measured on macOS 26.6 through the accessibility tree, which does state what
+/// the app itself cannot read: **an item is 2 pt wider than the length it asks
+/// for, and consecutive items sit 14 pt apart**. Three modules asking for 56,
+/// 38 and 40 came back as items of 58, 40 and 42 spanning 168 pt; the same
+/// three sharing one item came back as 154. So sharing an item really does save
+/// — 14 pt a boundary, since the 9 pt `combinedGap` inside one item is narrower
+/// than the gap between two — and the old four-item default took 258.
+///
+/// The two constants could move under a future macOS. A figure a few points off
+/// in an informational label is a smaller lie than the one this used to tell,
+/// which was that the padding is unknowable.
 @MainActor
 enum StripWidth {
     static func points(of parts: MenuBarParts, combined: Bool) -> CGFloat {
-        let indicators = parts.enabled.map { $0.indicator(parts: parts[$0]) }
+        let indicators = parts.indicators
         guard !indicators.isEmpty else { return 0 }
-        return combined
-            ? CombinedStrip.width(of: indicators)
-            : indicators.reduce(0) { $0 + $1.width }
+        if combined {
+            return CombinedStrip.width(of: indicators) + itemPadding
+        }
+        let asked = indicators.reduce(0) { $0 + $1.width }
+        return asked + itemPadding * CGFloat(indicators.count)
+            + itemGap * CGFloat(indicators.count - 1)
     }
+
+    private static let itemPadding: CGFloat = 2
+    private static let itemGap: CGFloat = 14
 }
 
 /// The one image the modules share when they share a status item. Here rather

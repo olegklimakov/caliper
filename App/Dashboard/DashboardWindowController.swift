@@ -99,14 +99,23 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
     private static let flowSize = NSSize(width: 680, height: 600)
     private static let roomsSize = NSSize(width: 1000, height: 640)
 
-    /// Grows the window from the flow to the rooms, as the flow finishes.
-    ///
-    /// Called on the one edge rather than from every preference change, so it
-    /// never argues with a window the user has resized since.
+    /// Called on the one edge where the flow finishes, rather than from every
+    /// preference change, so it never argues with a window the user has resized
+    /// since.
     func growToRooms() {
         guard let window else { return }
         window.setContentSize(Self.roomsSize)
         window.center()
+    }
+
+    /// Brings the window back on whatever room it was showing — the answer to
+    /// launching Caliper again while it is already running.
+    ///
+    /// Its current room, not `returnSection`: a window closed on a process card
+    /// has already been moved off it by `windowWillClose`, and one still open on
+    /// a card is a card the user is reading.
+    func bringForward() {
+        show(navigation.section)
     }
 
     private func makeWindow() -> NSWindow {
