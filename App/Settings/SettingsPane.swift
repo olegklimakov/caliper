@@ -31,8 +31,6 @@ struct SettingsPane: View {
     /// nil when there is no store to watch — the rules are still listed and
     /// still editable, they simply have nothing to be evaluated against.
     let alerts: AlertMonitor?
-    @State private var launchesAtLogin: Bool
-    @State private var loginError: String?
     @State private var confirming: Deletion?
     @State private var deleteError: String?
     @State private var showingAcknowledgements = false
@@ -76,7 +74,6 @@ struct SettingsPane: View {
         self.metrics = metrics
         self.updater = updater
         self.alerts = alerts
-        _launchesAtLogin = State(initialValue: preferences.launchesAtLogin)
     }
 
     var body: some View {
@@ -106,7 +103,7 @@ struct SettingsPane: View {
                 Toggle("Combine into one item", isOn: $preferences.combinesModules)
                 List {
                     ForEach(preferences.menuBar.order, id: \.self) { module in
-                        moduleRow(module)
+                        MenuBarModuleRow(preferences: preferences, metrics: metrics, module: module)
                             .moveDisabled(!preferences.combinesModules)
                     }
                     .onMove { source, destination in
@@ -184,23 +181,13 @@ struct SettingsPane: View {
             CostSection(selfMetrics: metrics.snapshot?.selfMetrics, storeSize: storeSize)
 
             Section("General") {
-                Toggle("Launch at login", isOn: $launchesAtLogin)
-                    .onChange(of: launchesAtLogin) { _, enabled in
-                        do {
-                            try preferences.setLaunchesAtLogin(enabled)
-                            loginError = nil
-                        } catch {
-                            // The system's to refuse, so put the switch back
-                            // rather than pretending.
-                            loginError = error.localizedDescription
-                            launchesAtLogin = preferences.launchesAtLogin
-                        }
-                    }
-                if let loginError {
-                    Text(loginError)
-                        .font(.footnote)
-                        .foregroundStyle(Color(Palette.critical))
-                }
+                Toggle("Show Caliper in the Dock", isOn: $preferences.showsDockIcon)
+                Text(
+                    "Off, Caliper is only in the menu bar, and a Dock tile appears while a window of its own is open. On, it keeps one — which is also how to find the app again when the menu bar is full."
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                LaunchAtLoginToggle(preferences: preferences)
             }
 
             updates
@@ -265,36 +252,6 @@ struct SettingsPane: View {
 
     // MARK: - Menu bar
 
-    private func moduleRow(_ module: MenuBarModule) -> some View {
-        HStack(spacing: 12) {
-            Toggle(module.title, isOn: enabledBinding(module))
-                .frame(width: 104, alignment: .leading)
-                .disabled(isLastEnabled(module))
-            // Three states rather than a checkbox; see `IndicatorGraphic`.
-            Picker("", selection: graphicBinding(module)) {
-                Text(module.graphTitle).tag(IndicatorGraphic.graph)
-                Text("Icon").tag(IndicatorGraphic.icon)
-                Text("Nothing").tag(IndicatorGraphic.off)
-            }
-            .labelsHidden()
-            .frame(width: 116)
-            .disabled(!preferences.menuBar[module].isEnabled)
-            // A setting *of* the module beside it, not another module.
-            Toggle(module.valueTitle, isOn: valueBinding(module))
-                .toggleStyle(.checkbox)
-                .frame(width: 112, alignment: .leading)
-                .disabled(isValueLocked(module))
-            Spacer(minLength: 8)
-            MenuBarIndicatorPreview(
-                module: module,
-                parts: preferences.menuBar[module],
-                coloured: preferences.colouredIndicators,
-                metrics: metrics
-            )
-            .opacity(preferences.menuBar[module].isEnabled ? 1 : 0.35)
-        }
-    }
-
     /// The price, because a pin is the one setting here that makes the file
     /// bigger rather than smaller.
     private var pinnedHint: String {
@@ -311,42 +268,6 @@ struct SettingsPane: View {
         preferences.combinesModules
             ? "Every module in one button, and clicking it opens all of them at once. Drag the rows to set the order they are drawn in."
             : "A module can draw its graph, the symbol that names it, or neither — the narrower it is, the more of the menu bar is left for everything else. Drag items in the menu bar with ⌘ held to reorder them."
-    }
-
-    private func enabledBinding(_ module: MenuBarModule) -> Binding<Bool> {
-        Binding(
-            get: { preferences.menuBar[module].isEnabled },
-            set: { preferences.menuBar[module].isEnabled = $0 }
-        )
-    }
-
-    /// The last module stays: an empty strip has no button to right-click, and
-    /// that menu is the only way to the settings and to Quit.
-    private func isLastEnabled(_ module: MenuBarModule) -> Bool {
-        preferences.menuBar.enabled == [module]
-    }
-
-    private func graphicBinding(_ module: MenuBarModule) -> Binding<IndicatorGraphic> {
-        Binding(
-            get: { preferences.menuBar[module].graphic },
-            // The stored value refuses picture-and-number-off and hands the
-            // number back, so the checkbox beside this ticks itself.
-            set: { preferences.menuBar[module].graphic = $0 }
-        )
-    }
-
-    private func valueBinding(_ module: MenuBarModule) -> Binding<Bool> {
-        Binding(
-            get: { preferences.menuBar[module].showsValue },
-            set: { preferences.menuBar[module].showsValue = $0 }
-        )
-    }
-
-    /// With nothing in the picture slot the number is all there is, so it
-    /// cannot be switched off.
-    private func isValueLocked(_ module: MenuBarModule) -> Bool {
-        let parts = preferences.menuBar[module]
-        return !parts.isEnabled || parts.graphic == .off
     }
 
     private func delete(_ deletion: Deletion) {
@@ -366,29 +287,6 @@ struct SettingsPane: View {
             // weighs.
             storeSize = history?.sizeOnDisk() ?? 0
         }
-    }
-}
-
-/// The very image the menu bar will draw, at the size it will draw it —
-/// rendered through the same indicator the status item uses, so there is no
-/// second drawing to keep in step.
-private struct MenuBarIndicatorPreview: View {
-    let module: MenuBarModule
-    let parts: ModuleParts
-    let coloured: Bool
-    let metrics: LiveMetrics
-
-    var body: some View {
-        let indicator = module.indicator(parts: parts)
-        Image(nsImage: indicator.makeImage(metrics, style: IndicatorStyle(isTemplate: !coloured)))
-            .renderingMode(coloured ? .original : .template)
-            // Reading the identity is what subscribes this view to the
-            // metrics: `makeImage`'s drawing block runs when the image is
-            // painted, after the body that would have tracked what it read.
-            .id(indicator.identity(metrics))
-            // Everything it shows is in the row's own checkboxes and in the
-            // status item this is a picture of.
-            .accessibilityHidden(true)
     }
 }
 

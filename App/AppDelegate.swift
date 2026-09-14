@@ -33,6 +33,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var updater: UpdaterService?
     private var updates: Task<Void, Never>?
     private var isDashboardVisible = false
+    /// Whether the first-run flow is still the thing the window is drawing.
+    ///
+    /// A second answer to a question `preferences.hasCompletedSetup` already
+    /// answers, and it earns the duplication: what the Dock tile and the window
+    /// size follow is the *edge* — the moment the flow finished — and a
+    /// preference only ever says where things are now.
+    private var isSettingUp = false
     /// What the open panel is drawing, `nil` when none is. One optional rather
     /// than a flag beside a set, which can disagree.
     private var openPanelMetrics: Set<MetricKind>?
@@ -129,7 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panels.onOpenCard = { [weak dashboard] target in
             dashboard?.show(.process(target))
         }
-        preferences.onChange = { [weak statusItemController, preferences, processRecorder] in
+        preferences.onChange = { [weak self, weak statusItemController, preferences, processRecorder] in
             statusItemController?.setLayout(
                 preferences.menuBar,
                 combined: preferences.combinesModules
@@ -137,6 +144,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             statusItemController?.setColoured(preferences.colouredIndicators)
             processRecorder?.setEnabled(preferences.recordsProcessHistory)
             processRecorder?.setPinned(preferences.pinnedProcesses)
+            self?.applyActivation()
         }
         self.statusItemController = statusItemController
         self.panels = panels
@@ -144,6 +152,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startRecording()
         becomeVisible()
         observeWorkspace()
+
+        applyActivation()
+        // What a fresh install has instead of silence. Held before the window
+        // is asked for, so the Dock tile and the menu across the top are there
+        // when it arrives rather than a moment after it.
+        if !preferences.hasCompletedSetup {
+            isSettingUp = true
+            activation.hold(.setup)
+            // The room the flow hands the window over to when it is done; the
+            // flow is drawn in place of the whole split view, so which room
+            // this is does not show until then.
+            dashboard.show(.overview)
+        }
 
         updates = Task { [coordinator, metrics, statusItemController, recorder, processRecorder] in
             let snapshots = await coordinator.snapshots()
@@ -187,6 +208,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Down the responder chain, the way Settings is.
     @objc func checkForUpdates(_ sender: Any?) {
         updater?.checkForUpdates()
+    }
+
+    /// The Dock tile, from the reasons for it that are not a window on screen:
+    /// the Dock preference, and a first run coming to an end.
+    ///
+    /// Called at launch and on every preference change. The `.setup` hold
+    /// itself is taken once, at launch — `hold` brings the app forward, and
+    /// doing that on every checkbox in the flow would be a new kind of rude.
+    private func applyActivation() {
+        if isSettingUp, preferences.hasCompletedSetup {
+            isSettingUp = false
+            activation.release(.setup)
+            dashboard?.growToRooms()
+        }
+        if preferences.showsDockIcon {
+            activation.hold(.dock)
+        } else {
+            activation.release(.dock)
+        }
+    }
+
+    /// Launching Caliper again while it is already running — from Applications,
+    /// from Spotlight, from a Dock tile.
+    ///
+    /// Without this, that does nothing whatsoever. For an app whose only other
+    /// surface is a status item macOS may have found no room for, the gesture
+    /// everyone tries first has to be the one that brings it back.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        // `true` without a window controller, not `false`: `false` claims the
+        // gesture was handled, and claiming that while doing nothing is the
+        // reported symptom itself.
+        guard let dashboard else { return true }
+        dashboard.bringForward()
+        return false
     }
 
     /// A popover is a window, so closing one — which opening a second panel

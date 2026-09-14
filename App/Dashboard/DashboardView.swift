@@ -21,6 +21,17 @@ struct DashboardView: View {
     @Bindable var navigation: DashboardNavigation
 
     var body: some View {
+        // In place of the whole split view, not as a room in it: a first run has
+        // no business offering five rooms to someone who has not been told where
+        // the app is, and finishing it opens the window up behind itself.
+        if preferences.hasCompletedSetup {
+            rooms
+        } else {
+            WelcomeView(preferences: preferences, metrics: metrics)
+        }
+    }
+
+    private var rooms: some View {
         NavigationSplitView {
             List(DashboardSection.listed, id: \.self, selection: $navigation.section) { section in
                 HStack {

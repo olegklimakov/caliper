@@ -21,12 +21,13 @@
 
 ## What it does
 
-Five modules in the menu bar — CPU, memory, network, disk and temperature —
+Five modules for the menu bar — CPU, memory, network, disk and temperature —
 each drawn at a fixed width so nothing shoves its neighbours around when a
-number changes. Every module is configured on its own: the picture is its live
-graph, the symbol that names it, or nothing at all, and the value switches on
-and off beside it. They can also share a single item, in an order you set by
-dragging.
+number changes. An install starts with three of them, because the menu bar is
+not this app's to fill. Every module is configured on its own: the picture is
+its live graph, the symbol that names it, or nothing at all, and the value
+switches on and off beside it. They can also share a single item, in an order
+you set by dragging.
 
 Behind each one is a panel with the detail.
 
@@ -75,7 +76,14 @@ resident.
 
 Memory is *physical footprint*, the figure Activity Monitor calls "Memory" —
 not RSS, which counts the shared system frameworks every Mac app maps whether
-Caliper runs or not. Measured on an M5 Pro with the default five-module strip.
+Caliper runs or not. Measured on an M5 Pro with four modules in the strip, which
+is what `Scripts/footprint_check.sh` pins.
+
+A share of one core is a property of the machine as much as of the app: the work
+in a sweep is roughly fixed, so a slower core spends a larger share of itself on
+it, and this figure has not been measured on one. The memory figure is the one
+that travels — nothing Caliper keeps in memory scales with how fast or how large
+the Mac is.
 
 ## Installing
 
@@ -89,6 +97,15 @@ drag Caliper onto Applications.
 
 The build is signed with a Developer ID and notarized by Apple, so it opens
 without a warning.
+
+The first launch puts up a window — Caliper has no Dock icon of its own, and an
+app whose only surface is a menu bar item a full menu bar may have no room for
+is an app you cannot find. It says where it went, and asks which readings are
+worth the width: it starts with three of the five in a single item — 154
+points of menu bar, against the 258 four separate items took — and the window
+prices every one you add. Launching Caliper again,
+from Applications or from Spotlight, brings that window back at any time, and
+"Show Caliper in the Dock" in the settings keeps a tile for good.
 
 Sensors are read on a best-effort basis through private interfaces: whatever a
 particular Mac will not report is hidden rather than guessed at, so on some

@@ -28,13 +28,7 @@ public enum HistoryDatabase {
     /// wedges the directory — even `readdir` blocks afterwards. So the
     /// entitlement is checked rather than the path.
     public static func defaultURL() throws -> URL {
-        let directory =
-            groupContainer()
-            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-                .first?
-                .appendingPathComponent("Caliper", isDirectory: true)
-
-        guard let directory else {
+        guard let directory = directory() else {
             throw CocoaError(.fileNoSuchFile)
         }
         // Or it turns into an opaque "unable to open database" a moment
@@ -43,7 +37,28 @@ public enum HistoryDatabase {
             at: directory,
             withIntermediateDirectories: true
         )
-        return directory.appendingPathComponent("history.sqlite")
+        return directory.appendingPathComponent(fileName)
+    }
+
+    /// Whether a store an earlier run left behind is already here.
+    ///
+    /// Asked by the first-run flow, which is deciding whether this Mac has ever
+    /// run Caliper — a question `UserDefaults` cannot answer, because every
+    /// setting has a default and a user who changed none of them has an empty
+    /// domain. Creates nothing, unlike `defaultURL`, since the point of the
+    /// question is that nothing has been written yet.
+    public static var hasStore: Bool {
+        guard let url = directory()?.appendingPathComponent(fileName) else { return false }
+        return FileManager.default.fileExists(atPath: url.path)
+    }
+
+    private static let fileName = "history.sqlite"
+
+    private static func directory() -> URL? {
+        groupContainer()
+            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+                .first?
+                .appendingPathComponent("Caliper", isDirectory: true)
     }
 
     /// The group container, if this build is signed in a way that grants it.

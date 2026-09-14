@@ -21,6 +21,21 @@ final class Preferences {
         static let processRetention = "processHistoryRetention"
         static let pinnedProcesses = "pinnedProcesses"
         static let alertRules = "alertRules"
+        static let completedSetup = "completedSetup"
+        static let dockIcon = "showsDockIcon"
+
+        /// The keys that existed before the first-run flow did, and so the only
+        /// ones whose presence is evidence that this Mac has run Caliper — see
+        /// `settle`. Not `dockIcon`, which an MDM profile or a `defaults write`
+        /// can put in a domain the app has never opened, and not
+        /// `completedSetup`, which is the answer rather than evidence for it.
+        ///
+        /// A key missing from this list is not a disaster — the store file is
+        /// the other half of the answer — but it is a lie.
+        static let olderVersions = [
+            layout, order, combined, coloured, processHistory, processRetention,
+            pinnedProcesses, alertRules,
+        ]
     }
 
     /// Per module rather than one switch for the strip: a CPU sparkline earns
@@ -137,14 +152,46 @@ final class Preferences {
         alertRules.removeAll { $0.id == id }
     }
 
+    /// Whether the first-run flow has been through. Stored rather than
+    /// inferred: every other setting here has a default, so an empty domain is
+    /// what a user who changed nothing looks like, and "have we introduced
+    /// ourselves" is not a question a default can answer.
+    private(set) var hasCompletedSetup: Bool {
+        didSet {
+            defaults.set(hasCompletedSetup, forKey: Key.completedSetup)
+            // The Dock tile a first run holds is let go here — see
+            // `ActivationPolicy.Holder.setup`.
+            onChange?()
+        }
+    }
+
+    func completeSetup() {
+        hasCompletedSetup = true
+    }
+
+    /// A Dock tile of its own, for people who would rather not hunt for this
+    /// app in the menu bar at all.
+    ///
+    /// Off by default — a status bar monitor has no business holding a Dock slot
+    /// with nothing on screen — but the default is what made an install
+    /// unfindable, so it is a switch and not a rule. See `ActivationPolicy`.
+    var showsDockIcon: Bool {
+        didSet {
+            defaults.set(showsDockIcon, forKey: Key.dockIcon)
+            onChange?()
+        }
+    }
+
     /// A direct callback rather than an observation loop: re-arming
     /// `withObservationTracking` leaves a window where an edit is lost.
     var onChange: (() -> Void)?
 
     private let defaults: UserDefaults
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = DefaultsPolicy.store()) {
         self.defaults = defaults
+        Self.settle(defaults)
+        hasCompletedSetup = defaults.bool(forKey: Key.completedSetup)
         menuBar = MenuBarParts(
             stored: defaults.dictionary(forKey: Key.layout) as? [String: [String]] ?? [:],
             order: defaults.array(forKey: Key.order) as? [String] ?? []
@@ -161,6 +208,43 @@ final class Preferences {
         alertRules =
             (defaults.data(forKey: Key.alertRules)
             .flatMap { try? JSONDecoder().decode([AlertRule].self, from: $0) }) ?? []
+        showsDockIcon = defaults.bool(forKey: Key.dockIcon)
+    }
+
+    /// Decides once, before anything is read, which of three Macs this is.
+    ///
+    /// *New to Caliper*: nothing stored and no history file. It gets the opening
+    /// layout written down — not merely defaulted, or quitting the first-run
+    /// flow half way through would leave the third answer below — and is shown
+    /// the flow.
+    ///
+    /// *Running an older Caliper*: the strip up there is its own, whatever it
+    /// came from, and an update is no occasion to rearrange it or to introduce
+    /// an app it has been running for months. The store file is what says so:
+    /// a user who changed no setting has an empty domain and months of history.
+    ///
+    /// *Already answered*: nothing to do.
+    private static func settle(_ defaults: UserDefaults) {
+        guard defaults.object(forKey: Key.completedSetup) == nil else { return }
+
+        // A named domain is one this app has been handed for the occasion, so a
+        // store belonging to some other identity says nothing about it.
+        let ranBefore =
+            Key.olderVersions.contains { defaults.object(forKey: $0) != nil }
+            || (DefaultsPolicy.suiteName == nil && HistoryDatabase.hasStore)
+        guard !ranBefore else {
+            defaults.set(true, forKey: Key.completedSetup)
+            return
+        }
+
+        let opening = MenuBarParts.opening
+        defaults.set(opening.stored, forKey: Key.layout)
+        defaults.set(opening.storedOrder, forKey: Key.order)
+        // One item rather than three: three either fit or are dropped from the
+        // right one at a time, and a strip macOS truncated is the failure this
+        // whole flow exists to answer for.
+        defaults.set(true, forKey: Key.combined)
+        defaults.set(false, forKey: Key.completedSetup)
     }
 
     // MARK: - Launch at login

@@ -92,9 +92,35 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
         onVisibilityChange(true)
     }
 
+    /// One window, two things to hold: the first-run flow is a column of text,
+    /// and a thousand points of width around it is an empty room. The rooms
+    /// behind it are a sidebar with a chart beside it, and cramping those into
+    /// the flow's width is the other half of the same mistake.
+    private static let flowSize = NSSize(width: 680, height: 600)
+    private static let roomsSize = NSSize(width: 1000, height: 640)
+
+    /// Called on the one edge where the flow finishes, rather than from every
+    /// preference change, so it never argues with a window the user has resized
+    /// since.
+    func growToRooms() {
+        guard let window else { return }
+        window.setContentSize(Self.roomsSize)
+        window.center()
+    }
+
+    /// Brings the window back on whatever room it was showing — the answer to
+    /// launching Caliper again while it is already running.
+    ///
+    /// Its current room, not `returnSection`: a window closed on a process card
+    /// has already been moved off it by `windowWillClose`, and one still open on
+    /// a card is a card the user is reading.
+    func bringForward() {
+        show(navigation.section)
+    }
+
     private func makeWindow() -> NSWindow {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1000, height: 640),
+            contentRect: NSRect(origin: .zero, size: Self.roomsSize),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -118,7 +144,9 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
         if !window.setFrameUsingName("dashboard") {
             // Not the `contentRect` above: assigning the hosting controller
             // shrinks the window to the panes' *minimum*, 748 × 612.
-            window.setContentSize(NSSize(width: 1000, height: 640))
+            window.setContentSize(
+                preferences.hasCompletedSetup ? Self.roomsSize : Self.flowSize
+            )
             window.center()
         }
         window.setFrameAutosaveName("dashboard")
