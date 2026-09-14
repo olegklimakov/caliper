@@ -125,10 +125,22 @@ struct MenuBarParts: Equatable {
         return parts
     }
 
-    /// The drawings of whatever is in the strip, in the order it draws them.
+    /// The drawings of every module that is in the strip, in the order it draws
+    /// them.
     @MainActor
     var indicators: [any MenuBarIndicator] {
         enabled.map { $0.indicator(parts: self[$0]) }
+    }
+
+    /// Only the ones with something to say, which is what the status items
+    /// actually put up: `StatusItemController.refreshCombined` skips a module
+    /// whose identity is nil, and `refreshSeparate` gives it zero width. A Mac
+    /// that reports no temperature is the permanent case, the second before the
+    /// first sample lands is the transient one, and counting or drawing either
+    /// describes a strip that is not up there.
+    @MainActor
+    func indicators(drawing state: LiveMetrics) -> [any MenuBarIndicator] {
+        indicators.filter { $0.identity(state) != nil }
     }
 
     /// Whatever was stored, ignoring anything this build cannot use.
@@ -410,9 +422,16 @@ enum MenuBarBadge {
 /// which was that the padding is unknowable.
 @MainActor
 enum StripWidth {
-    static func points(of parts: MenuBarParts, combined: Bool) -> CGFloat {
-        let indicators = parts.indicators
-        guard !indicators.isEmpty else { return 0 }
+    static func points(
+        of parts: MenuBarParts,
+        drawing state: LiveMetrics,
+        combined: Bool
+    ) -> CGFloat {
+        let indicators = parts.indicators(drawing: state)
+        // What the strip is when nothing has a reading yet: one item holding
+        // the placeholder, whichever arrangement is set — see `drawPlaceholder`
+        // and the `standIn` in `refreshSeparate`.
+        guard !indicators.isEmpty else { return MenuBarMetrics.minimumWidth + itemPadding }
         if combined {
             return CombinedStrip.width(of: indicators) + itemPadding
         }

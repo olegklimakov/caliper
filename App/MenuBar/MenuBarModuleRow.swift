@@ -118,11 +118,14 @@ struct MenuBarStripPreview: View {
     let metrics: LiveMetrics
 
     var body: some View {
-        let indicators = parts.indicators
+        // The ones with a reading, not every module switched on: a module the
+        // strip is leaving out would be drawn here as a blank slice, beside a
+        // number that had also counted it.
+        let indicators = parts.indicators(drawing: metrics)
         let style = IndicatorStyle(isTemplate: !coloured)
         HStack(spacing: combined ? 0 : MenuBarStripPreview.itemGap) {
             ForEach(Array(strips(of: indicators).enumerated()), id: \.offset) { _, strip in
-                Image(nsImage: CombinedStrip.image(of: strip, state: metrics, style: style))
+                Image(nsImage: image(of: strip, style: style))
                     .renderingMode(coloured ? .original : .template)
             }
         }
@@ -130,9 +133,20 @@ struct MenuBarStripPreview: View {
         .accessibilityHidden(true)
     }
 
-    /// One picture when the modules share an item, one each when they do not.
+    /// One picture when the modules share an item, one each when they do not —
+    /// and the placeholder the strip itself falls back to when no module has
+    /// anything to draw.
     private func strips(of indicators: [any MenuBarIndicator]) -> [[any MenuBarIndicator]] {
-        combined ? [indicators] : indicators.map { [$0] }
+        guard !indicators.isEmpty else { return [[]] }
+        return combined ? [indicators] : indicators.map { [$0] }
+    }
+
+    private func image(
+        of strip: [any MenuBarIndicator],
+        style: IndicatorStyle
+    ) -> NSImage {
+        guard !strip.isEmpty else { return MenuBarPlaceholder.image(style: style) }
+        return CombinedStrip.image(of: strip, state: metrics, style: style)
     }
 
     private static let itemGap: CGFloat = 14

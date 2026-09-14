@@ -184,6 +184,7 @@ struct WelcomeStep: View {
     private var width: String {
         let points = StripWidth.points(
             of: preferences.menuBar,
+            drawing: metrics,
             combined: preferences.combinesModules
         )
         return "This strip takes \(Int(points.rounded())) points of menu bar."

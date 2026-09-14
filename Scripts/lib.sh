@@ -64,6 +64,22 @@ caliper_stop() {
     [[ -n "$pid" ]] && kill "$pid" 2>/dev/null || true
 }
 
+# Waits for the app to be gone, rather than sleeping past it.
+#
+# `open` hands `--env` and `--args` only to a *new* instance and silently fronts
+# an existing one, so a launch that races the previous quit runs under the
+# previous settings domain. Observed rather than reasoned about: the smoke
+# test's first-run check went red because the relaunch landed on the instance
+# that was still shutting down, read the settled domain, and put up no window —
+# a `sleep 1` had been covering it.
+caliper_await_exit() {
+    local binary="${1:-}" i
+    for i in $(seq 1 20); do
+        [[ -z "$(caliper_pid "$binary")" ]] && return
+        sleep 0.5
+    done
+}
+
 # Physical footprint in megabytes, as `vmmap` reports it.
 #
 # The units vary with size — vmmap writes K, M or G — and an unrecognised one

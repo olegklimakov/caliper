@@ -99,8 +99,12 @@ measure() {
     shift 2
 
     echo "measuring $MINUTES min: $label"
-    pkill -x Caliper 2>/dev/null || true
-    # `-a` with `--args`, and only after the pkill: `open` hands arguments to a
+    # Scoped to the build under test, not `pkill -x Caliper`, which the name of
+    # an installed copy also answers to — the rule `lib.sh` states beside
+    # `caliper_pid`.
+    caliper_stop "$BINARY" 2>/dev/null || true
+    caliper_await_exit "$BINARY"
+    # `-a` with `--args`, and only after that: `open` hands arguments to a
     # *new* instance and silently just fronts an existing one.
     #
     # And in a domain of its own, which is what makes the window assertion below

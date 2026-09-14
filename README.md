@@ -76,7 +76,14 @@ resident.
 
 Memory is *physical footprint*, the figure Activity Monitor calls "Memory" —
 not RSS, which counts the shared system frameworks every Mac app maps whether
-Caliper runs or not. Measured on an M5 Pro with the default five-module strip.
+Caliper runs or not. Measured on an M5 Pro with four modules in the strip, which
+is what `Scripts/footprint_check.sh` pins.
+
+A share of one core is a property of the machine as much as of the app: the work
+in a sweep is roughly fixed, so a slower core spends a larger share of itself on
+it, and this figure has not been measured on one. The memory figure is the one
+that travels — nothing Caliper keeps in memory scales with how fast or how large
+the Mac is.
 
 ## Installing
 

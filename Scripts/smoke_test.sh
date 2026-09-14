@@ -38,7 +38,11 @@ SUITE_FRESH="caliper.smoketest.fresh.$$"
 SUITE_UPGRADE="caliper.smoketest.upgrade.$$"
 
 cleanup() {
-    pkill -x Caliper 2>/dev/null || true
+    # `caliper_stop`, never `pkill -x Caliper`: the name matches an installed
+    # copy in /Applications too, and killing the user's own running app to test
+    # a build is not a trade a harness gets to make. `lib.sh` says so where
+    # `caliper_pid` is defined, and this file was ignoring it.
+    caliper_stop "$BINARY" 2>/dev/null || true
     for suite in "$SUITE_SETTLED" "$SUITE_FRESH" "$SUITE_UPGRADE"; do
         defaults delete "$suite" 2>/dev/null || true
         rm -f "$HOME/Library/Preferences/$suite.plist"
@@ -60,13 +64,12 @@ seed_settled() {
     defaults write "$SUITE_SETTLED" menuBarOrder '(cpu, memory, network, disk, temperature)'
 }
 
-# Launches the app against one domain and waits for it to settle. Quits any
-# instance first rather than killing it: a kill throws away the minute of
-# history the recorder is holding.
+# Launches the app against one domain and waits for it to settle. Quits the
+# build under test first rather than killing it: a kill throws away the minute
+# of history the recorder is holding.
 launch_with() {
     caliper_stop "$BINARY" 2>/dev/null || true
-    pkill -x Caliper 2>/dev/null || true
-    sleep 1
+    caliper_await_exit "$BINARY"
     open --env "CALIPER_DEFAULTS_SUITE=$1" "$APP"
     sleep 4
 }
