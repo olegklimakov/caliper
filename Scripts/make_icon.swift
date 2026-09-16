@@ -179,12 +179,13 @@ if isDev {
         )
     )
     // Optical bounds rather than the typographic ones: "DEV" is three caps with
-    // no descender, and centring it on the line height would sit it low.
+    // no descender, and centring it on the line height would sit it low. They
+    // also settle the trailing kern, which `.kern` adds after the last glyph
+    // and no centring wants: measured here, optical bounds grow by two
+    // trackings over an unkerned run and typographic ones by three.
     let text = CTLineGetBoundsWithOptions(line, .useOpticalBounds)
     context.textPosition = CGPoint(
-        // Kerning is applied after the last glyph too, so the run is `tracking`
-        // wider than the letters are.
-        x: band.midX - (text.width - tracking) / 2 - text.minX,
+        x: band.midX - text.width / 2 - text.minX,
         y: band.midY - text.height / 2 - text.minY
     )
     CTLineDraw(line, context)

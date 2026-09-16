@@ -21,13 +21,19 @@ public enum HistoryDatabase {
     }
 
     /// Where the store lives: the group container for a build that actually
-    /// holds the entitlement, Application Support for everything else.
+    /// holds the entitlement, `Application Support/<folderName>` for everything
+    /// else.
     ///
     /// `containerURL(forSecurityApplicationGroupIdentifier:)` hands a path to
     /// any caller, entitled or not, and an unentitled process that writes there
     /// wedges the directory — even `readdir` blocks afterwards. So the
     /// entitlement is checked rather than the path.
-    public static func defaultURL() throws -> URL {
+    ///
+    /// The folder is named by the caller because the caller is the one that
+    /// knows which app it is: the development build is a separate app under a
+    /// separate identifier, and two of them recording into one SQLite file is
+    /// not a thing to find out about later.
+    public static func defaultURL(folderName: String) throws -> URL {
         let directory =
             groupContainer()
             ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
@@ -44,20 +50,6 @@ public enum HistoryDatabase {
             withIntermediateDirectories: true
         )
         return directory.appendingPathComponent("history.sqlite")
-    }
-
-    /// Named after the bundle, so that the development build ("Caliper Dev")
-    /// and a local Release build of the same source do not record into one
-    /// store. Only this path needs it: a build that reaches the group container
-    /// is signed, and the group belongs to the release alone.
-    ///
-    /// The fallback covers a host with no bundle name — the test runner.
-    private static var folderName: String {
-        guard
-            let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String,
-            !name.isEmpty
-        else { return "Caliper" }
-        return name
     }
 
     /// The group container, if this build is signed in a way that grants it.

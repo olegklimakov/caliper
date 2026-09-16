@@ -37,7 +37,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var openPanelMetrics: Set<MetricKind>?
 
     override init() {
-        if let store = try? HistoryStore() {
+        if let store = try? HistoryStore(
+            url: HistoryDatabase.defaultURL(folderName: AppInfo.name)
+        ) {
             history = HistoryReader(store: store)
             recorder = HistoryRecorder(store: store)
             processRecorder = ProcessHistoryRecorder(
