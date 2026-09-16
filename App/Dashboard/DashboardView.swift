@@ -83,7 +83,7 @@ struct DashboardView: View {
                 )
             }
         }
-        .navigationTitle("Caliper")
+        .navigationTitle(AppInfo.name)
     }
 
     /// Pinned rather than listed, so its selected look is drawn by hand — the

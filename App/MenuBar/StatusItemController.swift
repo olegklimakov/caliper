@@ -340,7 +340,7 @@ final class StatusItemController {
         ).target = self
         menu.addItem(.separator())
         menu.addItem(
-            withTitle: "Quit Caliper",
+            withTitle: "Quit \(AppInfo.name)",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )

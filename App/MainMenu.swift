@@ -26,7 +26,7 @@ enum MainMenu {
         let item = NSMenuItem()
         let menu = NSMenu()
         menu.addItem(
-            withTitle: "About Caliper",
+            withTitle: "About \(AppInfo.name)",
             action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
             keyEquivalent: ""
         )
@@ -45,7 +45,7 @@ enum MainMenu {
         )
         menu.addItem(.separator())
         menu.addItem(
-            withTitle: "Hide Caliper",
+            withTitle: "Hide \(AppInfo.name)",
             action: #selector(NSApplication.hide(_:)),
             keyEquivalent: "h"
         )
@@ -63,7 +63,7 @@ enum MainMenu {
         )
         menu.addItem(.separator())
         menu.addItem(
-            withTitle: "Quit Caliper",
+            withTitle: "Quit \(AppInfo.name)",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )

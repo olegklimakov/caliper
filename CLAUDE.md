@@ -20,6 +20,25 @@ They were moved out because most of the plan is about work that has not been
 done yet, and this repository is public. `docs/` still holds the screenshots
 the README uses, and those stay.
 
+## The development build
+
+Debug builds a *different app*: `Caliper Dev.app`,
+`com.olegklimakov.caliper.dev`, its own icon, its own settings domain, its own
+history store under `Application Support/Caliper Dev`, and no update feed.
+Release is untouched — `Caliper.app`, `com.olegklimakov.caliper`, the real
+appcast.
+
+**Install it only with `Scripts/install_dev.sh`**, which deletes the copy in
+`/Applications` before putting the new one there, and builds into `build/dd`.
+Never copy a bundle over one that is already there, and never point a dev build
+at another derived-data path: both leave a second app on the Mac that Spotlight,
+the Dock and the login items list show beside the first, with nothing to tell
+them apart.
+
+`assets/icon/AppIcon.icns` and `AppIcon-Dev.icns` are both generated from the
+same render by `Scripts/make_icons.sh` and committed; a build needs neither
+step.
+
 ## What stays public
 
 Source, `README.md`, `NOTICE`, `LICENSE`, `release-notes/`, the screenshots in
