@@ -93,7 +93,7 @@ final class DashboardWindowController: NSObject, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Caliper"
+        window.title = AppInfo.name
         window.contentViewController = NSHostingController(
             rootView: DashboardView(
                 metrics: metrics,

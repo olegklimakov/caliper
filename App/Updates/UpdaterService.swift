@@ -53,6 +53,18 @@ final class UpdaterService: NSObject, SPUStandardUserDriverDelegate {
 
     private var updater: SPUUpdater { controller.updater }
 
+    /// Whether this build has an appcast to poll. The development build's
+    /// `SPARKLE_FEED_URL` is empty, and an updater started without one would
+    /// offer it the *release* — a different identifier under a different name —
+    /// and install Caliper.app over Caliper Dev.app.
+    ///
+    /// An unstarted updater reports `canCheckForUpdates == false`, which is
+    /// already what the menu item and the settings button disable on.
+    private static var hasFeed: Bool {
+        let feed = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String
+        return !(feed ?? "").isEmpty
+    }
+
     init(activation: ActivationPolicy) {
         self.activation = activation
         // Placeholders: Swift wants every stored property set before
@@ -62,7 +74,7 @@ final class UpdaterService: NSObject, SPUStandardUserDriverDelegate {
         super.init()
 
         controller = SPUStandardUpdaterController(
-            startingUpdater: true,
+            startingUpdater: Self.hasFeed,
             updaterDelegate: nil,
             userDriverDelegate: self
         )
@@ -89,6 +101,7 @@ final class UpdaterService: NSObject, SPUStandardUserDriverDelegate {
     /// Asked for by hand. Sparkle shows its window straight away for this one:
     /// the user is waiting, and "no updates" is an answer.
     func checkForUpdates() {
+        guard canCheckForUpdates else { return }
         clearUnseenUpdate()
         activation.hold(.updater)
         updater.checkForUpdates()

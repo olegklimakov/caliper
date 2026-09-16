@@ -32,7 +32,7 @@ public enum HistoryDatabase {
             groupContainer()
             ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
                 .first?
-                .appendingPathComponent("Caliper", isDirectory: true)
+                .appendingPathComponent(folderName, isDirectory: true)
 
         guard let directory else {
             throw CocoaError(.fileNoSuchFile)
@@ -44,6 +44,20 @@ public enum HistoryDatabase {
             withIntermediateDirectories: true
         )
         return directory.appendingPathComponent("history.sqlite")
+    }
+
+    /// Named after the bundle, so that the development build ("Caliper Dev")
+    /// and a local Release build of the same source do not record into one
+    /// store. Only this path needs it: a build that reaches the group container
+    /// is signed, and the group belongs to the release alone.
+    ///
+    /// The fallback covers a host with no bundle name — the test runner.
+    private static var folderName: String {
+        guard
+            let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String,
+            !name.isEmpty
+        else { return "Caliper" }
+        return name
     }
 
     /// The group container, if this build is signed in a way that grants it.

@@ -4,9 +4,13 @@
 // continuous-corner shape, so the corners match every other Mac icon and the
 // margins are the ones the Dock expects.
 //
-// Usage: swift Scripts/make_icon.swift <source.png> <out.png>
+// `--dev` stamps the development build's badge over the same artwork, so the
+// two icons cannot drift apart: one crop, one grid, one shape, one file.
+//
+// Usage: swift Scripts/make_icon.swift <source.png> <out.png> [--dev]
 
 import AppKit
+import CoreText
 import SwiftUI
 
 func fail(_ message: String) -> Never {
@@ -15,11 +19,12 @@ func fail(_ message: String) -> Never {
 }
 
 let arguments = CommandLine.arguments
-guard arguments.count == 3 else {
-    fail("usage: make_icon.swift <source.png> <out.png>")
+guard arguments.count == 3 || (arguments.count == 4 && arguments[3] == "--dev") else {
+    fail("usage: make_icon.swift <source.png> <out.png> [--dev]")
 }
 let sourceURL = URL(fileURLWithPath: arguments[1])
 let outputURL = URL(fileURLWithPath: arguments[2])
+let isDev = arguments.count == 4
 
 guard
     let source = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
@@ -39,6 +44,15 @@ let bleed: CGFloat = 8
 /// A tile pixel is darker than this. The mark inside the tile is lighter in
 /// places, which is why the scan below takes a bounding box rather than a mask.
 let tileLuma = 128.0
+
+// The development badge. A band rather than a tint or a letter in a corner
+// because the icon has to be told apart at 16 pt, where the text below is gone
+// and a saturated strip along the bottom of a near-black tile is not.
+/// Apple's systemOrange, dark appearance — the badge sits on a dark tile.
+let badgeColour = CGColor(red: 1, green: 0.624, blue: 0.039, alpha: 1)
+let badgeHeightRatio: CGFloat = 0.22     // Of the tile.
+let badgeLabel = "DEV"
+let badgeTracking: CGFloat = 0.1         // Of the point size.
 
 /// The tile is the dark region in the render; the surround is the generator's
 /// pale backdrop.
@@ -141,6 +155,40 @@ let path = Path(
 context.addPath(path)
 context.clip()
 context.draw(cropped, in: shape.insetBy(dx: -bleed, dy: -bleed))
+
+if isDev {
+    // Drawn inside the clip, so the band's lower corners follow the squircle
+    // instead of squaring it off.
+    let band = CGRect(x: shape.minX, y: shape.minY, width: tile, height: tile * badgeHeightRatio)
+    context.setFillColor(badgeColour)
+    context.fill(band)
+
+    let pointSize = band.height * 0.58
+    let tracking = pointSize * badgeTracking
+    let line = CTLineCreateWithAttributedString(
+        NSAttributedString(
+            string: badgeLabel,
+            attributes: [
+                .font: NSFont.systemFont(ofSize: pointSize, weight: .heavy),
+                .kern: tracking,
+                // CoreText's own key: `.foregroundColor` carries an NSColor,
+                // and CTLineDraw wants a CGColor.
+                kCTForegroundColorAttributeName as NSAttributedString.Key:
+                    CGColor(gray: 0.08, alpha: 1),
+            ]
+        )
+    )
+    // Optical bounds rather than the typographic ones: "DEV" is three caps with
+    // no descender, and centring it on the line height would sit it low.
+    let text = CTLineGetBoundsWithOptions(line, .useOpticalBounds)
+    context.textPosition = CGPoint(
+        // Kerning is applied after the last glyph too, so the run is `tracking`
+        // wider than the letters are.
+        x: band.midX - (text.width - tracking) / 2 - text.minX,
+        y: band.midY - text.height / 2 - text.minY
+    )
+    CTLineDraw(line, context)
+}
 
 guard
     let output = context.makeImage(),
