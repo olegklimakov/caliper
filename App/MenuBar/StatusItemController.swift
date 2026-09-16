@@ -333,11 +333,13 @@ final class StatusItemController {
         ).target = self
         // With the dot showing the answer is already known, so the item is
         // named for what it will do. The only place the dot can be acted on.
-        menu.addItem(
-            withTitle: isUpdateAvailable ? "Update Available…" : "Check for Updates…",
-            action: #selector(checkForUpdates),
-            keyEquivalent: ""
-        ).target = self
+        if UpdaterService.hasFeed {
+            menu.addItem(
+                withTitle: isUpdateAvailable ? "Update Available…" : "Check for Updates…",
+                action: #selector(checkForUpdates),
+                keyEquivalent: ""
+            ).target = self
+        }
         menu.addItem(.separator())
         menu.addItem(
             withTitle: "Quit \(AppInfo.name)",

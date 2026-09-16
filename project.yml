@@ -100,8 +100,8 @@ targets:
         # login items list — could tell one from another or from an install.
         #
         # A separate identifier also hands the dev build its own `UserDefaults`
-        # domain and, through CFBundleName, its own history store; see
-        # HistoryDatabase.folderName.
+        # domain, and AppInfo.name hands it its own history store; see
+        # HistoryDatabase.defaultURL(folderName:).
         debug:
           PRODUCT_NAME: Caliper Dev
           PRODUCT_BUNDLE_IDENTIFIER: com.olegklimakov.caliper.dev
@@ -111,6 +111,12 @@ targets:
           # back and never starts the updater when it is empty.
           SPARKLE_FEED_URL: ""
           EXCLUDED_SOURCE_FILE_NAMES: AppIcon.icns
+          # And no entitlements, so it cannot claim the release's app group.
+          # Today an ad-hoc signature is what keeps it out of that container —
+          # HistoryDatabase.groupContainer checks the team identifier, not the
+          # entitlement — but a dev build signed with the real Developer ID
+          # would otherwise record straight into the release's history.
+          CODE_SIGN_ENTITLEMENTS: ""
     info:
       path: App/Info.plist
       properties:

@@ -13,7 +13,7 @@ import Sparkle
 @MainActor
 @Observable
 final class UpdaterService: NSObject, SPUStandardUserDriverDelegate {
-    /// The menu item and the button disable on it.
+    /// The settings button disables on it.
     private(set) var canCheckForUpdates = false
     private(set) var lastUpdateCheckDate: Date?
 
@@ -58,9 +58,10 @@ final class UpdaterService: NSObject, SPUStandardUserDriverDelegate {
     /// offer it the *release* — a different identifier under a different name —
     /// and install Caliper.app over Caliper Dev.app.
     ///
-    /// An unstarted updater reports `canCheckForUpdates == false`, which is
-    /// already what the menu item and the settings button disable on.
-    private static var hasFeed: Bool {
+    /// The menus read it too: an unstarted updater reports
+    /// `canCheckForUpdates == false`, which disables the settings button, but a
+    /// menu item AppKit auto-enables would stay live and do nothing.
+    static var hasFeed: Bool {
         let feed = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String
         return !(feed ?? "").isEmpty
     }
@@ -101,7 +102,6 @@ final class UpdaterService: NSObject, SPUStandardUserDriverDelegate {
     /// Asked for by hand. Sparkle shows its window straight away for this one:
     /// the user is waiting, and "no updates" is an answer.
     func checkForUpdates() {
-        guard canCheckForUpdates else { return }
         clearUnseenUpdate()
         activation.hold(.updater)
         updater.checkForUpdates()

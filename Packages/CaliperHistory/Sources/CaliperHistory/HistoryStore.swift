@@ -13,8 +13,8 @@ public struct HistoryStore: Sendable {
         self.queue = queue
     }
 
-    public init(url: URL? = nil) throws {
-        self.init(queue: try HistoryDatabase.open(at: url ?? HistoryDatabase.defaultURL()))
+    public init(url: URL) throws {
+        self.init(queue: try HistoryDatabase.open(at: url))
     }
 
     // MARK: - Writing
