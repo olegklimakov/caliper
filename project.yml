@@ -123,6 +123,11 @@ targets:
         # Menu bar accessory: no Dock icon, no main window.
         LSUIElement: true
         CFBundleDisplayName: $(PRODUCT_NAME)
+        # XcodeGen emits this one by default and the app leans on it: AppInfo
+        # and the history store's folder are both named from CFBundleName, and
+        # a default that went away would quietly put the dev build back under
+        # "Caliper". Stated here so it is a decision rather than an inheritance.
+        CFBundleName: $(PRODUCT_NAME)
         CFBundleIconFile: $(APP_ICON_NAME)
         # XcodeGen defaults these to 1.0/1 instead of the version settings.
         CFBundleShortVersionString: $(MARKETING_VERSION)
