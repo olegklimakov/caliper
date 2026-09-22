@@ -20,6 +20,7 @@ final class Preferences {
         static let processHistory = "recordProcessHistory"
         static let processRetention = "processHistoryRetention"
         static let pinnedProcesses = "pinnedProcesses"
+        static let alertRules = "alertRules"
     }
 
     /// Per module rather than one switch for the strip: a CPU sparkline earns
@@ -109,6 +110,33 @@ final class Preferences {
         pinnedProcesses.count < Self.pinLimit
     }
 
+    /// Standing questions about the record — see `AlertRule`.
+    ///
+    /// JSON rather than a plist shape of its own: a rule has five fields that
+    /// travel together and no defaults screen builds one field at a time, so
+    /// the shape the type already has is the shape worth storing. A rule that
+    /// fails to decode is dropped rather than crashing the launch it is read
+    /// on; a silent alert is recoverable, an app that will not start is not.
+    private(set) var alertRules: [AlertRule] {
+        didSet {
+            defaults.set(try? JSONEncoder().encode(alertRules), forKey: Key.alertRules)
+            onChange?()
+        }
+    }
+
+    func addAlertRule(_ rule: AlertRule) {
+        alertRules.append(rule)
+    }
+
+    func updateAlertRule(_ rule: AlertRule) {
+        guard let index = alertRules.firstIndex(where: { $0.id == rule.id }) else { return }
+        alertRules[index] = rule
+    }
+
+    func removeAlertRule(_ id: UUID) {
+        alertRules.removeAll { $0.id == id }
+    }
+
     /// A direct callback rather than an observation loop: re-arming
     /// `withObservationTracking` leaves a window where an edit is lost.
     var onChange: (() -> Void)?
@@ -130,6 +158,9 @@ final class Preferences {
             (defaults.string(forKey: Key.processRetention).flatMap(ProcessRetention.init(rawValue:)))
             ?? .week
         pinnedProcesses = Set(defaults.stringArray(forKey: Key.pinnedProcesses) ?? [])
+        alertRules =
+            (defaults.data(forKey: Key.alertRules)
+            .flatMap { try? JSONDecoder().decode([AlertRule].self, from: $0) }) ?? []
     }
 
     // MARK: - Launch at login

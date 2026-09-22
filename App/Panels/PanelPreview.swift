@@ -39,20 +39,37 @@ enum PanelPreview {
     }
 
     /// The overview, with the cursor parked on the moment worth reading.
+    ///
+    /// The span comes with the loader rather than being the pane's default: the
+    /// incident export renders whatever the user is looking at, and a week's
+    /// slice drawn under a header reading "last 24 hours" is a picture that lies
+    /// about itself.
+    ///
+    /// `showsControls` off is what the export asks for; see `OverviewPane`.
     static func renderOverview(
         metrics: LiveMetrics,
         history: DashboardHistory,
+        span: HistorySpan,
         cursor: Date,
-        appearance: NSAppearance
+        appearance: NSAppearance,
+        scale: CGFloat = 1,
+        showsControls: Bool = true
     ) -> NSImage? {
         render(
-            OverviewPane(metrics: metrics, preloaded: history, cursor: cursor),
+            OverviewPane(
+                metrics: metrics,
+                preloaded: history,
+                span: span,
+                cursor: cursor,
+                showsControls: showsControls
+            ),
             appearance: appearance,
             // Taller than the other panes, at the overview's own minimum: five
             // stacked charts and a list of processes do not fit in what one
             // chart needs, and a preview cropped short would hide the thing it
             // is meant to check.
-            height: 620
+            height: 620,
+            scale: scale
         )
     }
 
@@ -123,10 +140,51 @@ enum PanelPreview {
         render(ProcessesPane(preloaded: search, query: query), appearance: appearance)
     }
 
+    /// The cost section on its own: the whole settings pane needs an
+    /// `UpdaterService`, and building one starts Sparkle, which is not a thing
+    /// a picture should do.
+    ///
+    /// Drawn `.columns` where the room draws `.grouped`, because a grouped form
+    /// on macOS is scroll-backed and `ImageRenderer` draws those blank — the
+    /// same trap the overview's charts and the search room's list already work
+    /// around. So this checks the rows, their values and their wording; the
+    /// grouped chrome around them is Apple's and goes unchecked.
+    @MainActor
+    static func renderCost(
+        selfMetrics: SelfMetrics?,
+        storeSize: UInt64,
+        appearance: NSAppearance
+    ) -> NSImage? {
+        render(
+            Form { CostSection(selfMetrics: selfMetrics, storeSize: storeSize) }
+                .formStyle(.columns)
+                .padding(20),
+            appearance: appearance,
+            height: 260
+        )
+    }
+
+    /// The alerts section with rules standing in it, drawn the same way and for
+    /// the same reason as `renderCost`.
+    @MainActor
+    static func renderAlerts(preferences: Preferences, appearance: NSAppearance) -> NSImage? {
+        render(
+            Form { AlertsSection(preferences: preferences, monitor: nil) }
+                .formStyle(.columns)
+                .padding(20),
+            appearance: appearance,
+            height: 260
+        )
+    }
+
+    /// One point per pixel by default, which is what the preview harness
+    /// compares against the mockups. The export asks for two: that picture gets
+    /// opened on somebody else's Retina Mac.
     private static func render(
         _ pane: some View,
         appearance: NSAppearance,
-        height: CGFloat = 560
+        height: CGFloat = 560,
+        scale: CGFloat = 1
     ) -> NSImage? {
         let renderer = ImageRenderer(
             content: pane
@@ -134,7 +192,7 @@ enum PanelPreview {
                 .background(Color(nsColor: .windowBackgroundColor))
                 .environment(\.colorScheme, appearance.name == .darkAqua ? .dark : .light)
         )
-        renderer.scale = 1
+        renderer.scale = scale
         return renderer.nsImage
     }
 

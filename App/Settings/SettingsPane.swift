@@ -1,3 +1,4 @@
+import CaliperCore
 import CaliperHistory
 import SwiftUI
 
@@ -27,6 +28,9 @@ struct SettingsPane: View {
     /// there rather than a mock-up of it.
     let metrics: LiveMetrics
     let updater: UpdaterService
+    /// nil when there is no store to watch — the rules are still listed and
+    /// still editable, they simply have nothing to be evaluated against.
+    let alerts: AlertMonitor?
     @State private var launchesAtLogin: Bool
     @State private var loginError: String?
     @State private var confirming: Deletion?
@@ -64,12 +68,14 @@ struct SettingsPane: View {
         preferences: Preferences,
         history: HistoryActions?,
         metrics: LiveMetrics,
-        updater: UpdaterService
+        updater: UpdaterService,
+        alerts: AlertMonitor?
     ) {
         self.preferences = preferences
         self.history = history
         self.metrics = metrics
         self.updater = updater
+        self.alerts = alerts
         _launchesAtLogin = State(initialValue: preferences.launchesAtLogin)
     }
 
@@ -154,7 +160,6 @@ struct SettingsPane: View {
                 Button("Delete process history…") { confirming = .processHistory }
                     .disabled(history == nil)
 
-                LabeledContent("On disk", value: ByteFormatter.capacity(storeSize))
                 Button("Delete all history…") { confirming = .everything }
                     .disabled(history == nil)
                 if let deleteError {
@@ -173,6 +178,10 @@ struct SettingsPane: View {
             } message: { deletion in
                 Text(deletion.message)
             }
+
+            AlertsSection(preferences: preferences, monitor: alerts)
+
+            CostSection(selfMetrics: metrics.snapshot?.selfMetrics, storeSize: storeSize)
 
             Section("General") {
                 Toggle("Launch at login", isOn: $launchesAtLogin)
@@ -380,5 +389,52 @@ private struct MenuBarIndicatorPreview: View {
             // Everything it shows is in the row's own checkboxes and in the
             // status item this is a picture of.
             .accessibilityHidden(true)
+    }
+}
+
+/// What this app is costing, which is the one question the README answers with
+/// a table and every competitor's FAQ answers with "disable some modules".
+///
+/// **With this window open**, and that is not a caveat that can be dropped:
+/// reading the figure is what creates it. Menu-bar-only steady state is a
+/// different measurement — half an hour of a release build under
+/// `Scripts/footprint_check.sh` — and no number the app can take of itself
+/// while being looked at is that one. No figure from the harness is quoted
+/// here either: a constant baked into a settings row goes stale silently,
+/// where the README's table at least gets read when it is edited.
+///
+/// A view of its own so the preview harness can render it: `SettingsPane`
+/// needs an `UpdaterService`, and constructing one starts Sparkle's updater,
+/// which is not a thing a picture should do.
+struct CostSection: View {
+    let selfMetrics: SelfMetrics?
+    let storeSize: UInt64
+
+    var body: some View {
+        Section("What Caliper costs") {
+            LabeledContent(
+                "CPU",
+                // Of *one* core, the unit Activity Monitor's %CPU column uses
+                // — the same convention this app reports every other process
+                // in, and the one the README's table is quoted in.
+                value: selfMetrics.map {
+                    "\(PercentFormatter.string($0.cpu, decimals: 1)) of one core"
+                } ?? "—"
+            )
+            LabeledContent(
+                "Memory",
+                value: selfMetrics.map { ByteFormatter.memory($0.memoryFootprint) } ?? "—"
+            )
+            LabeledContent(
+                "Power",
+                value: selfMetrics.map { PowerFormatter.string($0.power) } ?? "—"
+            )
+            LabeledContent("History on disk", value: ByteFormatter.capacity(storeSize))
+            Text(
+                "What it costs right now, with this window open — which is the expensive state, because opening a window is how you come to read the figure. Menu-bar-only steady state is lower, and is measured over half an hour by the project's own harness rather than by this row."
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
     }
 }
