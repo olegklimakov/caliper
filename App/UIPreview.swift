@@ -213,13 +213,14 @@ enum UIPreview {
             let heat = exp(-pow((phase - 0.71) * 9, 2))
             let ripple = 0.5 + 0.5 * sin(phase * 34)
 
-            for (series, value) in [
-                MetricSeries.cpu: 0.06 + 0.72 * load + 0.04 * ripple,
+            let levels: KeyValuePairs<MetricSeries, Double> = [
+                .cpu: 0.06 + 0.72 * load + 0.04 * ripple,
                 .memory: 0.42 + 0.28 * phase + 0.03 * ripple,
                 .temperature: 37 + 29 * heat + 1.5 * ripple,
                 .networkDownload: 2e5 + 4.2e7 * load * ripple,
                 .diskRead: 1e5 + 9e6 * load * ripple,
-            ] {
+            ]
+            for (series, value) in levels {
                 samples.append(
                     HistorySample(
                         series: series,

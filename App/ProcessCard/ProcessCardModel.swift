@@ -151,7 +151,7 @@ final class ProcessCardModel {
             var probe = ProcessProbe(family: family)
             while !Task.isCancelled {
                 let reading = probe.sample()
-                await MainActor.run { self?.apply(reading) }
+                await self?.apply(reading)
                 try? await Task.sleep(for: .seconds(1))
             }
         }
