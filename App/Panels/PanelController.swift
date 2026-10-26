@@ -12,6 +12,10 @@ final class PanelController: NSObject, NSPopoverDelegate {
     private let preferences: Preferences
     private var popover: NSPopover?
     private var opened: Opened?
+    /// Clicks in other apps. `.transient` alone misses them: the app is an
+    /// accessory that never becomes active, so the popover is never key and
+    /// the first click outside only activates — it took several to close.
+    private var outsideClickMonitor: Any?
 
     /// The combined window is not a module and cannot be one — it is every
     /// module at once.
@@ -103,7 +107,25 @@ final class PanelController: NSObject, NSPopoverDelegate {
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         self.popover = popover
         opened = panel
+        installOutsideClickMonitor()
         onOpenChange?(metrics(of: panel))
+    }
+
+    /// Our own status item is not "outside": its click is the app's, so the
+    /// global monitor never sees it and `toggle` stays the one to close.
+    private func installOutsideClickMonitor() {
+        guard outsideClickMonitor == nil else { return }
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.close() }
+        }
+    }
+
+    private func removeOutsideClickMonitor() {
+        guard let monitor = outsideClickMonitor else { return }
+        NSEvent.removeMonitor(monitor)
+        outsideClickMonitor = nil
     }
 
     @ViewBuilder
@@ -155,6 +177,7 @@ final class PanelController: NSObject, NSPopoverDelegate {
         popover?.contentViewController = nil
         popover = nil
         opened = nil
+        removeOutsideClickMonitor()
         onOpenChange?(nil)
     }
 }
